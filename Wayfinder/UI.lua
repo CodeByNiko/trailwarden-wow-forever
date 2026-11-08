@@ -125,6 +125,7 @@ end
 function W.UpdateUI()
     if not frame then W.CreateUI() end
     local state=W.State;if not state then return end
+    frame.renderDecisionID=W.Decision and W.Decision.id or 0
     local p=state.profile;local r=W.CurrentRoute or {}
     fields.subtitle:SetText(string.format("%s  /  %s %s  /  %d",state.name,state.raceName,state.className,state.level))
     fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED STEP" or (p.includeGroup and "GROUP QUESTS" or "SOLO"))
@@ -146,9 +147,10 @@ function W.UpdateUI()
         if step then row.title:SetText(step.title);row.detail:SetText((step.target or W.MapName(step.mapID)).."  /  "..(step.mapID and W.MapName(step.mapID) or "Your bags")) end
     end
     local status=string.format("%s  /  %d active  /  %d completed  /  %d free slots",state.zone,#state.activeQuests,state.completedCount,state.freeSlots)
-    if not W.CatalogReady then status=status.."\n"..(W.DatabaseStatus or "Waiting for data")
+    if W.CatalogError then status=status.."\nQuest catalog needs attention / /wf debug"
+    elseif not W.CatalogReady then status=status.."\n"..(W.DatabaseStatus or "Waiting for data")
     elseif #(W.Unmapped or {})>0 then status=status.."\n"..#W.Unmapped.." deferred or unmapped quest(s)  /  /wf debug" end
-    if not state.historyReady then status=status.."\nAwaiting completed quest history" end
+    if not state.historyReady and not W.CatalogError and W.CatalogReady and #(W.Unmapped or {})==0 then status=status.."\nAwaiting completed quest history" end
     fields.status:SetText(status)
     local empty=not W.CatalogReady and "Reading quest data. Your next steps will appear here shortly."
         or #(W.Unmapped or {})>0 and "No further mapped steps yet. Some active quests need Questie, a different comfort setting or more complete quest data."
@@ -162,7 +164,8 @@ function W.UpdateUI()
 end
 function W.UpdateLiveUI()
     if not fields.distance or not W.CurrentRoute then return end
-    local n=W.NavigationInfo and W.NavigationInfo(W.CurrentRoute) or {}
+    local n=W.Navigation or {}
+    if W.Decision and n.decisionID~=W.Decision.id then fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route");return end
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))
     fields.navStatus:SetText(n.label or "")
 end
@@ -175,7 +178,7 @@ function W.ToggleUI()
     local p=W.GetProfile();p.panelHidden=not p.panelHidden;frame:SetShown(not p.panelHidden)
     if not p.panelHidden then W.Refresh(true) end
 end
-function W.ShowDiagnostics()
+function W.ShowDiagnostics(content)
     if not W.DiagnosticsFrame then
         local f=CreateFrame("Frame","WayfinderDiagnosticsFrame",UIParent,"BackdropTemplate");f:SetSize(510,370);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");f:EnableMouse(true);W.Backdrop(f)
         atText(f,"WAYFINDER / DIAGNOSTICS",12,C.cyan,16,16,470,20)
@@ -185,5 +188,5 @@ function W.ShowDiagnostics()
         local close=W.Button(f,"Close",110,function() f:Hide() end);close:SetPoint("BOTTOMRIGHT",-16,14)
         f.edit=edit;W.DiagnosticsFrame=f
     end
-    local f=W.DiagnosticsFrame;f.edit:SetText(W.Diagnostics());f:Show();f.edit:SetFocus();f.edit:HighlightText()
+    local f=W.DiagnosticsFrame;f.edit:SetText(type(content)=="string" and content or W.Diagnostics());f:Show();f.edit:SetFocus();f.edit:HighlightText()
 end

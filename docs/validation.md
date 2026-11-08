@@ -1,46 +1,26 @@
-# Validation for 1.1.0
+# Validation for 1.2.0
 
-93 deterministic scenario checks pass locally. The local runner used system Lua 5.4 with test-only compatibility aliases for Lua 5.1 globals; the release workflow installs and runs Lua 5.1 before it can publish a package.
+Run `python3 tools/check.py`. The fail-fast suite currently passes **165 checks** and **14 replay frames**:
 
-The scenarios cover:
+| Suite | Count | Coverage |
+| --- | ---: | --- |
+| Client/scenario integration | 120 | Existing 1.0/1.1 regressions, quest truth, profiles, catalog recovery, coordinates, decision ownership, UI callbacks and trace export |
+| Pure route engine | 24 | No-client execution, immutable inputs, deterministic ordering, score sums, queue legs, nearby work, Duskwood and Teldrassil journeys |
+| Provider/client contracts | 21 | Dot-call signatures, numeric zero/nil semantics, percent spawns, support strings, transient failures, race masks, observations, nullable client rows and shown/total log counts |
+| Journey replay | 10 frames | Expected decisions reproduced from synthetic serialized inputs |
+| Export replay | 4 frames | Exported synthetic integration decisions reproduced |
 
-- Night Elf Warrior class/race gating and local Teldrassil routing.
-- Existing Darkshire pickups and an already accepted Night Watch-style quest.
-- Per-character history, legacy display migration and retained turn-in events.
-- Single/all/negative prerequisites, exclusives and live offer overrides.
-- Completed group/high-level turn-ins while solo mode is active.
-- NPC kill targets, object-sourced items, multiple objectives, deliveries,
-  client-waypoint fallback and inventory quest starters.
-- Automatic advancement after acceptance; exclusion of completed objectives.
-- Full quest logs, group settings, comfort limits, focus release, stable spawn areas,
-  temporary skips, undo, skip expiration, pause and death.
-- Negative gossip scoped to the inspected NPC and quest snapshot; shared quests
-  cannot invent an NPC coordinate.
-- Independent distance, all four cardinal bearings using non-Cartesian world axes,
-  another continent, missing positions, owned waypoint cleanup and preserving a
-  waypoint selected by the user.
-- Updated map markers when an objective's target changes, without repeated replacement
-  of an unchanged marker.
-- Strict frame API doubles for panel/navigator creation, login and diagnostics.
+Local execution uses system Lua 5.4 with test-only Lua 5.1 compatibility globals. GitHub Actions installs Lua 5.1 and repeats all suites before release publication. A failing suite prevents packaging/release.
 
-The package builder validates every TOC dependency, the arrow asset, ZIP CRCs and
-the single `Wayfinder/` root. It writes deterministic metadata so the same source
-produces the same archive.
+Contract fixtures follow primary sources pinned for review:
 
-`docs/previews/` shows development renders made from the actual frame calls and
-synthetic quest data. They help inspect spacing and text regions; they are not
-screenshots from the Forever client and use a substitute font.
+- [QuestieDB documented API](https://github.com/Questie/QuestieDB/blob/5c14272d61ad2c8d08526b15d633322fc561588e/docs/api.md).
+- [Forever quest-log API](https://github.com/Gethe/wow-ui-source/blob/f0da0a9171aa736c8a64d2b3a8ae70195f5d2afb/Interface/AddOns/Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua).
 
-Live-client testing is still outstanding. In particular, actual database coverage,
-quest objective ordering, map/phase placement and native client behavior need the
-user's gameplay feedback. Automated scenarios cannot prove those external facts.
+The package builder validates TOC dependencies, arrow asset, ZIP CRCs and the single `Wayfinder/` root. Deterministic metadata produces identical archives from identical inputs.
 
-## Additional 1.1 regressions
+Development renders in `docs/previews/` come from actual frame calls with synthetic quest data and a substitute font. They support spacing review; they are not in-game screenshots.
 
-Similar creature names and reordered objectives; buy/search/defeat item instructions;
-non-mutating source metadata; invalid/degenerate/recovering map projections; missing
-facing; arrival jitter and exit; rejected native waypoint updates; saved display
-preference repair; expired undo state; retry/caching of optional modules; idle,
-movement and event refresh behavior; recovery after planner failure; actual settings
-callbacks; locked/unlocked drags; resume, visible undo, empty-list and compact-mode
-behavior; fitting long current titles inside their text allocation.
+Live-client testing remains outstanding. Synthetic scenarios and documented contracts cannot establish actual Forever database coverage, phase placement, transport behavior, or real event timing. `/wf debug` provides current diagnostics and `/wf trace` exports recent local decisions for reproducible follow-up. No real gameplay traces are bundled or claimed.
+
+Audit point 7 (performance profiling/budgets) is intentionally deferred. Existing 1.1 idle/movement regression checks remain, without a new performance claim.

@@ -9,14 +9,10 @@ local function makeStep(kind,q,point,target,suffix,source,objectiveText)
     elseif kind=="item" then instruction="Use "..target.." in your bags to begin this quest."
     else instruction=objectiveText or ("Work around "..target.." until the quest objective updates.") end
     return {kind=kind,key=W.StepKey(kind,q.id,suffix),questID=q.id,questName=name,title=(labels[kind] or "")..name,point=point,
-        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint}
-end
-local function observedPoint(id,kind,state)
-    local l=state.profile.locations[kind..":"..id]
-    if l then local p=W.Point(l.mapID,l.x,l.y);if p then p.name=l.name;return p end end
+        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)}
 end
 local function relationPoint(q,field,kind,state)
-    local seen=observedPoint(q.id,kind,state)
+    local seen=W.ObservedPoint(q.id,kind,state)
     if seen then return seen,"Observed in game" end
     return W.NearestPoint(W.RelationPoints(q.id,field),state.player,state.mapID),"QuestieDB"
 end
@@ -73,7 +69,7 @@ local function spawnPoints(spawns)
     local out={}
     for area,coords in pairs(spawns or {}) do
         local m=W.MapForArea(area)
-        for _,c in ipairs(coords) do local p=W.Point(m,c[1],c[2]);if p then out[#out+1]=p end end
+        for _,c in ipairs(coords) do local p=W.PercentPoint(m,c[1],c[2]);if p then out[#out+1]=p end end
     end
     return out
 end
@@ -85,6 +81,7 @@ function W.ActiveSteps(q,state)
         if p then out[1]=makeStep("turnin",q,p,p.name or "the quest receiver","",source) end
         return out
     end
+    if q.objectivesReady~=true then return out end
     local objectives=W.Q(q.id,"objectives") or {}
     for group=1,3 do
         local entries=objectives[group] or {}
@@ -137,24 +134,28 @@ function W.ActiveSteps(q,state)
     end
     if #out==0 and q.waypoint then out[1]=makeStep("objective",q,q.waypoint,"the next quest target","client","Client waypoint") end
     local hasDBObjectives=next(objectives)~=nil or trigger or W.Q(q.id,"extraObjectives")
-    if #out==0 and #q.objectives==0 and not hasDBObjectives then
+    if #out==0 and #q.objectives==0 and not hasDBObjectives and W.QuestFieldsHealthy(q.id) then
         local p,source=relationPoint(q,"finishedBy","turnin",state)
         if p then out[1]=makeStep("deliver",q,p,p.name or "the quest receiver","",source) end
     end
     return out
 end
-local function appendPickups(out,mapID,state)
+local function appendPickups(out,mapID,state,gates)
     local seen={}
     local function add(id,name)
-        if seen[id] or not W.IsQuestAvailable(id,state) then return end
+        if seen[id] then return end
         seen[id]=true
+        local verdict=W.QuestEligibility(id,state);gates[id]=verdict
+        if verdict.status~="eligible" then return end
         local p,source=relationPoint({id=id},"startedBy","pickup",state)
-        if p and p.mapID==mapID then out[#out+1]=makeStep("pickup",{id=id,title=name},p,p.name or "the quest giver","",source) end
+        if p and p.mapID==mapID then
+            local step=makeStep("pickup",{id=id,title=name},p,p.name or "the quest giver","",source);step.eligibility=verdict;out[#out+1]=step
+        end
     end
     for _,record in ipairs((W.CatalogByMap or {})[mapID] or {}) do
         if record.minLevel<=state.level and (record.level==0 or record.level>=state.level-6) and record.level<=state.level+state.profile.maxLevelAbove then add(record.id,record.name) end
     end
-    for id,offer in pairs(state.profile.offers) do if W.Now()-offer.seen<300 then add(id,offer.title) end end
+    for id,offer in pairs(state.profile.offers) do if offer.revision==state.revision and state.now-offer.seen>=0 and state.now-offer.seen<300 then add(id,offer.title) end end
 end
 local function itemPickups(out,state)
     for _,e in ipairs(W.ItemQuests or {}) do
@@ -169,107 +170,117 @@ local function itemPickups(out,state)
         end
     end
 end
-local function score(c,state,all)
-    local d=W.TravelCost(state.player,c.point)
-    if c.kind=="item" then d=0 end
-    c.distance=W.Distance(state.player,c.point);c.cluster=0
-    if c.point then
-        local seen={}
+-- Candidate collection is the only routing layer that reads provider APIs.
+function W.CollectCandidates(state)
+    local out,deferred,gates={},{},{}
+    if state.questLogReady then
+        for _,q in ipairs(state.activeQuests) do
+            local allowed,why=W.QuestPolicy(q.id,state,true)
+            if q.isComplete or (allowed and not q.failed) then
+                local steps=W.ActiveSteps(q,state)
+                for _,c in ipairs(steps) do out[#out+1]=c end
+                if #steps==0 then deferred[#deferred+1]={id=q.id,title=q.title,reason=q.objectivesReady and "No mapped target" or "Objective state unavailable"} end
+            else deferred[#deferred+1]={id=q.id,title=q.title,reason=why or "Failed quest"} end
+        end
+        if state.freeSlots>0 then appendPickups(out,state.mapID,state,gates);itemPickups(out,state) end
+        local localActions=0
+        for _,c in ipairs(out) do if c.mapID==state.mapID or c.kind=="item" then localActions=localActions+1 end end
+        if localActions==0 and state.freeSlots>0 and W.CatalogReady then
+            local zone=W.Zones[state.mapID];local maps={}
+            for _,id in ipairs(zone and zone.next or {}) do maps[id]=true end
+            if next(maps)==nil then for id,z in pairs(W.Zones) do if zone and z.region==zone.region and z.min<=state.level and z.max>=state.level then maps[id]=true end end end
+            local ordered={};for id in pairs(maps) do ordered[#ordered+1]=id end;table.sort(ordered)
+            for _,id in ipairs(ordered) do if id~=state.mapID then appendPickups(out,id,state,gates) end end
+        end
+    end
+    for _,c in ipairs(out) do c.ownerKey=state.key end
+    return {candidates=out,deferred=deferred,gates=gates,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
+end
+W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=150,leaveWorkAreaPenalty=450}
+local function score(c,state,all,origin,w)
+    local d=c.kind=="item" and 0 or W.TravelCost(origin,c.point)
+    local cluster=0;local seen={}
+    if c.point then for _,other in ipairs(all) do if other.questID~=c.questID and other.point and W.TravelCost(c.point,other.point)<w.clusterRadius and not seen[other.questID] then cluster=cluster+1;seen[other.questID]=true end end end
+    local action=0
+    if c.kind=="turnin" then
+        local proximity=math.max(0,math.min(1,(w.turninFadeRadius-d)/(w.turninFadeRadius-w.turninFullRadius)))
+        action=d*(w.turninFactor-1)+w.turninBonus*proximity
+    elseif c.kind=="pickup" then action=d*(w.pickupFactor-1)+w.pickupBase+(d<w.nearPickupRadius and w.nearPickupBonus or 0)
+    elseif c.kind=="deliver" then action=d*(w.deliveryFactor-1)+w.deliveryBase
+    elseif c.kind=="item" then action=w.item else action=w.objectiveBase end
+    local parts={distance=d,action=action,cluster=math.min(cluster,w.clusterLimit)*w.clusterBonus,zone=c.point and c.mapID~=state.mapID and w.zonePenalty or 0,class=c.classQuest and w.classBonus or 0,capacity=state.freeSlots<3 and c.kind=="turnin" and w.fullLogBonus or 0}
+    parts.batching=0
+    if c.kind=="turnin" and d>w.workAreaRadius and state.freeSlots>=3 then
         for _,other in ipairs(all) do
-            if other.questID~=c.questID and other.point and W.TravelCost(c.point,other.point)<300 and not seen[other.questID] then
-                c.cluster=c.cluster+1;seen[other.questID]=true
-            end
+            if other.kind=="objective" and other.point and W.TravelCost(origin,other.point)<=w.workAreaRadius then parts.batching=w.leaveWorkAreaPenalty;break end
         end
     end
-    local s=d
-    if c.kind=="turnin" then s=d*0.8-450
-    elseif c.kind=="pickup" then s=d*0.95+180;if d<350 then s=s-420 end
-    elseif c.kind=="deliver" then s=d*0.9+30
-    elseif c.kind=="item" then s=-800
-    else s=d+70 end
-    s=s-math.min(c.cluster,4)*65
-    if c.point and c.mapID~=state.mapID then s=s+800 end
-    if (W.Q(c.questID,"requiredClasses") or 0)>0 then s=s-60 end
-    if state.freeSlots<3 and c.kind=="turnin" then s=s-500 end
-    c.score=s
-    c.reason=c.kind=="turnin" and "Ready to hand in; this may open the next part of its chain."
-        or c.kind=="pickup" and "Gather a nearby quest before leaving this quest hub."
-        or c.kind=="item" and "A quest-starting item is already in your bags."
-        or "Continue a quest already in your log."
-    if c.cluster>0 then c.reason=c.reason.." "..c.cluster.." other quest step(s) are in this area." end
+    local value=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
+    return value,parts,cluster
 end
-local function fallback(state)
-    local text
-    if not W.CatalogReady then text=(W.DatabaseStatus or "Waiting for quest data")..(W.BuildingCatalog and (" ("..(W.CatalogProgress or 0).."%)") or "")
-    elseif state.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
-    elseif W.Unmapped and #W.Unmapped>0 then text="Some active quests have no usable target or are outside your comfort settings. Use Questie for their details, or enable group/harder quests in Settings."
-    else text="No eligible mapped quest step is available here. Speak with a quest giver so Wayfinder can learn the live offer, or refresh after updating QuestieDB." end
-    return {kind="wait",key="wait",title="Finding your next quest",instruction=text,reason="Progress is read from this character's quest log and completed quests.",target=state.zone}
+local function fallback(input)
+    local s,m=input.state,input.meta
+    local title,text="Finding your next quest"
+    if not s.questLogReady then title="Waiting for your quest log";text="The live quest log is not ready. Wayfinder will retry without guessing your progress."
+    elseif not m.ready then text=m.databaseStatus
+    elseif not s.historyReady then text="Waiting for completed quest history. Active quests remain usable; database pickups wait for confirmation."
+    elseif s.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
+    elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /wf debug for details."
+    else text="No eligible mapped step is available. Inspect a quest giver, restore skipped quests or refresh your quest data." end
+    return {kind="wait",key="wait",title=title,instruction=text,reason="Waiting for confirmed character data.",target=s.zone,ownerKey=s.key}
 end
-function W.PlanRoute(state,force)
-    state=state or W.State
-    if state.profile.paused then return {kind="wait",key="paused",title="Route paused",instruction="Resume when you want Wayfinder to plan your next quest step.",reason="Your quest progress is still recorded."},{} end
-    if state.dead then return {kind="wait",key="dead",title="Return to your character",instruction="Quest navigation resumes after you are alive again.",reason="Your current quest step is preserved."},{} end
-    local out={};W.Unmapped={}
-    for _,q in ipairs(state.activeQuests) do
-        local allowed,why=W.QuestPolicy(q.id,state,true)
-        if q.isComplete or (allowed and not q.failed) then
-            local steps=W.ActiveSteps(q,state)
-            for _,c in ipairs(steps) do out[#out+1]=c end
-            if #steps==0 then W.Unmapped[#W.Unmapped+1]={id=q.id,title=q.title,reason="No mapped target"} end
-        else W.Unmapped[#W.Unmapped+1]={id=q.id,title=q.title,reason=why or "Failed quest"} end
-    end
-    if state.freeSlots>0 then appendPickups(out,state.mapID,state);itemPickups(out,state) end
-    local localActions=0
-    for _,c in ipairs(out) do if c.mapID==state.mapID or c.kind=="item" then localActions=localActions+1 end end
-    -- Only consider changing questing zones when the present zone has no useful steps.
-    if localActions==0 and state.freeSlots>0 and W.CatalogReady then
-        local zone=W.Zones[state.mapID]
-        local maps={};for _,id in ipairs(zone and zone.next or {}) do maps[id]=true end
-        if next(maps)==nil then
-            for id,z in pairs(W.Zones) do if zone and z.region==zone.region and z.min<=state.level and z.max>=state.level then maps[id]=true end end
-        end
-        for id in pairs(maps) do if id~=state.mapID then appendPickups(out,id,state) end end
-    end
-    local candidates={}
-    for _,c in ipairs(out) do
+-- Pure selector: plain snapshot in, plain decision out. No game/provider/profile writes.
+function W.SelectRoute(input)
+    local state=input.state;local w=input.weights or W.RouteWeights
+    if state.profile.paused then return {kind="wait",key="paused",title="Route paused",instruction="Resume when you want Wayfinder to plan your next quest step.",reason="Quest progress is still recorded.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
+    if state.dead then return {kind="wait",key="dead",title="Return to your character",instruction="Quest navigation resumes after you are alive again.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
+    if not state.questLogReady then return fallback(input),{},{clearPin=false,candidates={}} end
+    local candidates={};local previous=input.previous
+    for _,raw in ipairs(input.meta.candidates) do
+        local c=W.Copy(raw)
         local skipped=state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID]
-        if not skipped or skipped<=W.Now() then candidates[#candidates+1]=c end
-    end
-    local previous=W.CurrentRoute
-    for _,c in ipairs(candidates) do
-        if previous and previous.key==c.key and c.kind=="objective" and previous.fingerprint==c.fingerprint then
-            c.point=previous.point;c.mapID=previous.mapID;c.x=previous.x;c.y=previous.y
+        if not skipped or skipped<=state.now then
+            if previous and previous.ownerKey==state.key and previous.key==c.key and c.kind=="objective" and previous.fingerprint==c.fingerprint and previous.targetRevision==c.targetRevision and previous.mapID==c.mapID then c.point=W.Copy(previous.point);c.mapID=previous.mapID;c.x=previous.x;c.y=previous.y end
+            c.score,c.scoreParts,c.cluster=score(c,state,input.meta.candidates,state.player,w)
+            c.distance=W.Distance(state.player,c.point)
+            c.reason=c.kind=="turnin" and "Ready to hand in; this may open the next chain step." or c.kind=="pickup" and "Gather a nearby quest before leaving this hub." or c.kind=="item" and "A quest-starting item is already in your bags." or "Continue a quest already in your log."
+            if c.cluster>0 then c.reason=c.reason.." "..c.cluster.." other quest step(s) are nearby." end
+            candidates[#candidates+1]=c
         end
-        score(c,state,candidates)
     end
     table.sort(candidates,function(a,b) if a.score~=b.score then return a.score<b.score end return a.key<b.key end)
-    local best=candidates[1]
-    local pinFound=false
-    for _,c in ipairs(candidates) do
-        if state.profile.pinned==c.key then best=c;pinFound=true end
+    local best=candidates[1];local pinned=state.profile.pinned;local foundPin=false
+    for _,c in ipairs(candidates) do if c.key==pinned then best=c;foundPin=true end end
+    if not foundPin and not input.force and previous and previous.ownerKey==state.key and best then
+        for _,c in ipairs(candidates) do if c.key==previous.key and c.score<=best.score+math.max(w.switchMargin,math.abs(best.score)*w.switchRatio) then best=c;break end end
     end
-    if state.profile.pinned and not pinFound then state.profile.pinned=nil end
-    if not state.profile.pinned and not force and previous and best then
-        for _,c in ipairs(candidates) do
-            if c.key==previous.key and c.score<=best.score+math.max(120,math.abs(best.score)*0.18) then best=c;break end
-        end
-    end
-    if not best then return fallback(state),{} end
+    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates}
+    if not best then return fallback(input),{},detail end
     local queue={};local used={[best.questID]=true};local from=best.point or state.player
     for _=1,4 do
         local nextStep,nextScore
         for _,c in ipairs(candidates) do
             if not used[c.questID] then
-                local s=W.TravelCost(from,c.point)+c.score*0.25
-                if not nextStep or s<nextScore then nextStep,nextScore=c,s end
+                -- Each queued leg is evaluated from the preceding step, not the player's original position.
+                local value=score(c,state,candidates,from,w)
+                if not nextStep or value<nextScore or value==nextScore and c.key<nextStep.key then nextStep,nextScore=c,value end
             end
         end
         if not nextStep then break end
         queue[#queue+1]=nextStep;used[nextStep.questID]=true;from=nextStep.point or from
     end
-    return best,queue
+    return best,queue,detail
 end
-function W.PinStep(step)
-    if step then W.GetProfile().pinned=step.key;W.CurrentRoute=nil;W.Refresh(true) end
+function W.PlanRoute(state,force,context)
+    context=context or {previous=W.CurrentRoute}
+    W.BeginDataCapture()
+    local ok,meta=pcall(W.CollectCandidates,state)
+    local facts=W.EndDataCapture()
+    if not ok then error(meta) end
+    meta.facts=facts
+    local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),force=force==true,weights=W.Copy(W.RouteWeights)}
+    local route,queue,detail=W.SelectRoute(input)
+    detail.input=input
+    return route,queue,detail
 end
+function W.PinStep(step) if step then W.GetProfile().pinned=step.key;W.Refresh(true) end end

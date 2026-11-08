@@ -1,10 +1,28 @@
 Wayfinder = Wayfinder or {}
 local W = Wayfinder
-W.Version = "1.1.0"
+W.Version = "1.2.0"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)
     if ok then return a,b,c,d end
+end
+function W.Call(fn,...)
+    if type(fn)~="function" then return "missing" end
+    local ok,a,b,c,d=pcall(fn,...)
+    if not ok then return "error",tostring(a) end
+    return "ok",a,b,c,d
+end
+function W.Copy(value,seen)
+    if type(value)~="table" then return value end
+    seen=seen or {};if seen[value] then return seen[value] end
+    local out={};seen[value]=out
+    for k,v in pairs(value) do out[W.Copy(k,seen)]=W.Copy(v,seen) end
+    return out
+end
+function W.ProviderIdentity()
+    local api=C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+    local _,build=W.Safe(GetBuildInfo)
+    return {version=W.Safe(api,"QuestieDB","Version") or "unknown",contract=LibQuestieDB and LibQuestieDB.contractVersion or 0,build=build or "unknown"}
 end
 function W.Now() return (GetServerTime and GetServerTime()) or (time and time()) or 0 end
 function W.Count(t) local n=0 for _ in pairs(t or {}) do n=n+1 end return n end
@@ -30,9 +48,8 @@ end
 local transforms={}
 function W.Point(mapID,x,y)
     if not W.IsFinite(mapID) or mapID<=0 or not W.IsFinite(x) or not W.IsFinite(y) then return nil end
-    if x>1 or y>1 then x,y=x/100,y/100 end
     if x<0 or x>1 or y<0 or y>1 then return nil end
-    local p={mapID=mapID,x=x,y=y}
+    local p={mapID=mapID,x=x,y=y,units="normalized",frame="uimap"}
     if C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D then
         local t=transforms[mapID]
         if not t then
@@ -50,9 +67,13 @@ function W.Point(mapID,x,y)
                 end
             end
         end
-        if t then p.continent=t.continent;p.wx=t.x+x*t.ex+y*t.sx;p.wy=t.y+x*t.ey+y*t.sy end
+        if t then p.continent=t.continent;p.wx=t.x+x*t.ex+y*t.sx;p.wy=t.y+x*t.ey+y*t.sy;p.ex=t.ex;p.ey=t.ey;p.sx=t.sx;p.sy=t.sy end
     end
     return p
+end
+function W.PercentPoint(mapID,x,y)
+    if not W.IsFinite(x) or not W.IsFinite(y) or x<0 or x>100 or y<0 or y>100 then return nil end
+    return W.Point(mapID,x/100,y/100)
 end
 function W.PlayerPoint()
     if not C_Map then return nil end

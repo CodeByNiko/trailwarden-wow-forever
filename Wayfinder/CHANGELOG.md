@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- Distinguish eligible, blocked and unknown quests; expire live offers after progress changes.
+- Validate saved profiles and repair malformed nested data.
+- Build catalogs transactionally, retain published data on failure and retry with bounds.
+- Separate percent and normalized coordinates; validate observation age, provider and entity identity.
+- Commit one decision for panel, navigation and map; isolate route selection from live reads.
+- Score each queue leg from its predecessor; preserve nearby unfinished work.
+- Add local decision trace/replay, provider/client contracts and whole-character journeys.
+- 165 automated checks plus 14 replay frames. Performance profiling remains deferred.
+
 ## 1.1.0
 
 - Match similar objective names by specificity, including reordered live rows.

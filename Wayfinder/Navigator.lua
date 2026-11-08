@@ -1,7 +1,6 @@
 local W=Wayfinder
 local frame,arrow,title,distance,status,here
 local ownWaypoint,lastStep
-local arrivalKey,wasArrived
 function W.PositionNavigator()
     if not frame then return end
     local p=W.GetProfile();local pos=p.navigatorPoint
@@ -10,46 +9,42 @@ function W.PositionNavigator()
     frame:SetScale(p.uiScale)
 end
 function W.Bearing(target,player)
-    if not target or not player then return nil end
-    if target.wx and player.wx then
-        if target.continent~=player.continent then return nil end
-        -- Derive east/north from the actual player map. WoW world axes are not
-        -- assumed to be Cartesian east/north, and map aspect ratios vary.
-        local sx=player.x<0.999 and 0.001 or -0.001
-        local sy=player.y<0.999 and 0.001 or -0.001
-        local east=W.Point(player.mapID,player.x+sx,player.y)
-        local south=W.Point(player.mapID,player.x,player.y+sy)
-        if east and east.wx and south and south.wx then
-            local ex,ey=(east.wx-player.wx)/sx,(east.wy-player.wy)/sx
-            local nx,ny=-(south.wx-player.wx)/sy,-(south.wy-player.wy)/sy
-            local el,nl=math.sqrt(ex^2+ey^2),math.sqrt(nx^2+ny^2)
-            if el>0 and nl>0 then
-                local dx,dy=target.wx-player.wx,target.wy-player.wy
-                return math.atan2((dx*ex+dy*ey)/el,(dx*nx+dy*ny)/nl)
-            end
-        end
-    end
-    return nil
+    if not target or not player or not target.wx or not player.wx or target.continent~=player.continent then return nil end
+    local ex,ey,nx,ny=player.ex,player.ey,player.sx and -player.sx,player.sy and -player.sy
+    if not ex or not ey or not nx or not ny then return nil end
+    local el,nl=math.sqrt(ex^2+ey^2),math.sqrt(nx^2+ny^2)
+    if el<=0 or nl<=0 then return nil end
+    local dx,dy=target.wx-player.wx,target.wy-player.wy
+    return math.atan2((dx*ex+dy*ey)/el,(dx*nx+dy*ny)/nl)
 end
-function W.NavigationInfo(route)
-    if not route or not route.point then
-        arrivalKey,wasArrived=nil,false
-        return {label=route and route.kind=="item" and "Use the item" or route and route.key=="paused" and "Navigation paused" or "No waypoint"}
-    end
-    local player=W.PlayerPoint();local point=W.Point(route.mapID,route.x,route.y)
-    if not player or not point then return {label="Position unavailable"} end
-    local d=W.Distance(player,point)
-    local key=W.GetCharacterKey()..":"..tostring(route.key)
-    if arrivalKey~=key then arrivalKey,wasArrived=key,false end
+function W.ComputeNavigation(route,player,facing,previous)
+    if not route or not route.point then return {label=route and route.kind=="item" and "Use the item" or route and route.key=="paused" and "Navigation paused" or "No waypoint"} end
+    if not player or not route.point then return {label="Position unavailable"} end
+    local point=route.point;local d=W.Distance(player,point)
+    local key=(route.ownerKey or "character")..":"..tostring(route.key)..":"..tostring(point.mapID)..":"..tostring(point.x)..":"..tostring(point.y)
     local radius=route.kind=="objective" and 45 or 22
-    local threshold=wasArrived and radius+12 or radius
-    wasArrived=d and d<=threshold or false
-    if wasArrived then return {distance=d,arrived=true,label=route.kind=="pickup" and "Accept at quest giver" or route.kind=="turnin" and "Turn in here" or route.kind=="deliver" and "Speak with quest receiver" or "Work in this area"} end
+    local threshold=previous and previous.arrivalKey==key and previous.arrived and radius+12 or radius
+    if d and d<=threshold then return {distance=d,arrived=true,arrivalKey=key,label=route.kind=="pickup" and "Accept at quest giver" or route.kind=="turnin" and "Turn in here" or route.kind=="deliver" and "Speak with quest receiver" or "Work in this area"} end
     local bearing=W.Bearing(point,player)
-    if not bearing then return {distance=d,label=(point.continent and player.continent and point.continent~=player.continent) and "Travel connection needed" or "Position unavailable"} end
-    local facing=W.Safe(GetPlayerFacing)
-    if not W.IsFinite(facing) then return {distance=d,label="Facing unavailable"} end
-    return {distance=d,bearing=bearing,facing=facing,label=route.mapID~=player.mapID and "Travel via roads / transit" or "Following your step"}
+    if not bearing then return {distance=d,arrivalKey=key,label=point.continent and player.continent and point.continent~=player.continent and "Travel connection needed" or "Position unavailable"} end
+    if not W.IsFinite(facing) then return {distance=d,arrivalKey=key,label="Facing unavailable"} end
+    return {distance=d,bearing=bearing,facing=facing,arrivalKey=key,label=point.mapID~=player.mapID and "Travel via roads / transit" or "Following your step"}
+end
+local function readNavigation(route,previous)
+    local copy=route and W.Copy(route)
+    if copy and copy.point then copy.point=W.Point(copy.mapID,copy.x,copy.y) end
+    return W.ComputeNavigation(copy,W.PlayerPoint(),W.Safe(GetPlayerFacing),previous)
+end
+local compatibilityNavigation
+function W.NavigationInfo(route)
+    compatibilityNavigation=readNavigation(route,compatibilityNavigation)
+    return compatibilityNavigation
+end
+function W.UpdateNavigation()
+    local decision=W.Decision
+    local n=readNavigation(decision and decision.route or W.CurrentRoute,W.Navigation)
+    n.decisionID=decision and decision.id or 0;W.Navigation=n
+    return n
 end
 function W.CreateNavigator()
     if frame then return end
@@ -74,7 +69,8 @@ function W.UpdateNavigator()
     if p.navigatorHidden then return end
     local r=W.CurrentRoute
     title:SetText(r and (r.questName or r.title) or "Preparing your route")
-    local n=W.NavigationInfo(r)
+    local n=W.Navigation or {label="Preparing navigation"}
+    frame.renderDecisionID=W.Decision and W.Decision.id or 0
     here:SetShown(n.arrived==true);arrow:Hide()
     if not n.arrived and n.bearing then
         arrow:SetRotation(-(n.bearing+n.facing));arrow:Show()
@@ -103,6 +99,7 @@ function W.ReleaseWaypoint()
     ownWaypoint=nil;lastStep=nil
 end
 function W.SyncWaypoint(route,force)
+    W.WaypointDecisionID=W.Decision and W.Decision.id or 0
     if not W.GetProfile().mapSync then W.ReleaseWaypoint();W.WaypointStatus="Map sync off";return end
     if not route or not route.point then W.ReleaseWaypoint();W.WaypointStatus="No mapped step";return end
     local signature=table.concat({route.key,tostring(route.mapID),string.format("%.5f",route.x),string.format("%.5f",route.y)},":")

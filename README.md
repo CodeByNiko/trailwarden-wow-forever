@@ -6,7 +6,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.1.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.2.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
@@ -27,11 +27,11 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 
 This is balanced quest routing, with a preference for coherent nearby work. It is a heuristic planner, not a claim of a globally fastest leveling route.
 
-## New in 1.1
+## New in 1.2
 
-The polish release adds stable arrival transitions, clearer buy/search/defeat instructions for item quests, an immediate Undo skip control, a useful empty-plan message and window locking. It fixes similar-name objective matching, rejected/stale map markers and the Resume route button. Stationary characters no longer trigger a full route plan every two seconds; quest events and meaningful movement still refresh the plan.
+The foundation release separates confirmed, blocked and unknown quest states; repairs saved profiles; rebuilds quest data transactionally with bounded retries; and validates position units, freshness and NPC identity. One committed decision now drives the guide, navigator and map marker. Routing preserves nearby unfinished work and evaluates each planned leg from the preceding stop.
 
-See [1.1 quality review](docs/V1.1-quality-review.md).
+A local `/wf trace` export makes decisions reproducible without uploading anything. See [foundation review](docs/V1.2-foundation.md) and [validation](docs/validation.md). Performance profiling and new budgets (audit point 7) remain deferred.
 
 ## Using it
 
@@ -52,6 +52,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | `/wf auto` | Toggle the native map waypoint; the custom arrow is independent |
 | `/wf reset` | Reset both window positions |
 | `/wf rebuild` | Rebuild the QuestieDB index after data changes |
+| `/wf trace` | Copy a bounded local decision replay; export before reload/logout |
 | `/wf debug` | Copyable local diagnostics; nothing is transmitted |
 
 ## First evening with your characters
@@ -62,7 +63,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 
 ## Scope and limits
 
-Forever quest data is still developing. The provider itself documents incomplete new content, objectives, restrictions and live placement. A database position can be absent or out of date; cave floors, phases, moving NPCs, unusual scripted/spell objectives and transport connections may require Questie or the quest text. A recent live offer can resolve incorrect availability data. Unknown active quests can use a client waypoint when one exists; otherwise they are shown as unmapped in diagnostics.
+Forever quest data is still developing. The provider itself documents incomplete new content, objectives, restrictions and live placement. A database position can be absent or out of date; cave floors, phases, moving NPCs, unusual scripted/spell objectives and transport connections may require Questie or the quest text. A fresh live offer can resolve incorrect static restrictions, but cannot override subsequent confirmed blocking progress. Incomplete quest history or a partial/collapsed quest log suspends database pickups; expand quest headers and run `/wf refresh` if diagnostics report an incomplete log. Unknown active quests can use a client waypoint when one exists; otherwise they are shown as unmapped in diagnostics.
 
 The arrow points toward a target; it does **not** calculate a terrain-safe path, bridge/cave entrances or boat schedules. Follow roads and use normal travel connections. It never displays a stale bearing when position data is missing or a target is on another continent. Distances are direct map distances, not walking distance.
 
@@ -70,6 +71,6 @@ The automated scenarios use synthetic client data modeled on the two character c
 
 ## Development and releases
 
-Lua files live in `Wayfinder/`; the TOC defines load order. `python3 tools/run_lua.py` runs the scenario checks. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs the scenarios under Lua 5.1 and publishes a release for a new TOC version.
+Lua files live in `Wayfinder/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts and replay verification. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs all checks under Lua 5.1 and publishes a release for a new TOC version.
 
 MIT license for Wayfinder's code and original arrow asset. Questie and QuestieDB are separate dependencies; no database or paid guide content is bundled.

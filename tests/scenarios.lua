@@ -121,7 +121,7 @@ npcs[303]={name="Wolf",spawns={[20]={{58,60}}}}
 npcs[304]={name="Dire Wolf",spawns={[20]={{68,60}}}}
 npcs[202]={name="Quartermaster",spawns={[20]={{57,61}}}}
 items[403]={name="Supply pack",vendors={202}}
-local numeric={requiredLevel=true,questLevel=true,requiredRaces=true,requiredClasses=true,requiredMaxLevel=true,requiredSpell=true,requiredSpecialization=true,specialFlags=true,questFlags=true,rank=true}
+local numeric={sourceItemId=true,zoneOrSort=true,nextQuestInChain=true,parentQuest=true,breadcrumbForQuestId=true,availableUntilCompleted=true,availableStartingWith=true,disabledByQuest=true,requiredLevel=true,questLevel=true,requiredRaces=true,requiredClasses=true,requiredMaxLevel=true,requiredSpell=true,requiredSpecialization=true,specialFlags=true,questFlags=true,rank=true}
 local function db(data)
  return {Get=function(id,key) local r=data[id];if not r then return nil end if r[key]~=nil then return r[key] end if numeric[key] then return 0 end if key=="startedBy" or key=="finishedBy" or key=="objectives" then return {} end end,
  GetAllIds=function() local ids={} for id in pairs(data) do ids[#ids+1]=id end table.sort(ids);return ids end}
@@ -131,7 +131,7 @@ LibQuestieDB={Quest=db(quests),Npc=db(npcs),Item=db(items),Object=db(objects),co
 local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=function(id) return id==17 end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Data","Tracking","Database","Planner","UI","Navigator","Core"}) do dofile("Wayfinder/"..file..".lua") end
+for _,file in ipairs({"Common","Data","Tracking","Database","Planner","UI","Navigator","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
 local W=Wayfinder
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
@@ -219,7 +219,7 @@ W.GetProfile().skipped.test=epoch-1;W.GetProfile();check("expired skips pruned",
 W.GetProfile().paused=true;plan();check("pause clears actionable route",W.CurrentRoute.key=="paused");W.GetProfile().paused=false
 player.dead=true;plan();check("death suspends quest navigation",W.CurrentRoute.key=="dead");player.dead=false
 -- Live negative gossip is scoped to this exact quest snapshot, not permanent.
-dwarf();log={};local gs=scan();offers={};W.ObserveGossip()
+dwarf();log={};local gs=scan();offers={};W.ObserveGossip();gs=W.ScanCharacter()
 check("live gossip removes phantom offers at the inspected NPC",not W.IsQuestAvailable(1,gs))
 log={{id=10,title="The Night Watch",rows={{type="monster",text="Skeleton",objectiveID=300}}}};gs=scan()
 check("quest changes invalidate negative gossip",W.IsQuestAvailable(1,gs))
@@ -317,6 +317,75 @@ local titleNode
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text==longTitle then titleNode=n end end
 check("long current titles shrink within their allocated text area",titleNode and titleNode.fontSize<16 and titleNode:GetStringHeight()<=43)
 W.CurrentRoute=originalRoute;W.UpdateUI()
+
+-- 1.2 foundation regressions; these were demonstrated during the audit.
+ne();player.guid="Player-Foundation";player.name="Foundation";log={};complete={};W.CurrentRoute=nil
+quests[1001]={name="Offer ending after turn-in",questLevel=7,startedBy={{201}},availableUntilCompleted=24}
+W.ObserveQuest(1001,quests[1001].name,"pickup");s=W.ScanCharacter();check("fresh offer initially eligible",W.IsQuestAvailable(1001,s))
+W.RememberTurnIn(24);s=W.ScanCharacter();local gate=W.QuestEligibility(1001,s)
+check("confirmed turn-in overrides old live offer",gate.status=="blocked" and gate.reason=="Availability ended by turn-in")
+quests[1002]={name="Disabled offer",questLevel=7,startedBy={{201}},disabledByQuest=26}
+W.ObserveQuest(1002,quests[1002].name,"pickup");log={{id=26,title="Blocking quest"}};s=W.ScanCharacter()
+check("active blocking quest overrides old offer",W.QuestEligibility(1002,s).status=="blocked")
+quests[1003]={name="Live race exception",questLevel=7,requiredRaces=4,startedBy={{201}}}
+log={};W.ObserveQuest(1003,quests[1003].name,"pickup");s=W.ScanCharacter();check("fresh observation can resolve a static race discrepancy",W.IsQuestAvailable(1003,s))
+log={{id=2,title="Warrior training"}};s=W.ScanCharacter();check("progression change invalidates a previous offer exception",not W.IsQuestAvailable(1003,s))
+local oldHistory=C_QuestLog.GetAllCompletedQuestIDs;C_QuestLog.GetAllCompletedQuestIDs=function() error("History loading") end
+log={};s=W.ScanCharacter();check("unavailable history stays unknown despite cached completions",not s.historyReady and W.QuestEligibility(36,s).status=="unknown")
+C_QuestLog.GetAllCompletedQuestIDs=oldHistory
+local oldInfo=C_QuestLog.GetInfo;log={{id=2,title="Warrior training"}};C_QuestLog.GetInfo=function() return nil end
+W.Refresh(true);check("incomplete log waits without producing actionable guidance",W.CurrentRoute.kind=="wait" and not W.State.questLogReady and not W.CurrentRoute.point)
+C_QuestLog.GetInfo=oldInfo
+local oldObjectives=C_QuestLog.GetQuestObjectives;C_QuestLog.GetQuestObjectives=function() return nil end
+s=W.ScanCharacter();check("unknown objective state is not treated as a delivery",not s.activeQuests[1].objectivesReady and #W.ActiveSteps(s.activeQuests[1],s)==0)
+C_QuestLog.GetQuestObjectives=oldObjectives
+s=W.ScanCharacter();local savedProfile=W.GetProfile();savedProfile.completed[777]=true;savedProfile.paused=not s.profile.paused
+check("captured state does not alias mutable saved progression",not s.completed[777] and s.profile.paused~=savedProfile.paused)
+savedProfile.paused=false
+savedProfile.skipped="bad";savedProfile.offers=42;savedProfile.locations=false;savedProfile.gossip="bad";savedProfile.panelPoint={point="BAD",relativePoint="CENTER",x=0,y=0}
+savedProfile=W.GetProfile();check("nested saved containers and invalid anchors recover",type(savedProfile.skipped)=="table" and type(savedProfile.offers)=="table" and type(savedProfile.locations)=="table" and type(savedProfile.gossip)=="table" and savedProfile.panelPoint==nil)
+quests[1004]={name="Receiver corrected",questLevel=7,finishedBy={{201}}}
+savedProfile.locations["turnin:1004"]={mapID=1431,x=.1,y=.1,units="normalized",name="Old receiver",entityID=201,entityKind="Npc",seen=epoch-1000000,provider=W.ProviderIdentity()}
+log={{id=1004,title="Receiver corrected",complete=true}};s=W.ScanCharacter();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("expired observation yields to current database receiver",activeSteps[1].mapID==1438)
+local location=savedProfile.locations["turnin:1004"];location.seen=epoch;location.provider.version="older-provider";s=W.ScanCharacter()
+check("provider version change invalidates observed coordinates",W.ObservedPoint(1004,"turnin",s)==nil)
+location.provider=W.ProviderIdentity();location.entityID=999;s=W.ScanCharacter();check("different NPC identity invalidates observation",W.ObservedPoint(1004,"turnin",s)==nil)
+check("percent coordinate conversion below one percent is explicit",math.abs(W.PercentPoint(1438,.5,.25).x-.005)<.000001 and W.Point(1438,50,25)==nil)
+-- Catalog replacement is atomic; failures are bounded and restartable.
+local published=W.CatalogByMap;local countBefore=W.CatalogCount;local originalSpawns=npcs[201].spawns
+npcs[201].spawns="malformed";W.BuildQuestCatalog(true)
+check("failed build releases the building flag",not W.BuildingCatalog and W.CatalogError~=nil)
+check("failed build retains the previously published index",W.CatalogByMap==published and W.CatalogCount==countBefore)
+drain();check("automatic failure retries are bounded",not W.BuildingCatalog and #tasks==0)
+npcs[201].spawns=originalSpawns;W.BuildQuestCatalog(true)
+check("partial new catalog is never published",W.CatalogByMap==published and W.BuildingCatalog)
+drain();check("explicit rebuild recovers and replaces catalog atomically",W.CatalogReady and not W.BuildingCatalog and W.CatalogError==nil and W.CatalogByMap~=published)
+-- Unreadable rows stay explicitly unknown; capture failures are contained.
+local rowAPI=C_QuestLog.GetInfo;C_QuestLog.GetInfo=function() return {isHeader=false,questID=0} end
+log={{id=2,title="Warrior training"}};W.Refresh(true);check("placeholder quest IDs do not imply a complete log",not W.State.questLogReady and W.CurrentRoute.kind=="wait")
+C_QuestLog.GetInfo=rowAPI
+local objectiveAPI=C_QuestLog.GetQuestObjectives;C_QuestLog.GetQuestObjectives=function() return {{text="Malformed objective",type="monster",numFulfilled="bad",numRequired=1}} end
+s=W.ScanCharacter();check("malformed objective counts remain unknown",not s.activeQuests[1].objectivesReady)
+C_QuestLog.GetQuestObjectives=objectiveAPI
+local captureAPI=W.ReadCharacter;W.ReadCharacter=function() error("synthetic capture failure") end
+W.Refresh(true);check("capture-stage failure clears actionable guidance safely",W.CurrentRoute.key=="error" and not W.CurrentRoute.point and W.Navigation.decisionID==W.Decision.id)
+W.ReadCharacter=captureAPI;W.Refresh(true)
+
+-- Every visible route consumer shares one committed decision.
+ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false}}}};W.Refresh(true)
+check("panel navigator and map consume one decision version",W.Decision.id==W.Navigation.decisionID and W.Decision.id==W.MainFrame.renderDecisionID and W.Decision.id==W.NavigatorFrame.renderDecisionID and W.Decision.id==W.WaypointDecisionID)
+local beforeInput=W.Json(W.Decision.detail.input);local statePin=W.Decision.detail.input.state.profile.pinned
+W.SelectRoute(W.Decision.detail.input)
+check("selector does not modify input or profile state",beforeInput==W.Json(W.Decision.detail.input) and statePin==W.Decision.detail.input.state.profile.pinned)
+log[#log+1]={id=36,title="Object starter"};W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_ACCEPTED",36);drain()
+log[1].complete=true;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain()
+table.remove(log,1);W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_TURNED_IN",2);drain()
+check("local replay retains accept objective and turn-in transitions",#(W.ReplayFrames or {})>=4)
+local export=W.ExportReplay("synthetic-contract")
+check("local replay contains objectives provider and expected decisions",export:find('"schema":1',1,true) and export:find('"objective',1,true) and export:find('"expected"',1,true) and export:find('"provider"',1,true))
+check("replay removes player identifiers",not export:find('Player-NE',1,true) and not export:find('Raelorn',1,true))
+local traceFile=io.open('tests/replay-export.json','w');traceFile:write(export);traceFile:close()
 
 print(string.format("%d scenario checks passed",passed))
 -- Export actual frame calls, not an independently designed mockup.
