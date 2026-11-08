@@ -82,7 +82,7 @@ function W.CreateUI()
     fields.source=atText(card,"",9,C.muted,12,125,304,13);fields.source:SetWordWrap(false)
     card:SetScript("OnEnter",function(self)
         local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
-        W.Tooltip(self,r.title or "Why this step?",{r.instruction,r.reason,z and z.hint,"Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow shows direction, not a terrain-safe path. Use roads and entrances.","Click a planned step to focus it. The plan updates as your quests change."})
+        W.Tooltip(self,r.title or "Why this step?",{r.instruction,W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction,r.reason,z and z.hint,"Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow is direction only. Cyan pins mark known cave entrances; gold pins mark objectives. A marker is not a walking path.","Click a planned step to focus it. The plan updates as your quests change."})
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");strip:SetPoint("TOPLEFT",16,-234);strip:SetSize(328,28);W.Backdrop(strip,C.raised)
@@ -214,6 +214,12 @@ function W.UpdateLiveUI()
     fields.xpETA:SetText(e.available and not e.paused and e.eta and ("~"..W.FormatETA(e.eta)) or "--")
     local n=W.Navigation or {}
     if W.Decision and n.decisionID~=W.Decision.id then fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route");return end
+    local travel=n.travel
+    local r=W.CurrentRoute
+    fields.instruction:SetText(travel and travel.instruction or r.instruction or "Reading your quest progress...")
+    local entrance=travel and travel.mode=="cave-approach"
+    local point=entrance and travel.entry or r.point
+    fields.source:SetText(point and string.format("%s  /  %.1f, %.1f  /  %s",W.MapName(point.mapID),point.x*100,point.y*100,entrance and (point.accessSource or "Entrance") or r.source or "Live state") or ((W.State and W.State.zone or "").."  /  Live state"))
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))
     fields.navStatus:SetText(n.label or "")
 end

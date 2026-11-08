@@ -4,6 +4,10 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest installable version](https://github.com/CodeByNiko/wayfinder-wow-forever/releases/latest)**
 
+## Unreleased 1.7 development branch
+
+This branch contains the **OpenMap navigation foundation**, with known cave entrance guidance and access/objective markers. It has no additional navigation-addon dependency. A validated pedestrian graph and walking-route line are still outstanding, so this is **not a finished 1.7 release**. The stable download remains 1.6.0. See [development scope and prerequisites](https://github.com/CodeByNiko/wayfinder-wow-forever/blob/feature/v1.7-openmap-navigation/docs/V1.7-openmap-navigation.md).
+
 ## Install or update
 
 1. Download `Wayfinder-1.6.0-Forever.zip` under the release's **Assets**.

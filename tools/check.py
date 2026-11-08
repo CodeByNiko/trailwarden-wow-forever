@@ -9,6 +9,7 @@ commands=[
  ['tools/run_lua.py','tests/provider_contract.lua'],
  ['tools/run_lua.py','tests/experience.lua'],
  ['tools/run_lua.py','tests/safety.lua'],
+ ['tools/run_lua.py','tests/travel.lua'],
  ['tools/replay.py','tests/journey-replay.json'],
  ['tools/replay.py','tests/replay-export.json'],
  ['tools/replay.py','tests/experience-replay.json'],

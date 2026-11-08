@@ -1,3 +1,9 @@
+# Unreleased 1.7 development validation
+
+The OpenMap-only access foundation passes **366 checks and 37 replay frames**: 171 client/scenario, 49 pure engine, 21 provider/client, 56 experience, 36 combat safety and 33 access/map tests. These check cave-stage truth, live POI precedence, reference fallback, inverse map transforms, actual HBD call signatures, marker ownership/reuse and arrival text. No external navigation engine is used.
+
+A walking graph and actual minimap walking polyline are still missing. No test establishes terrain connectivity or live success. See [1.7 scope and release prerequisites](V1.7-openmap-navigation.md). This branch is not a release candidate.
+
 # Validation for 1.6.0
 
 Run `python3 tools/check.py`. The fail-fast suite currently passes **332 checks** and **37 replay frames**:

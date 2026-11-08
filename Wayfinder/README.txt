@@ -1,3 +1,9 @@
+UNRELEASED 1.7 DEVELOPMENT BRANCH
+This is not the finished minimap walking-route feature. The stable release
+remains 1.6.0. Known cave entrance guidance and OpenMap-compatible markers
+are implemented; a validated walking graph and path line remain outstanding.
+No additional navigation addon is required. /wf routepins toggles markers.
+
 WAYFINDER 1.6.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)

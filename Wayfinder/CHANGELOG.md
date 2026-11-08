@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7 development — unreleased
+
+- Separate quest target from cave access target.
+- Prefer live Forever entrance POIs, with labeled reference locations as fallback.
+- Add entrance/objective pins through HereBeDragons and OpenMap menu integration.
+- Suppress unsupported direct tunnel guidance; preserve quest-giver arrival instructions.
+- No additional navigation addon dependency; no full walking graph or walking line yet.
+- See docs/V1.7-openmap-navigation.md for release prerequisites and explicit limits.
+
 ## 1.6.0
 
 - Require known enemy levels within +2 of the player for automatic combat destinations.

@@ -7,7 +7,10 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 root = Path(__file__).resolve().parents[1]
 addon = root / 'Wayfinder'
 toc = (addon / 'Wayfinder.toc').read_text()
-version = re.search(r'^## Version: (\d+\.\d+\.\d+)$', toc, re.M).group(1)
+match = re.search(r'^## Version: (\d+\.\d+\.\d+)$', toc, re.M)
+if not match:
+    raise SystemExit('Unreleased development version: finish release prerequisites before packaging.')
+version = match.group(1)
 for entry in toc.splitlines():
     entry = entry.strip()
     if entry and not entry.startswith('#') and not (addon / entry).is_file():

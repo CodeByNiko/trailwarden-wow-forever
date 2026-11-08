@@ -6,10 +6,10 @@ from PIL import Image, ImageDraw, ImageFont
 root=Path(__file__).resolve().parents[1]
 font_path='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 version=re.search(r'## Version: (.+)',(root/'Wayfinder/Wayfinder.toc').read_text()).group(1)
-for subject in ('nightelf','dwarf','settings','empty','compact'):
+for subject in ('nightelf','dwarf','settings','empty','compact','cave'):
     data=json.loads((root/f'tests/ui-{subject}.json').read_text())
     image=Image.new('RGBA',(700,780),(15,23,32,255));draw=ImageDraw.Draw(image)
-    label=dict(nightelf='TELDRASSIL',dwarf='DUSKWOOD',settings='PREFERENCES',empty='PLANNED STEPS',compact='COMPACT GUIDE')[subject]
+    label=dict(nightelf='TELDRASSIL',dwarf='DUSKWOOD',settings='PREFERENCES',empty='PLANNED STEPS',compact='COMPACT GUIDE',cave='CAVE ACCESS')[subject]
     draw.text((28,20),f'WAYFINDER {version}  /  {label}',font=ImageFont.truetype(font_path,18),fill='#e4eced')
     coords={};visible={}
     def color(values,default):
