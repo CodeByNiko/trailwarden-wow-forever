@@ -130,7 +130,12 @@ function W.ReadCharacter()
     local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
     state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
-    if W.ObserveExperienceProgress then W.ObserveExperienceProgress(state);state.experience=W.ExperienceStats() end
+    if W.ObserveExperienceProgress then
+        local status,message=W.Call(W.ObserveExperienceProgress,state)
+        W.LearningError=status~="ok" and tostring(message) or nil
+        local xpStatus,xp=W.Call(W.ExperienceStats)
+        if xpStatus=="ok" and type(xp)=="table" then state.experience=xp else W.LearningError=tostring(xp) end
+    end
     return state
 end
 function W.ScanCharacter() local state=W.ReadCharacter();W.State=state;return state end

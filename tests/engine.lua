@@ -118,6 +118,43 @@ later.state.level=22;later.state.profile.maxLevelAbove=4;check("pure selector re
 later.state.profile.maxLevelAbove=2
 local rr,rq,rd=W.SelectRoute(later);local qkeys={};for _,value in ipairs(rq) do qkeys[#qkeys+1]=value.key end
 fixtureFrames[#fixtureFrames+1]={event="defer-until-level",input=later,expected={key=rr.key,queue=qkeys,clearPin=rd.clearPin==true}}
+-- Regional commitments survive volatile per-kill XP estimates and level-ups.
+local dusk=step("objective",800,.797,.685)
+local ridge=step("objective",801,.2,.2,1433)
+local function economy(rate)
+ return {rewardXP=rate,receiver=point(.797,.685),goals={},confidence="medium",interactionSeconds=3600}
+end
+dusk.economyModel=economy(4000);ridge.economyModel=economy(40000)
+local regional=input({ridge,dusk},.797,.685);regional.state.experience={enabled=true,moveSpeed=7,referenceRate=4000}
+local r1,q1,d1=W.SelectRoute(regional)
+check("initial regional plan prefers actual Duskwood work over speculative Redridge gain",r1.mapID==1431 and d1.commitment.mapID==1431)
+local stableRegion=true;local replayPrevious=r1;local replayCommitment=d1.commitment
+for kill=1,20 do
+ local value=W.Copy(regional);value.state.now=100+kill*20;value.state.level=kill>10 and 23 or 22
+ value.meta.candidates[1].economyModel.rewardXP=kill%2==0 and 150000 or 1000
+ value.meta.candidates[2].economyModel.rewardXP=kill%3==0 and 1000 or 8000
+ value.previous=W.Copy(replayPrevious);value.commitment=W.Copy(replayCommitment)
+ local chosen,queue,detail=W.SelectRoute(value)
+ if chosen.key~=dusk.key then stableRegion=false end
+ local keys={};for _,step in ipairs(queue) do keys[#keys+1]=step.key end
+ fixtureFrames[#fixtureFrames+1]={event="duskwood-kill-"..kill,input=value,expected={key=chosen.key,queue=keys,clearPin=detail.clearPin==true}}
+ replayPrevious=chosen;replayCommitment=detail.commitment
+end
+check("twenty kills and a level-up cause no Duskwood Redridge oscillation",stableRegion)
+local remaining=input({ridge},.797,.685);remaining.state.experience=regional.state.experience;remaining.commitment=d1.commitment;remaining.previous=r1
+local exhausted=W.SelectRoute(remaining);check("region changes when its usable batch is exhausted",exhausted.mapID==1433)
+local complete=input({ridge,step("turnin",800,.73,.46)},.797,.685);complete.commitment=d1.commitment;complete.previous=r1
+check("completed objective advances to local hand-in instead of holding stale work",W.SelectRoute(complete).kind=="turnin")
+local manual=W.Copy(regional);manual.releasePlan=true;manual.force=true
+check("explicit replan may evaluate a cross-zone alternative",W.SelectRoute(manual).mapID==1433)
+local move=W.Copy(regional);move.commitment=d1.commitment;move.previous=r1;move.previousMapID=1431;move.state.mapID=1433;move.state.player=point(.2,.2,1433)
+check("physically entering another quest zone adapts the commitment",W.SelectRoute(move).mapID==1433)
+local localSwitch=input({workA,workB},.65,.6);localSwitch.previous=W.Copy(workA);localSwitch.previous.ownerKey="character";localSwitch.meta.candidates[2].economyModel=economy(50000);localSwitch.state.experience=regional.state.experience
+check("unfinished objective remains committed despite higher estimated local XP",W.SelectRoute(localSwitch).key==workA.key)
+local currentSkipped=W.Copy(localSwitch);currentSkipped.state.profile.skipped["quest:"..workA.questID]=1000
+check("skip immediately releases committed objective",W.SelectRoute(currentSkipped).key~=workA.key)
+local updated=input({W.Copy(workA)},.65,.6);updated.previous=W.Copy(workA);updated.previous.ownerKey="character";updated.previous.fingerprint="old-count";updated.meta.candidates[1].fingerprint="new-count";updated.meta.candidates[1].point=point(.66,.6);updated.meta.candidates[1].x=.66
+check("partial progress does not chase a different spawn of the same objective",W.SelectRoute(updated).point.x==workA.point.x)
 local f=io.open("tests/journey-replay.json","w");f:write(W.Json({schema=1,origin="synthetic-journey",addonVersion=W.Version,frames=fixtureFrames}));f:close()
 print(passed.." pure engine checks passed")
 

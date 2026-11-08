@@ -101,6 +101,7 @@ COMBATLOG_XPGAIN_FIRSTPERSON="%s stirbt. Ihr erhaltet %d Erfahrung."
 reset();for i=1,9 do now=i*20;W.ExperienceEvent("CHAT_MSG_COMBAT_XP_GAIN","Test stirbt. Ihr erhaltet 100 Erfahrung.");xp=xp+100;W.SampleExperience() end
 e=W.ExperienceStats();check("enough rewarded kills establish an observed local grind rate",e.grind and e.grind.kills==9 and e.grind.rate>0)
 local best=step(90001,500);best.economy={xpPerHour=1000,confidence="medium"};state.player=point(0);state.now=now;state.profile=W.Copy(W.GetProfile());state.experience=e
+state.experience.inCombat=true;check("a kill during combat cannot start a new grind detour",W.ChooseGrindBreak(best,state,nil,{})==best);state.experience.inCombat=false
 local detail={};local grind=W.ChooseGrindBreak(best,state,nil,detail)
 check("observed better grind creates a bounded recommendation",grind.kind=="grind" and grind.grindUntil==now+180 and detail.questAlternative~=nil)
 best.economy.confidence="low";check("uncertain quest model does not trigger automatic grinding",W.ChooseGrindBreak(best,state,nil,{}).kind~="grind");best.economy.confidence="medium"

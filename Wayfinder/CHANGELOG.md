@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0
+
+- Separate XP event measurement, live step progression and regional planning.
+- Commit to a viable regional batch and unfinished objective instead of reacting to every XP estimate.
+- Reuse forecasts for 45 seconds; invalidate when goals, eligibility, catalog or travel materially change.
+- Coalesce quest events, ignore identical log updates and reduce idle/movement refresh churn.
+- Isolate XP sampling, learning, forecasting and per-quest target failures from the guide.
+- Preserve only freshly revalidated guidance after planner errors; never retain a completed objective.
+- Redesign XP display as labeled two-column metrics, with projections in the tooltip.
+- Add explicit regional replan in settings; Auto route keeps current region.
+- 291 checks and 36 replay frames, including a 20-kill/level-up zone-stability journey.
+
 ## 1.4.0
 
 - Measure rolling/session XP per hour from actual bar deltas and estimate time to next level.

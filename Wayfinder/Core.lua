@@ -10,20 +10,34 @@ local function render(name,fn,...)
 end
 function W.Refresh(force,trigger)
     local started=debugprofilestop and debugprofilestop()
-    W.PlanExecutions=(W.PlanExecutions or 0)+1;W.LastRefreshTime=W.Now()
-    local state,route,queue,detail
+    W.LastAttemptTime=W.Now()
+    render("experience",W.SampleExperience)
+    local state,route,queue,detail;local captured=false
     local ok,errorText=pcall(function()
-        W.SampleExperience()
-        state=W.ReadCharacter()
-        route,queue,detail=W.PlanRoute(state,force,{previous=W.Decision and W.Decision.route})
+        state=W.ReadCharacter();captured=true
+        local previous=W.Decision
+        local noisy=trigger=="QUEST_LOG_UPDATE" or trigger=="maintenance" or trigger=="XP_REVIEW"
+        if not force and noisy and previous and previous.state.key==state.key and previous.state.signature==state.signature and W.Now()-(W.LastRefreshTime or 0)<60 and not W.LastError then return end
+        W.PlanExecutions=(W.PlanExecutions or 0)+1;W.LastRefreshTime=W.Now()
+        route,queue,detail=W.PlanRoute(state,force,{previous=previous and previous.route,commitment=previous and previous.commitment,previousMapID=previous and previous.state.mapID,releasePlan=trigger=="manual-replan"})
         assert(type(route)=="table" and type(queue)=="table","Invalid planner result")
     end)
+    if ok and not route then return end
     if not ok then
+        route=nil;queue=nil;detail=nil
         W.LastError=tostring(errorText)
         state=state or W.Copy(W.State) or {key=W.GetCharacterKey(),name="Adventurer",className="Unknown",raceName="Unknown",zone="Unknown area",level=1,now=W.Now(),activeQuests={},completed={},completedCount=0,freeSlots=0,profile=W.GetProfile(),questLogReady=false,historyReady=false}
-        route={kind="wait",key="error",title="Waiting for reliable quest data",instruction="The current update could not be completed. Wayfinder will retry; /wf debug contains the details.",reason=W.LastError,ownerKey=state.key};queue={};detail={candidates={},clearPin=false}
+        -- Preserve only a step revalidated against the fresh live quest log.
+        local prior=W.Decision and W.Decision.route
+        local q=captured and state.questLogReady and prior and state.activeByID and state.activeByID[prior.questID]
+        if q and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
+            local status,steps=W.Call(W.ActiveSteps,q,state)
+            if status=="ok" then for _,step in ipairs(steps) do if step.key==prior.key then route=step;route.ownerKey=state.key;break end end end
+        end
+        if route then queue={};detail={clearPin=false,candidates={},commitment=W.Decision.commitment,recovering=true}
+        else route={kind="wait",key="error",title="Waiting for reliable quest data",instruction="The current update could not be completed. Wayfinder will retry; /wf debug contains the details.",reason=W.LastError,ownerKey=state.key};queue={};detail={candidates={},clearPin=false} end
     elseif W.LastError then W.RecoveredError=W.LastError;W.LastError=nil end
-    local decision={trigger=trigger or (force and "manual" or "refresh"),id=(W.Decision and W.Decision.id or 0)+1,state=state,route=W.Copy(route),queue=W.Copy(queue),detail=detail or {}}
+    local decision={trigger=trigger or (force and "manual" or "refresh"),id=(W.Decision and W.Decision.id or 0)+1,state=state,route=W.Copy(route),queue=W.Copy(queue),detail=detail or {},commitment=detail and detail.commitment}
     -- Publish one completed decision; every visible output consumes this version.
     W.Decision=decision;W.State=decision.state;W.CurrentRoute=decision.route;W.Queue=decision.queue
     W.Unmapped=detail and detail.input and detail.input.meta.deferred or {}
@@ -46,7 +60,7 @@ local function schedule(force,event)
         pending=false;local events={};for name in pairs(pendingEvents) do events[#events+1]=name end;table.sort(events);pendingEvents={}
         W.Refresh(force,table.concat(events,","))
     end
-    if C_Timer then C_Timer.After(.2,update) else update() end
+    if C_Timer then C_Timer.After(.5,update) else update() end
 end
 function W.Diagnostics()
     local s=W.State or W.ReadCharacter();local r=W.CurrentRoute or {};local n=W.Navigation or {}
@@ -60,11 +74,15 @@ function W.Diagnostics()
         "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /wf trace (last 20 decisions)","Deferred / unmapped:"}
     for _,issue in ipairs(s.readIssues or {}) do lines[#lines+1]="Read issue: "..issue end
     for _,q in ipairs(W.Unmapped or {}) do lines[#lines+1]=q.id.." / "..q.title.." / "..q.reason end
-    local e=W.ExperienceStats()
+    local e=W.SafeExperienceStats()
     lines[#lines+1]="XP: "..W.FormatXP(e.totalXP).." / rolling "..W.FormatXP(e.rate).." per hour / next level "..W.FormatETA(e.eta)
     lines[#lines+1]="XP sources: "..e.kills.." rewarded kills / "..e.turnins.." turn-ins / "..e.questXP.." event quest XP"
     lines[#lines+1]="XP pace: "..string.format("%.1f",e.moveSpeed).." yards/sec / "..string.format("%.1f",e.killSeconds).." seconds/kill"
     lines[#lines+1]="XP quest model: "..(r.economy and W.FormatXP(r.economy.xpPerHour) or "unknown").." / "..(r.economy and r.economy.confidence or "unknown")
+    lines[#lines+1]="Region plan: "..tostring(W.Decision and W.Decision.commitment and W.Decision.commitment.mapID)
+    lines[#lines+1]="Forecast error: "..tostring(W.ForecastError or "none").." / learning error: "..tostring(W.LearningError or "none")
+    lines[#lines+1]="Planning: "..tostring(W.PlanExecutions).." selections / "..tostring(W.ForecastBuilds or 0).." forecasts / "..tostring(W.ForecastCacheHits or 0).." cached forecasts"
+    for id,message in pairs(W.TargetErrors or {}) do lines[#lines+1]="Target "..id..": "..message end
     lines[#lines+1]="Active quest objectives:"
     for _,q in ipairs(s.activeQuests) do
         lines[#lines+1]=q.id.." / "..q.title.." / complete="..tostring(q.isComplete).." / objectives ready="..tostring(q.objectivesReady)
@@ -85,15 +103,18 @@ frame:SetScript("OnEvent",function(_,event,...)
         return
     end
     local args={...}
+    render("XP event",W.ExperienceEvent,event,unpack(args))
     local ok,message=pcall(function()
-        W.ExperienceEvent(event,unpack(args))
         if event=="QUEST_TURNED_IN" then W.RememberTurnIn(args[1]);W.ObserveQuest(args[1],nil,"turnin")
         elseif event=="GOSSIP_SHOW" or event=="QUEST_GREETING" then W.ObserveGossip()
         elseif event=="QUEST_DETAIL" then W.ObserveQuest(W.Safe(GetQuestID),W.Safe(GetTitleText),"pickup")
         elseif event=="QUEST_COMPLETE" then W.ObserveQuest(W.Safe(GetQuestID),W.Safe(GetTitleText),"turnin") end
     end)
     if not ok then W.EventError=tostring(message) end
-    schedule(false,event)
+    -- XP measurements are frequent; they do not invalidate the route after each kill.
+    if event=="PLAYER_XP_UPDATE" or event=="CHAT_MSG_COMBAT_XP_GAIN" or event=="PLAYER_FLAGS_CHANGED" then
+        if W.Now()-(W.LastRefreshTime or 0)>=60 and not W.Safe(InCombatLockdown) then schedule(false,"XP_REVIEW") end
+    else schedule(false,event) end
 end)
 local navElapsed,planElapsed,xpElapsed=0,0,0
 frame:SetScript("OnUpdate",function(_,dt)
@@ -105,9 +126,9 @@ frame:SetScript("OnUpdate",function(_,dt)
         if W.State then
             local current,previous=W.PlayerPoint(),W.State.player
             local changed=(current and not previous) or (previous and not current)
-            if current and previous then changed=current.mapID~=previous.mapID or W.TravelCost(current,previous)>=35 end
+            if current and previous then changed=current.mapID~=previous.mapID or W.TravelCost(current,previous)>=120 and W.Now()-(W.LastRefreshTime or 0)>=10 end
             local dead=W.Safe(UnitIsDeadOrGhost,"player")==true
-            if changed or dead~=W.State.dead or W.Now()-(W.LastRefreshTime or 0)>=15 or (W.CurrentRoute and W.CurrentRoute.key=="error") then W.Refresh(false,changed and "movement" or dead~=W.State.dead and "life-state" or "maintenance") end
+            if changed or dead~=W.State.dead or W.Now()-(W.LastRefreshTime or 0)>=60 or (W.CurrentRoute and W.CurrentRoute.key=="error") then W.Refresh(false,changed and "movement" or dead~=W.State.dead and "life-state" or "maintenance") end
         end
     end
 end)
@@ -120,7 +141,7 @@ SlashCmdList.WAYFINDER=function(message)
     elseif cmd=="arrow" then W.ToggleNavigator()
     elseif cmd=="settings" then W.ToggleSettings()
     elseif cmd=="lock" then p.locked=not p.locked;W.Refresh(true)
-    elseif cmd=="refresh" then p.pinned=nil;W.Refresh(true)
+    elseif cmd=="refresh" then p.pinned=nil;W.Refresh(true,"manual-replan")
     elseif cmd=="rebuild" then W.BuildQuestCatalog(true)
     elseif cmd=="skip" then W.SkipCurrent()
     elseif cmd=="later" then W.DeferCurrent()

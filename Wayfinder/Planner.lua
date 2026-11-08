@@ -174,6 +174,28 @@ local function itemPickups(out,state)
         end
     end
 end
+local forecastCache
+local function forecastCandidates(out,state)
+    local keys={tostring(state.revision),tostring(W.PublishedCatalogGeneration),tostring(state.profile.maxLevelAbove)}
+    for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
+    table.sort(keys);local stamp=table.concat(keys,"|")
+    local cache=forecastCache
+    if cache and cache.owner==state.key and cache.stamp==stamp and state.now-cache.at<45 and W.TravelCost(cache.player,state.player)<300 then
+        for _,c in ipairs(out) do
+            c.economyModel=W.Copy(cache.models[c.key]);c.economy=W.ProjectQuestXP(c.economyModel,state.player,state.experience)
+        end
+        state.experience.referenceRate=cache.referenceRate
+        W.ForecastCacheHits=(W.ForecastCacheHits or 0)+1
+        W.RecordFact("Planning",0,"forecastCacheAt",cache.at,"cached")
+        return
+    end
+    W.ForecastBuilds=(W.ForecastBuilds or 0)+1
+    local status,message=W.Call(W.PrepareQuestEconomies,out,state)
+    W.ForecastError=status~="ok" and tostring(message) or nil
+    if status~="ok" then for _,c in ipairs(out) do c.economy=nil;c.economyModel=nil end;return end
+    local models={};for _,c in ipairs(out) do models[c.key]=W.Copy(c.economyModel) end
+    forecastCache={owner=state.key,stamp=stamp,at=state.now,player=W.Copy(state.player),referenceRate=state.experience.referenceRate,models=models}
+end
 -- Candidate collection is the only routing layer that reads provider APIs.
 function W.CollectCandidates(state)
     local out,deferred,gates={},{},{}
@@ -181,9 +203,13 @@ function W.CollectCandidates(state)
         for _,q in ipairs(state.activeQuests) do
             local allowed,why=W.QuestPolicy(q.id,state,true)
             if q.isComplete or (allowed and not q.failed) then
-                local steps=W.ActiveSteps(q,state)
+                local status,steps=W.Call(W.ActiveSteps,q,state)
+                if status~="ok" or type(steps)~="table" then
+                    W.TargetErrors=W.TargetErrors or {};W.TargetErrors[q.id]=tostring(steps)
+                    steps={};deferred[#deferred+1]={id=q.id,title=q.title,reason="Target data temporarily unavailable"}
+                elseif W.TargetErrors then W.TargetErrors[q.id]=nil end
                 for _,c in ipairs(steps) do out[#out+1]=c end
-                if #steps==0 then deferred[#deferred+1]={id=q.id,title=q.title,reason=q.objectivesReady and "No mapped target" or "Objective state unavailable"} end
+                if #steps==0 and status=="ok" then deferred[#deferred+1]={id=q.id,title=q.title,reason=q.objectivesReady and "No mapped target" or "Objective state unavailable"} end
             else deferred[#deferred+1]={id=q.id,title=q.title,reason=why or "Failed quest"} end
         end
         if state.freeSlots>0 then appendPickups(out,state.mapID,state,gates);itemPickups(out,state) end
@@ -198,7 +224,7 @@ function W.CollectCandidates(state)
         end
     end
     for _,c in ipairs(out) do c.ownerKey=state.key end
-    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then W.PrepareQuestEconomies(out,state) end
+    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state) end
     return {candidates=out,deferred=deferred,gates=gates,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
 W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
@@ -262,7 +288,7 @@ function W.SelectRoute(input)
         local c=W.Copy(raw)
         local skipped=state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID]
         if not skipped or skipped<=state.now then
-            if previous and previous.ownerKey==state.key and previous.key==c.key and c.kind=="objective" and previous.fingerprint==c.fingerprint and previous.targetRevision==c.targetRevision and previous.mapID==c.mapID then c.point=W.Copy(previous.point);c.mapID=previous.mapID;c.x=previous.x;c.y=previous.y end
+            if previous and previous.ownerKey==state.key and previous.key==c.key and c.kind=="objective" and previous.targetRevision==c.targetRevision and previous.mapID==c.mapID and W.TravelCost(state.player,previous.point)<=600 then c.point=W.Copy(previous.point);c.mapID=previous.mapID;c.x=previous.x;c.y=previous.y end
             local level=(state.profile.deferredLevels or {})[c.questID]
             if level and level>state.level+state.profile.maxLevelAbove and c.kind~="turnin" then
                 c.levelDeferred=true;c.resumeLevel=math.max(1,level-state.profile.maxLevelAbove)
@@ -271,9 +297,19 @@ function W.SelectRoute(input)
             else candidates[#candidates+1]=c end
         end
     end
+    -- Regional commitment is independent of volatile XP estimates.
+    local commitment=input.commitment and input.commitment.ownerKey==state.key and W.Copy(input.commitment) or nil
+    local preferred=not input.releasePlan and commitment and commitment.mapID
+    local function hasZone(map)
+        for _,c in ipairs(candidates) do if c.mapID==map then return true end end
+    end
+    if input.previousMapID and input.previousMapID~=state.mapID and hasZone(state.mapID) then preferred=state.mapID end
+    if preferred and not hasZone(preferred) then preferred=nil end
+    if not input.releasePlan and not preferred and hasZone(state.mapID) then preferred=state.mapID end
     -- Score only actionable candidates: skipped quests must not hold a batch open.
     for _,c in ipairs(candidates) do
         c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w)
+        c.zoneRank=preferred and c.mapID and c.mapID~=preferred and 1 or 0
         c.distance=W.Distance(state.player,c.point)
         c.reason=c.batchBlocked and "Finish nearby accepted quest objectives before returning to town."
             or c.kind=="turnin" and "Ready to hand in; this may open the next chain step."
@@ -284,6 +320,7 @@ function W.SelectRoute(input)
         if c.economy then c.reason=c.reason.." Quest cycle: ~"..math.floor(c.economy.xpPerHour).." XP/h ("..c.economy.confidence.." confidence)." end
     end
     local function before(a,b)
+        if a.zoneRank~=b.zoneRank then return a.zoneRank<b.zoneRank end
         if a.batchBlocked~=b.batchBlocked then return not a.batchBlocked end
         if a.score~=b.score then return a.score<b.score end
         return a.key<b.key
@@ -292,12 +329,20 @@ function W.SelectRoute(input)
     local best=candidates[1];local pinned=state.profile.pinned;local foundPin=false
     for _,c in ipairs(candidates) do if c.key==pinned then best=c;foundPin=true end end
     if not foundPin and not input.force and previous and previous.ownerKey==state.key and best then
-        for _,c in ipairs(candidates) do if c.key==previous.key and (not c.batchBlocked or best.batchBlocked) and c.score<=best.score+math.max(w.switchMargin,math.abs(best.score)*w.switchRatio) then best=c;break end end
+        for _,c in ipairs(candidates) do if c.key==previous.key and c.zoneRank==best.zoneRank and (not c.batchBlocked or best.batchBlocked) then
+                if c.kind=="objective" or c.score<=best.score+math.max(w.switchMargin,math.abs(best.score)*w.switchRatio) then best=c;break end
+            end end
     end
     table.sort(levelDeferred,function(a,b) if a.resumeLevel~=b.resumeLevel then return a.resumeLevel<b.resumeLevel end return a.key<b.key end)
     local uniqueDeferred={};local seenDeferred={}
     for _,c in ipairs(levelDeferred) do if not seenDeferred[c.questID] then uniqueDeferred[#uniqueDeferred+1]=c;seenDeferred[c.questID]=true end end
     local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates,levelDeferred=uniqueDeferred}
+    if best then
+        local map=best.mapID or preferred or state.mapID
+        detail.commitment={ownerKey=state.key,mapID=map,startedAt=commitment and commitment.mapID==map and commitment.startedAt or state.now}
+        best.selectedAt=previous and previous.key==best.key and previous.selectedAt or state.now
+        best.reason=best.reason.." Finish the current regional batch before changing zones."
+    end
     local function withDeferred(queue)
         if #uniqueDeferred>0 and #queue>=4 then table.remove(queue) end
         for _,c in ipairs(uniqueDeferred) do if #queue>=4 then break end;queue[#queue+1]=c end
@@ -310,14 +355,15 @@ function W.SelectRoute(input)
     end
     local queue={};local used={[best.key]=true};local from=best.point or state.player
     for _=1,4 do
-        local nextStep,nextScore,nextBlocked
+        local nextStep,nextScore,nextBlocked,nextRank
         for _,c in ipairs(candidates) do
             if not used[c.key] then
                 -- Each queued leg is evaluated from the preceding step, not the player's original position.
                 local remaining={}
                 for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
                 local value,_,_,blocked=score(c,state,remaining,from,w)
-                if not nextStep or nextBlocked and not blocked or blocked==nextBlocked and (value<nextScore or value==nextScore and c.key<nextStep.key) then nextStep,nextScore,nextBlocked=c,value,blocked end
+                local rank=c.zoneRank
+                if not nextStep or rank<nextRank or rank==nextRank and (nextBlocked and not blocked or blocked==nextBlocked and (value<nextScore or value==nextScore and c.key<nextStep.key)) then nextStep,nextScore,nextBlocked,nextRank=c,value,blocked,rank end
             end
         end
         if not nextStep then break end
@@ -336,7 +382,7 @@ function W.PlanRoute(state,force,context)
     local facts=W.EndDataCapture()
     if not ok then error(meta) end
     meta.facts=facts
-    local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),force=force==true,weights=W.Copy(W.RouteWeights)}
+    local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
     local route,queue,detail=W.SelectRoute(input)
     detail.input=input
     return route,queue,detail

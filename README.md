@@ -6,7 +6,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.4.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.5.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
@@ -25,15 +25,17 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 - Provides an independent direction arrow and distance. Blizzard's native navigation display can remain disabled.
 - Handles Teldrassil and Duskwood with the same planner, with Alliance zone context and onward suggestions across level 1–60.
 
-XP-aware mode ranks available modeled cycles by estimated XP return, with a conservative discount for uncertain data. Local batching, eligibility and explicit focus remain constraints. Unknown cycles retain the normal questing fallback. This is a continuously updated heuristic, not a proof of a globally optimal route.
+XP-aware mode ranks modeled cycles within a committed region by estimated XP return, with a conservative discount for uncertain data. Regional continuity, unfinished work, eligibility and explicit focus remain constraints. Unknown cycles retain the normal questing fallback. This is a continuously updated heuristic, not a proof of a globally optimal route.
 
-## New in 1.4
+## New in 1.5
 
-**XP-aware questing and short grind comparisons.** The panel shows measured rolling XP/hour and estimated time to the next level. Quest projections consider eligible unaccepted quests as well as your current log, including travel, remaining work, kill XP and hand-ins. Compatible accepted quests sharing work areas/hand-in hubs are valued together without counting rewards twice.
+**Stable regional questing and a cleaner XP display.** XP changes no longer cause full planning after every kill. The planner commits to the current region while useful mapped steps remain, keeps an unfinished objective selected, and advances when progress makes that step invalid or complete. Level-ups reveal options without automatically sending you to another zone.
 
-The current Forever provider supplies rewards and quest targets, including its new quest corrections. Missing rewards stay unknown; unseen objective quantities and drop times remain explicitly uncertain. The model learns from your own movement and progress. With enough verified local kill data and a reliable quest alternative, it can suggest a short grind break and then resume questing. Existing local batching, manual focus, level deferrals and compact navigation remain.
+XP forecasts are reused for 45 seconds unless the goal set, eligibility, catalog or meaningful travel changes. Duplicate quest-log events do not rebuild unchanged plans. Forecast/learning failures fall back to normal quest guidance, and a planner error can retain only an independently revalidated live objective/hand-in.
 
-See [XP calculation and limits](docs/V1.4-experience.md). Audit point 7 remains deferred.
+The compact guide now gives measured XP/hour and next-level ETA their own readable two-column section. Uncertain quest/grind projections live in its tooltip. **Auto route** respects the regional batch; **Replan region now** in settings or `/wf refresh` explicitly reconsiders the wider route.
+
+See [stability and polish review](docs/V1.5-stability.md).
 
 ## Using it
 
@@ -47,7 +49,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | `/wf arrow` | Show/hide the navigator |
 | `/wf settings` | Open/close character preferences |
 | `/wf lock` | Lock/unlock window positions |
-| `/wf refresh` | Rescan progress and return to automatic routing |
+| `/wf refresh` | Explicitly reconsider the regional plan and return to automatic routing |
 | `/wf skip`, `/wf undo` | Defer for 15 minutes / undo the last timed or level skip |
 | `/wf later` | Defer the current above-range accepted quest until it fits your level settings |
 | `/wf scale 80` | Set panel scale to 80% (60–130%) |
@@ -62,7 +64,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | `/wf xpreset` | Reset this character’s current XP session, retaining learned pace |
 | `/wf debug` | Copyable local diagnostics; nothing is transmitted |
 
-Measured XP/h appears after 60 seconds. It includes actual XP from kills, quests and exploration, with travel and ordinary downtime in the denominator. Pause and AFK are excluded. Hover the XP lines for session statistics, estimate confidence and calculation details. Unknown rates show `--`; a zero measured rate has no finite level ETA.
+Measured XP/h appears after 60 seconds. Its dedicated section shows measured XP/hour and next-level ETA; projected quest/grind rates are in the hover details. It includes actual XP from kills, quests and exploration, with travel and ordinary downtime in the denominator. Pause and AFK are excluded. Hover the XP lines for session statistics, estimate confidence and calculation details. Unknown rates show `--`; a zero measured rate has no finite level ETA.
 
 A grind suggestion requires at least eight locally observed, verified rewarded kills over two minutes, a modeled quest alternative of medium confidence and at least a 25% rate advantage. It lasts at most three minutes, is rechecked as progress changes and can be dismissed with **Questing now**. A two-minute cooldown prevents immediate repetition. No fixed Classic grinding guide is bundled.
 

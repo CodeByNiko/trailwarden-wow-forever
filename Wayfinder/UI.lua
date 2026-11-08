@@ -48,7 +48,7 @@ end
 local function layout()
     local p=W.GetProfile();local compact=p.collapsed and not settingsOpen
     local count=p.queueRows
-    frame:SetHeight(settingsOpen and 626 or compact and 340 or 416+count*38)
+    frame:SetHeight(settingsOpen and 626 or compact and 374 or 450+count*38)
     fields.status:ClearAllPoints();fields.status:SetPoint("TOPLEFT",16,-(308+count*38))
     if settingsOpen then body:Hide();settings:Show() else body:Show();settings:Hide() end
     fields.thenLabel:SetShown(not compact and count>0);fields.status:SetShown(not compact)
@@ -61,7 +61,7 @@ function W.CreateUI()
     if frame then return end
     local p=W.GetProfile()
     frame=CreateFrame("Frame","WayfinderMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
-    frame:SetSize(360,492);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
+    frame:SetSize(360,526);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(358,50);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
@@ -103,18 +103,23 @@ function W.CreateUI()
         rows[i]=row
     end
     fields.status=atText(body,"",9,C.muted,16,384,328,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP")
-    fields.xp=atText(body,"",10,C.gold,16,0,328,14);fields.xp:ClearAllPoints();fields.xp:SetPoint("BOTTOMLEFT",16,66)
-    fields.xpRoute=atText(body,"",9,C.muted,16,0,328,13);fields.xpRoute:ClearAllPoints();fields.xpRoute:SetPoint("BOTTOMLEFT",16,51)
-    local xpHover=CreateFrame("Frame",nil,body);xpHover:SetPoint("BOTTOMLEFT",16,49);xpHover:SetSize(328,33);xpHover:EnableMouse(true)
+    local xpHover=CreateFrame("Frame",nil,body,"BackdropTemplate");xpHover:SetPoint("BOTTOMLEFT",16,52);xpHover:SetSize(328,52);xpHover:EnableMouse(true);W.Backdrop(xpHover,C.card)
+    atText(xpHover,"EXPERIENCE / HOUR",8,C.muted,12,8,148,12)
+    atText(xpHover,"NEXT LEVEL",8,C.muted,178,8,138,12)
+    fields.xp=atText(xpHover,"Learning...",16,C.gold,12,25,148,21)
+    fields.xpETA=atText(xpHover,"--",16,C.text,178,25,138,21)
+    local divider=xpHover:CreateTexture(nil,"ARTWORK");divider:SetColorTexture(unpack(C.line));divider:SetPoint("TOPLEFT",164,-10);divider:SetSize(1,32)
     xpHover:SetScript("OnEnter",function(self)
-        local e=W.ExperienceStats();local r=W.CurrentRoute or {};local m=r.economy
+        local e=W.SafeExperienceStats();local r=W.CurrentRoute or {};local m=r.economy
         W.Tooltip(self,"Experience and route estimates",{
             "Measured XP/h includes kills, quests and exploration. Travel and ordinary downtime count; pause/AFK do not.",
             "Session: "..W.FormatXP(e.totalXP).." XP / "..W.FormatXP(e.sessionRate).." XP/h. Rolling window: "..math.floor(e.windowSeconds/60).." min.",
             "Rewarded kills: "..e.kills.." / turn-ins: "..e.turnins..". Next level uses your measured rolling rate.",
             m and ("Route: ~"..W.FormatXP(m.xpPerHour).." XP/h / "..m.confidence.." confidence. "..(m.source or "Observed kills")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
             "Quest projections include remaining work, travel and reward collection. New unaccepted quest quantities may be uncertain.",
-            "Grind comparison needs at least 8 rewarded kills and 2 minutes in one area. /wf xpreset resets session statistics."})
+            "Grind comparison: "..W.FormatXP(e.grind and e.grind.rate).." XP/h from verified local kills.",
+            "The current region and unfinished objective stay committed; XP changes do not send you back and forth between zones.",
+            W.ForecastError and "Forecast temporarily unavailable. Normal quest guidance remains active." or "Grind comparison needs at least 8 verified kills over 2 minutes. /wf xpreset resets session statistics."})
     end)
     xpHover:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     fields.skip=W.Button(body,"Skip 15 min",96,function() local r=W.CurrentRoute;local state=W.State;if W.DeferLevel(r,state) then W.DeferCurrent() else W.SkipCurrent() end end);fields.skip:SetPoint("BOTTOMLEFT",16,12)
@@ -122,9 +127,9 @@ function W.CreateUI()
         local high=W.DeferLevel(r,state)
         if r and r.kind=="grind" then W.Tooltip(self,"Return to questing",{"End this grind break and resume the quest route. Automatic grind suggestions pause for two minutes."});return end
         W.Tooltip(self,high and "Skip for now" or "Defer this quest",{high and ("Keep this quest for later. It returns automatically at level "..(r.level-state.profile.maxLevelAbove).." with your current level range.") or "Skip the whole current quest for 15 minutes on this character.","Use Undo skip or click a Later step to resume immediately."}) end)
-    fields.refresh=W.Button(body,"Auto route",96,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true) end);fields.refresh:SetPoint("BOTTOMLEFT",118,12)
+    fields.refresh=W.Button(body,"Auto route",96,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true,"resume-auto") end);fields.refresh:SetPoint("BOTTOMLEFT",118,12)
     fields.arrow=W.Button(body,"Arrow: on",116,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,12)
-    settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(328,535)
+    settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(328,545)
     atText(settings,"YOUR JOURNEY",10,C.cyan,0,0,328,16)
     atText(settings,"Preferences are saved for this character.",10,C.muted,0,25,328,28)
     local definitions={
@@ -141,13 +146,14 @@ function W.CreateUI()
     }
     settingRows={}
     for i,d in ipairs(definitions) do
-        local b=W.Button(settings,"",328,function() local profile=W.GetProfile();d[3](profile);W.ApplyPositions();W.Refresh(true) end)
+        local b=W.Button(settings,"",328,function() local profile=W.GetProfile();d[3](profile);W.ApplyPositions();W.Refresh(false,"settings") end)
         b:SetPoint("TOPLEFT",0,-(58+(i-1)*29));b:SetHeight(26);settingRows[i]={button=b,definition=d}
     end
     local undo=W.Button(settings,"Restore skipped quests",328,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.GetProfile().deferredLevels={};W.GetProfile().lastDeferred=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-362)
     local reset=W.Button(settings,"Reset window positions",328,function() local profile=W.GetProfile();profile.panelPoint=nil;profile.navigatorPoint=nil;W.ApplyPositions() end);reset:SetPoint("TOPLEFT",0,-398)
-    local debug=W.Button(settings,"Copy diagnostics",328,function() W.ShowDiagnostics() end);debug:SetPoint("TOPLEFT",0,-438)
-    local back=W.Button(settings,"Back to your route",328,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-486)
+    local replan=W.Button(settings,"Replan region now",328,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.Refresh(true,"manual-replan") end);replan:SetPoint("TOPLEFT",0,-438)
+    local debug=W.Button(settings,"Copy diagnostics",328,function() W.ShowDiagnostics() end);debug:SetPoint("TOPLEFT",0,-474)
+    local back=W.Button(settings,"Back to your route",328,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-510)
     head:EnableMouseWheel(true)
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
     head:SetScript("OnEnter",function(self) W.Tooltip(self,"Wayfinder",{"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
@@ -160,7 +166,7 @@ function W.UpdateUI()
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     local p=state.profile;local r=W.CurrentRoute or {}
     fields.subtitle:SetText(string.format("%s  /  %s %s  /  %d",state.name,state.raceName,state.className,state.level))
-    fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED STEP" or (p.includeGroup and "GROUP QUESTS" or "SOLO"))
+    fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED STEP" or string.upper(state.zone or "QUESTING"))
     fields.action:SetText((W.ActionLabels[r.kind] or "ROUTE")..(r.level and r.level>0 and ("  /  LEVEL "..r.level) or "")..(W.DeferLevel(r,state) and "  /  ABOVE RANGE" or ""))
     fields.title:SetFont("Fonts\\FRIZQT__.TTF",16,"")
     fields.title:SetText(r.questName or r.title or "Preparing your route")
@@ -199,10 +205,10 @@ function W.UpdateUI()
 end
 function W.UpdateLiveUI()
     if not fields.distance or not W.CurrentRoute then return end
-    local e=W.ExperienceStats();local model=W.CurrentRoute.economy
-    local measured=e.available and (e.maximum==0 and "Level cap" or e.paused and "XP session paused" or e.rate and (W.FormatXP(e.rate).." XP/h  /  Next level ~"..W.FormatETA(e.eta)) or "XP/h: collecting data (60 seconds)") or "XP data unavailable"
+    local e=W.SafeExperienceStats();local model=W.CurrentRoute.economy
+    local measured=e.available and (e.maximum==0 and "Level cap" or e.paused and "Paused" or e.rate and W.FormatXP(e.rate) or "Learning...") or "Unavailable"
     fields.xp:SetText(measured)
-    fields.xpRoute:SetText("Quest ~"..W.FormatXP(W.CurrentRoute.kind=="grind" and W.Decision and W.Decision.detail.questAlternative and W.Decision.detail.questAlternative.economy and W.Decision.detail.questAlternative.economy.xpPerHour or model and model.xpPerHour).."/h  /  Grind "..W.FormatXP(e.grind and e.grind.rate).."/h measured")
+    fields.xpETA:SetText(e.available and not e.paused and e.eta and ("~"..W.FormatETA(e.eta)) or "--")
     local n=W.Navigation or {}
     if W.Decision and n.decisionID~=W.Decision.id then fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route");return end
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))
@@ -215,7 +221,7 @@ end
 function W.ToggleUI()
     if not frame then W.CreateUI() end
     local p=W.GetProfile();p.panelHidden=not p.panelHidden;frame:SetShown(not p.panelHidden)
-    if not p.panelHidden then W.Refresh(true) end
+    if not p.panelHidden then W.Refresh(false,"display") end
 end
 function W.ShowDiagnostics(content)
     if not W.DiagnosticsFrame then

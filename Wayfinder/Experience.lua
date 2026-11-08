@@ -315,6 +315,7 @@ function W.ChooseGrindBreak(best,state,previous,detail)
     if previous and previous.kind=="grind" and e.inCombat and (g.cooldownUntil or 0)<=state.now then
         detail.questAlternative=W.Copy(best);return W.Copy(previous)
     end
+    if e.inCombat then return best end
     if not best.economy or best.economy.confidence~="medium" then return best end
     if (g.cooldownUntil or 0)>state.now or not W.Distance(state.player,g.point) or W.Distance(state.player,g.point)>450 then return best end
     if g.rate<=best.economy.xpPerHour*1.25 then return best end
@@ -323,10 +324,20 @@ function W.ChooseGrindBreak(best,state,previous,detail)
     return {kind="grind",key="grind:observed",ownerKey=state.key,title="Grind briefly in this area",questName="Short grind break",target=state.zone,point=W.Copy(g.point),mapID=g.point.mapID,x=g.point.x,y=g.point.y,
         instruction="Grind nearby for up to 3 minutes. Your measured kill XP/h currently beats the quest estimate.",reason="Observed kill XP rate exceeds the estimated quest cycle by at least 25%.",source="Your recent kill XP",grindUntil=untilTime,economy={xpPerHour=g.rate,confidence="measured"}}
 end
-function W.FormatXP(value) return value and string.format("%.0f",value) or "--" end
+function W.FormatXP(value)
+    if not finite(value) then return "--" end
+    local digits=string.format("%.0f",value):reverse():gsub("(%d%d%d)","%1,"):reverse()
+    return (digits:gsub("^,",""))
+end
 function W.FormatETA(seconds)
     if not finite(seconds) then return "--" end
     local minutes=math.ceil(seconds/60)
     if minutes<60 then return minutes.."m" end
     return math.floor(minutes/60).."h "..(minutes%60).."m"
+end
+
+function W.SafeExperienceStats()
+    local status,e=W.Call(W.ExperienceStats)
+    if status=="ok" and type(e)=="table" then return e end
+    return {available=false,elapsed=0,totalXP=0,windowSeconds=0,kills=0,turnins=0,questXP=0,moveSpeed=7,killSeconds=35}
 end

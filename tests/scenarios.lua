@@ -241,7 +241,7 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 -- All UI and login code executes against a strict frame API double.
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
-check("main panel compact enough",W.MainFrame.w==360 and W.MainFrame.h==492)
+check("main panel compact enough",W.MainFrame.w==360 and W.MainFrame.h==526)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 -- 1.1 quality regressions.
@@ -287,11 +287,12 @@ ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,t
 local executions=W.PlanExecutions
 for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2) end
 check("standing still avoids repeated full planning",W.PlanExecutions==executions)
-epoch=epoch+6;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
-player.x=player.x+.01;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
-W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+3)
+epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
+epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
+log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+3)
+W.PinStep(W.ActiveSteps(W.State.activeByID[2],W.State)[1])
 local planAPI=W.PlanRoute;W.PlanRoute=function() error("synthetic planner failure") end;W.Refresh(true)
-check("planning failure produces recoverable visible state",W.CurrentRoute.key=="error" and W.LastError~=nil)
+check("planning failure retains a freshly verified unfinished step",W.CurrentRoute.questID==2 and W.CurrentRoute.kind=="objective" and W.LastError~=nil)
 W.PlanRoute=planAPI;W.Refresh(true);check("successful refresh clears current error and retains recovery details",W.LastError==nil and W.RecoveredError~=nil)
 -- Visible UI controls perform their advertised actions.
 W.ToggleSettings();local group=button("Quest difficulty:");group.scripts.OnClick();check("group setting callback updates character preference",W.GetProfile().includeGroup==true);group.scripts.OnClick()
@@ -309,7 +310,7 @@ W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately v
 W.Queue={};W.UpdateUI();local empty
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
 check("empty planned list explains what happens next",empty and empty.shown)
-W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==340 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==374 and not empty.shown and not undo.shown)
 W.GetProfile().collapsed=false;W.Refresh(true)
 local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
 W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
@@ -450,8 +451,8 @@ W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.Na
 check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
 W.GetProfile().locked=false
 check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==130 and W.NavigatorFrame.h==88)
-W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==568)
-W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==416)
+W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==602)
+W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==450)
 W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
 
 -- XP event wiring and real panel values, in addition to the isolated XP suite.
@@ -460,13 +461,45 @@ UnitXP=function() return testXP end;UnitXPMax=function() return 1000 end
 W.ResetExperience();epoch=epoch+60;testXP=300
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player");drain()
 check("client XP event refreshes the live session",W.ExperienceStats().totalXP==200 and W.ExperienceStats().rate==12000)
-local xpText=false;for _,node in ipairs(nodes) do if node.kind=="font" and node.text:find("12000 XP/h",1,true) then xpText=true end end
+local xpText=false;for _,node in ipairs(nodes) do if node.kind=="font" and node.text=="12,000" then xpText=true end end
 check("panel shows measured XP rate and next-level estimate",xpText and W.ExperienceStats().eta==210)
 check("XP gain and rewarded-kill events are registered",W.EventFrame.events.PLAYER_XP_UPDATE and W.EventFrame.events.CHAT_MSG_COMBAT_XP_GAIN)
 SlashCmdList.WAYFINDER("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
 SlashCmdList.WAYFINDER("xp");SlashCmdList.WAYFINDER("xpreset");check("session reset retains learned character preferences",W.ExperienceStats().totalXP==0 and W.GetProfile().xpRouting and W.GetProfile().queueRows==2)
 -- Leave a measured synthetic session for development UI renders.
 epoch=epoch+120;testXP=500;W.SampleExperience()
+
+-- Failure isolation and event-burst regression from live 1.4 feedback.
+ne();player.guid="Player-Stability";log={{id=2,title="Warrior training",rows={{type="monster",text="Forest creature: 0/4",numFulfilled=0,numRequired=4}}}}
+W.Refresh(false,"fault-test");W.PinStep(W.ActiveSteps(W.State.activeByID[2],W.State)[1]);W.GetProfile().pinned=nil;local initialPlans=W.PlanExecutions
+for i=1,20 do W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player");W.EventFrame.scripts.OnEvent(W.EventFrame,"CHAT_MSG_COMBAT_XP_GAIN","unparsed test") end;drain()
+check("XP and kill event burst does not invoke route planning",W.PlanExecutions==initialPlans)
+for i=1,10 do W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE") end;drain()
+check("duplicate quest-log events do not rebuild an unchanged plan",W.PlanExecutions==initialPlans)
+log[1].rows[1].numFulfilled=1;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain()
+check("actual partial progress refreshes the instruction once",W.PlanExecutions==initialPlans+1 and W.CurrentRoute.questID==2)
+local sampleXP=W.SampleExperience;W.SampleExperience=function() error("synthetic combat XP failure") end
+W.Refresh(false,"fault-test");check("XP sampling failure cannot erase valid quest guidance",W.CurrentRoute.questID==2 and W.CurrentRoute.kind=="objective")
+W.SampleExperience=sampleXP
+local learnXP=W.ObserveExperienceProgress;W.ObserveExperienceProgress=function() error("synthetic learning failure") end
+W.Refresh(false,"fault-test");check("learning failure is isolated from character capture",W.CurrentRoute.questID==2 and W.LearningError~=nil)
+W.ObserveExperienceProgress=learnXP
+local forecastXP=W.PrepareQuestEconomies;W.PrepareQuestEconomies=function() error("synthetic missing provider forecast") end
+epoch=epoch+46;W.Refresh(false,"fault-test")
+check("failed forecast falls back to quest routing rather than waiting card",W.CurrentRoute.questID==2 and W.ForecastError~=nil)
+W.PrepareQuestEconomies=forecastXP;W.Refresh(false,"fault-test")
+check("forecast recovers independently without resetting route",W.CurrentRoute.questID==2 and W.ForecastError==nil)
+local builds=W.ForecastBuilds or 0
+for i=1,3 do log[1].rows[1].numFulfilled=i;W.Refresh(false,"QUEST_LOG_UPDATE") end
+check("partial kills reuse forecast work while preserving live progress",(W.ForecastBuilds or 0)==builds and W.CurrentRoute.questID==2)
+local routeBefore=W.CurrentRoute
+local failPlan=W.PlanRoute;W.PlanRoute=function() error("synthetic planner fault") end
+log[1].complete=true;W.Refresh(false,"fault-test")
+check("recovery never preserves an objective after its quest completes",W.CurrentRoute.kind~="objective")
+W.PlanRoute=failPlan;W.Refresh(false,"fault-test")
+check("completed quest progresses after recovery",W.CurrentRoute.kind=="turnin")
+local countPlans=W.PlanExecutions;epoch=epoch+1;W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player");drain()
+check("post-turn-in XP measurement does not churn the planner",W.PlanExecutions==countPlans)
 
 -- Export actual frame calls, not an independently designed mockup.
 local function quote(v) return string.format('%q',v):gsub('\\\n','\\n') end
@@ -495,6 +528,8 @@ snapshot('tests/ui-dwarf.json')
 
 W.ToggleSettings();snapshot('tests/ui-settings.json');button("Back to your route").scripts.OnClick()
 W.Queue={};W.UpdateUI();snapshot('tests/ui-empty.json')
+W.GetProfile().collapsed=true;W.UpdateUI();snapshot('tests/ui-compact.json')
+W.GetProfile().collapsed=false;W.UpdateUI()
 
 
 print(string.format("%d scenario checks passed",passed))

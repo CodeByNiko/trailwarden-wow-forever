@@ -1,4 +1,4 @@
-WAYFINDER 1.4.0 — WORLD OF WARCRAFT: FOREVER
+WAYFINDER 1.5.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -25,7 +25,7 @@ The arrow has a transparent background. Locking prevents wheel resizing.
 /wf arrow     show/hide navigator
 /wf settings  open character preferences
 /wf lock      lock/unlock window positions
-/wf refresh   rescan and choose an automatic route
+/wf refresh   explicitly reconsider region and choose an automatic route
 /wf rebuild   rebuild the data index
 /wf skip      defer current quest for 15 minutes
 /wf later     save above-range accepted quest until within level range
@@ -42,12 +42,17 @@ The arrow has a transparent background. Locking prevents wheel resizing.
 /wf debug     copy local diagnostics
 /wf trace     copy recent local decisions for replay (before reload/logout)
 
+Regional batches remain committed while useful mapped work exists. XP events
+update measurement without rebuilding the whole plan after each kill. Accepted
+quests still advance from real progress. Auto route respects this region;
+Replan region now in settings or /wf refresh can reconsider other zones.
+
 XP/h and next-level ETA use actual XP bar gains, including kills and quests.
 Travel/downtime count; explicit pause/AFK do not. The first minute collects data.
 Quest XP/h is an estimate of the remaining cycle, not a guaranteed rate.
 Unknown new quest rewards remain unknown; current Forever data is used.
 Short grind suggestions require verified local kill data and a clear advantage.
-Hover the XP lines for details. Use Questing now to dismiss a grind break.
+Hover the two-column XP section for projected quest/grind rates and details. Use Questing now to dismiss a grind break.
 
 Data gaps in Forever can cause missing or inaccurate targets. For unmapped
 quests use Questie and the quest text. Progress, preferences and skips belong
