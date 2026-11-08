@@ -203,6 +203,12 @@ function W.UpdateUI()
     fields.skip:SetEnabled(r.questID~=nil or r.kind=="grind")
     local laterCount=W.Count(p.deferredLevels)
     if laterCount>0 then fields.status:SetText(status.." / "..laterCount.." saved for later") end
+    local opportunities=W.Decision and W.Decision.detail and W.Decision.detail.opportunities or {}
+    if #opportunities>0 then
+        local first=opportunities[1]
+        for _,o in ipairs(opportunities) do if o.activity=="escort" then first=o;break end end
+        fields.status:SetText(#opportunities.." nearby quest opportunity(s) / "..safetyCount.." held".."\n"..(first.activity=="escort" and "Escort: " or "Available: ")..first.name)
+    end
     for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":  "..v.definition[2](p)) end
     layout();W.UpdateLiveUI()
 end
@@ -220,7 +226,7 @@ function W.UpdateLiveUI()
     local entrance=travel and travel.mode=="cave-approach"
     local point=entrance and travel.entry or r.point
     fields.source:SetText(point and string.format("%s  /  %.1f, %.1f  /  %s",W.MapName(point.mapID),point.x*100,point.y*100,entrance and (point.accessSource or "Entrance") or r.source or "Live state") or ((W.State and W.State.zone or "").."  /  Live state"))
-    fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))
+    fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="escort" and "Escort active" or W.CurrentRoute.kind=="item" and "In your bags" or ""))
     fields.navStatus:SetText(n.label or "")
 end
 function W.ToggleSettings()

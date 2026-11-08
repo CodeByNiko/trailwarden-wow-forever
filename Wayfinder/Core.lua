@@ -71,7 +71,7 @@ function W.Diagnostics()
         "Quest log: "..#s.activeQuests.." active / "..s.completedCount.." completed / revision "..tostring(s.revision),
         "Catalog: "..tostring(W.CatalogState).." / "..tostring(W.CatalogCount or 0).." quests / "..tostring(W.DatabaseStatus),"Catalog error: "..tostring(W.CatalogError or "none"),
         "Step: "..tostring(r.key).." / "..tostring(r.title),"Target: "..tostring(r.target).." / "..tostring(r.mapID).." / "..tostring(r.x)..", "..tostring(r.y),
-        "Map pins: "..tostring(W.OverlayStatus),
+        "Map pins: "..tostring(W.OverlayStatus),"Planner work area: "..tostring(s.workArea and s.workArea.id).." / region "..tostring(s.regionMapID),
         "Access: "..tostring(n.travel and n.travel.mode).." / cave "..tostring(n.travel and n.travel.caveID).." / source "..tostring(n.travel and n.travel.entry and n.travel.entry.accessSource).." / error "..tostring(W.AccessError or "none"),
         "Navigation: "..(n.label or "none").." / distance "..tostring(n.distance),"Last plan: "..string.format("%.2f",W.LastPlanMilliseconds or 0).." ms / event "..tostring(W.LastEvent),
         "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /wf trace (last 20 decisions)","Deferred / unmapped:"}
@@ -142,8 +142,10 @@ frame:SetScript("OnUpdate",function(_,dt)
         planElapsed=0
         if W.State then
             local current,previous=W.PlayerPoint(),W.State.player
-            local changed=(current and not previous) or (previous and not current)
-            if current and previous then changed=current.mapID~=previous.mapID or W.TravelCost(current,previous)>=120 and W.Now()-(W.LastRefreshTime or 0)>=10 end
+            local area=W.Safe(W.ReadWorkArea,current)
+            local areaChanged=(area and area.id)~=(W.State.workArea and W.State.workArea.id)
+            local changed=areaChanged or (current and not previous) or (previous and not current)
+            if current and previous then changed=changed or current.mapID~=previous.mapID or W.TravelCost(current,previous)>=120 and W.Now()-(W.LastRefreshTime or 0)>=10 end
             local dead=W.Safe(UnitIsDeadOrGhost,"player")==true
             if changed or dead~=W.State.dead or W.Now()-(W.LastRefreshTime or 0)>=60 or (W.CurrentRoute and W.CurrentRoute.key=="error") then W.Refresh(false,changed and "movement" or dead~=W.State.dead and "life-state" or "maintenance") end
         end

@@ -1,7 +1,14 @@
-WAYFINDER 1.7.0 — WORLD OF WARCRAFT: FOREVER
+WAYFINDER 1.7.1 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
+
+1.7.1 keeps accepted local collection ahead of distant quest objectives,
+even when an outside XP estimate is higher. Recent actual quest progress
+protects work beyond named caves. Nearby eligible offers remain visible;
+escort offers wait for local collection, then precede departure. Once accepted,
+follow the escort NPC until completion/failure; do not run toward its endpoint.
+Quest data/availability and recognizable event metadata are still required.
 
 1.7 adds cave entrance guidance and map markers, with no additional navigation
 addon. Keep Questie and OpenMap enabled for minimap/world-map markers.

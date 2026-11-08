@@ -25,14 +25,51 @@ function W.MatchCave(route)
         if cave.interiorMaps[route.mapID] or route.mapID==cave.mapID and (inBounds(route.point,cave) or cave.npcs and cave.npcs[route.point.entityID]) then return cave end
     end
 end
+-- Capture only observed location evidence; 2D proximity cannot establish entry.
+function W.CaveForPlayer(player,facts,records)
+    if not player then return end
+    facts=facts or {};local names=facts.names or {}
+    for _,cave in ipairs(records or W.CaveAccess) do
+        if cave.interiorMaps[player.mapID] or facts.indoors and type(names[cave.id])=="string" and facts.subzone==names[cave.id] then return cave end
+    end
+end
+local function locationFacts()
+    local facts={indoors=W.Safe(IsIndoors)==true,subzone=W.Safe(GetSubZoneText),names={},entrances={}}
+    for _,cave in ipairs(W.CaveAccess) do
+        for map in pairs(cave.interiorMaps) do
+            local info=C_Map and W.Safe(C_Map.GetMapInfo,map)
+            if info and type(info.name)=="string" and info.name~="" then facts.names[cave.id]=info.name;break end
+        end
+        facts.names[cave.id]=facts.names[cave.id] or cave.name
+    end
+    return facts
+end
+function W.QuestRegion(mapID)
+    local original=mapID;local seen={}
+    for _=1,8 do
+        if not mapID or seen[mapID] then break end
+        if W.Zones and W.Zones[mapID] then return mapID end
+        seen[mapID]=true
+        local info=C_Map and W.Safe(C_Map.GetMapInfo,mapID)
+        mapID=info and info.parentMapID
+    end
+    return original
+end
+function W.ReadWorkArea(player)
+    local cave=W.CaveForPlayer(player,locationFacts())
+    if cave then return {id=cave.id,name=cave.name,mapID=cave.mapID,kind="cave"} end
+    local indoors=W.Safe(IsIndoors)==true;local subzone=W.Safe(GetSubZoneText)
+    if player and indoors and type(subzone)=="string" and subzone~="" then
+        return {id="interior:"..tostring(W.QuestRegion(player.mapID))..":"..subzone,name=subzone,mapID=W.QuestRegion(player.mapID),kind="interior"}
+    end
+end
 -- Pure access state: proximity alone cannot prove the player entered a cave.
 function W.ResolveAccess(route,player,facts,records)
     facts=facts or {};local names=facts.names or {};records=records or W.CaveAccess
     if not route or not route.point then return {mode="none",navRoute=route,goal=route and route.point} end
-    local destination,inside
+    local destination;local inside=W.CaveForPlayer(player,facts,records)
     for _,cave in ipairs(records) do
         if cave.interiorMaps[route.mapID] or route.mapID==cave.mapID and (inBounds(route.point,cave) or cave.npcs and cave.npcs[route.point.entityID]) then destination=cave end
-        if player and (cave.interiorMaps[player.mapID] or facts.indoors and type(names[cave.id])=="string" and facts.subzone==names[cave.id]) then inside=cave end
     end
     local function entrance(cave)
         return facts.entrances and facts.entrances[cave.id]
@@ -51,11 +88,8 @@ function W.ResolveAccess(route,player,facts,records)
 end
 function W.ReadAccess(route,player)
     if not route or not route.point then return W.ResolveAccess(route,player,{}) end
-    local facts={indoors=W.Safe(IsIndoors)==true,subzone=W.Safe(GetSubZoneText),names={},entrances={}}
+    local facts=locationFacts()
     for _,cave in ipairs(W.CaveAccess) do
-        local name
-        for map in pairs(cave.interiorMaps) do local info=C_Map and W.Safe(C_Map.GetMapInfo,map);if info and type(info.name)=="string" and info.name~="" then name=info.name;break end end
-        facts.names[cave.id]=name or cave.name
         local poi=C_AreaPoiInfo and W.Safe(C_AreaPoiInfo.GetAreaPOIInfo,cave.mapID,cave.poiID)
         local point
         if type(poi)=="table" and poi.position and (poi.name==facts.names[cave.id] or cave.interiorMaps[poi.linkedUiMapID]) then

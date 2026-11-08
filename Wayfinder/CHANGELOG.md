@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.1
+
+- Protect unfinished local work against remote objectives as well as town returns; XP cannot override the boundary.
+- Capture cave/interior context before selection and resolve floor maps to their parent quest region.
+- Prefer an eligible known source inside the current cave over a nearer outside source.
+- Learn temporary work focus from actual quest progress, including unmapped interiors; review unavailable safe targets rather than silently leave.
+- Retain nearby eligible pickup opportunities, including Forever escort offers; show their names in the existing status area.
+- Defer starting escorts until local work is done, then consider them before leaving.
+- Keep accepted escorts active without an endpoint bearing until completion/failure, using provider event metadata.
+- Preserve safety, explicit skips/focus and deterministic replay; no quest-ID exceptions in runtime policy.
+- 409 checks and 40 replay frames; live confirmation remains outstanding.
+
 ## 1.7.0
 
 - Separate quest target from cave access target.

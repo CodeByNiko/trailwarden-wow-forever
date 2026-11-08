@@ -529,6 +529,61 @@ UnitGUID=guidAPI;UnitLevel=levelAPI;UnitName=nameAPI;UnitCanAttack=nil;UnitClass
 -- Export actual frame calls, not an independently designed mockup.
 local function quote(v) return string.format('%q',v):gsub('\\\n','\\n') end
 local function array(t) local a={} for _,v in ipairs(t or {}) do a[#a+1]=tostring(v) end return '['..table.concat(a,',')..']' end
+-- Synthetic client reproduction of the Ban'ethil live report, including source choice.
+local savedCaves=W.CaveAccess;local savedMapInfo=C_Map.GetMapInfo
+local savedIndoors,savedSubzone=IsIndoors,GetSubZoneText
+ne();player.guid="Player-Cave-Batch";player.level=8;player.x=.447;player.y=.589
+local lo,hi=W.Point(1438,.47,.62),W.Point(1438,.44,.56)
+W.CaveAccess={{id="banethil",name="Ban'ethil Barrow Den",mapID=1438,interiorMaps={[60]=true,[61]=true},continent=1,bounds={lo.wx,lo.wy,hi.wx,hi.wy},entrance={hi.wx,hi.wy}}}
+C_Map.GetMapInfo=function(id) if id==60 or id==61 then return {name="Ban'ethil Barrow Den"} end;return savedMapInfo(id) end
+IsIndoors=function() return true end;GetSubZoneText=function() return "Ban'ethil Barrow Den" end
+objects[4200]={name="Cave chest",spawns={[20]={{43.9,58.9},{46.5,58.9}}}}
+objects[4201]={name="Second cave chest",spawns={[20]={{46,60}}}}
+objects[4202]={name="Outside moonwell",spawns={[20]={{42.4,67.1}}}}
+items[4200]={name="Black Feather Quill",objectDrops={4200}};items[4201]={name="Rune",objectDrops={4201}};items[4202]={name="Filled Tourmaline Phial",objectDrops={4202}}
+quests[4200]={name="The Relics of Wakening",questLevel=9,objectives={[3]={{4200},{4201}}}}
+quests[4201]={name="Crown of the Earth",questLevel=9,objectives={[3]={{4202}}}}
+log={{id=4200,title="The Relics of Wakening",level=9,rows={{type="item",text="Black Feather Quill",numFulfilled=0,numRequired=1},{type="item",text="Rune",numFulfilled=0,numRequired=1}}},
+ {id=4201,title="Crown of the Earth",level=9,rows={{type="item",text="Filled Tourmaline Phial",numFulfilled=0,numRequired=1}}}}
+npcs[275744]={name="Sentinel Lynessa Duskblossom",minLevel=10,maxLevel=10,spawns={[20]={{44.67,58.91}}}}
+quests[99053]={name="Escaping Ban'ethil",requiredLevel=4,questLevel=10,requiredRaces=8,startedBy={{275744}},finishedBy={{201}},triggerEnd={"Escort Lynessa Duskblossom out of Ban'ethil",{[20]={{43.08,51.65}}}}}
+W.BuildQuestCatalog(true);drain()
+W.GetProfile().offers={};W.Refresh(true)
+check("observed indoor cave context reaches the planner",W.State.workArea and W.State.workArea.id=="banethil")
+check("cave object source wins over a nearer outdoor source",W.CurrentRoute.questID==4200 and W.CurrentRoute.point.x>=.44)
+check("selected cave collection does not tell the player to leave",W.Navigation.travel.mode=="cave-interior")
+log[1].rows[2].numFulfilled=1;log[1].rows[2].finished=true;W.Refresh(false,"QUEST_LOG_UPDATE")
+local foundEscort=false;for _,o in ipairs(W.Decision.detail.opportunities) do if o.questID==99053 and o.activity=="escort" then foundEscort=true end end
+check("new Forever escort appears as a nearby opportunity before acceptance",foundEscort)
+check("escort exit pickup waits for unfinished cave collection",W.CurrentRoute.questID==4200)
+check("quest-log progress is captured independently of XP routing",W.State.workFocus and W.State.workFocus.questID==4200)
+check("last cave item stays ahead of an outside quest",W.CurrentRoute.questID==4200 and W.CurrentRoute.target=="Black Feather Quill")
+check("completed collection sub-objective is removed independently",#W.ActiveSteps(W.State.activeByID[4200],W.State)==1)
+W.GetProfile().skipped["quest:4200"]=epoch+900;W.Refresh(true)
+check("explicit cave skip can release the outside route",W.CurrentRoute.questID~=4200)
+W.GetProfile().skipped={};log[1].complete=true;log[1].rows[1].numFulfilled=1;log[1].rows[1].finished=true;W.Refresh(true)
+check("finished collection exposes the nearby escort before departure",W.CurrentRoute.questID==99053 and W.CurrentRoute.kind=="pickup")
+maps[60]=maps[1438];player.map=60;W.Refresh(true)
+check("cave floor still discovers pickups indexed in parent quest zone",W.State.regionMapID==1438 and W.CurrentRoute.questID==99053)
+player.map=1438;maps[60]=nil
+log[#log+1]={id=99053,title="Escaping Ban'ethil",level=10,rows={{type="event",text="Escort Lynessa Duskblossom out of Ban'ethil",numFulfilled=0,numRequired=1}}};W.Refresh(true)
+check("accepted escort becomes the active task without an exit bearing",W.CurrentRoute.kind=="escort" and not W.CurrentRoute.point and not W.Navigation.bearing)
+check("active escort does not recommend running ahead to an endpoint",W.Navigation.label=="Stay with the escort")
+log[#log].complete=true;W.Refresh(true)
+check("completed escort releases escort activity",W.CurrentRoute.kind~="escort")
+-- The general progress guideline also works without a named cave record.
+W.CaveAccess={};GetSubZoneText=function() return "Unmapped underground area" end
+log[1].complete=false;log[1].rows[1].finished=false;log[1].rows[1].numRequired=2;log[1].rows[1].numFulfilled=0;W.Refresh(true)
+log[1].rows[1].numFulfilled=1;W.Refresh(false,"QUEST_LOG_UPDATE")
+check("unmapped interiors get a live context without quest-specific cave IDs",W.State.workArea.kind=="interior" and W.State.workFocus.questID==4200)
+check("partial collection stays active in an unmapped underground area",W.CurrentRoute.questID==4200)
+local priorItem=items[4200];items[4200]={name="Black Feather Quill"};W.Refresh(true)
+check("missing source data cannot silently send an engaged quest elsewhere",W.CurrentRoute.reviewWork and W.CurrentRoute.questID==4200 and not W.CurrentRoute.point)
+items[4200]=priorItem
+player.x=.8;player.y=.8;W.Refresh(true)
+check("walking out of the progress area releases its focus",not W.State.workFocus)
+W.CaveAccess=savedCaves;C_Map.GetMapInfo=savedMapInfo;IsIndoors=savedIndoors;GetSubZoneText=savedSubzone
+
 local function snapshot(path)
  local dump={}
  for i,node in ipairs(nodes) do

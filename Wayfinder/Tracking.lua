@@ -55,6 +55,31 @@ function W.GetProfile()
 end
 function W.RememberTurnIn(id) if validID(id) then W.GetProfile().completed[id]=true end end
 local function done(v) return v==true or v==1 end
+local workOwner,workRows,workFocus
+-- Progress evidence is per login/character and independent of XP tracking.
+local function updateWorkFocus(state)
+    if workOwner~=state.key then workOwner=state.key;workRows={};workFocus=nil end
+    if not state.questLogReady then return end
+    local context=state.workArea and state.workArea.id
+    if workFocus and (workFocus.context~=context or not W.Distance(workFocus.point,state.player) or W.Distance(workFocus.point,state.player)>450) then workFocus=nil end
+    local nextRows={}
+    for _,q in ipairs(state.activeQuests) do
+        nextRows[q.id]={}
+        for index,row in ipairs(q.objectives) do
+            nextRows[q.id][index]=row.fulfilled
+            local old=workRows[q.id] and workRows[q.id][index]
+            if not q.isComplete and not q.failed and state.player and W.IsFinite(old) and row.fulfilled>old then
+                workFocus={questID=q.id,point=W.Copy(state.player),context=context}
+            end
+        end
+    end
+    workRows=nextRows
+    if workFocus then
+        local q=state.activeByID[workFocus.questID]
+        if not q or q.isComplete or q.failed then workFocus=nil end
+    end
+    state.workFocus=W.Copy(workFocus)
+end
 function W.ReadCharacter()
     local p=W.GetProfile();validateContents(p)
     local className,classToken=W.Safe(UnitClass,"player")
@@ -64,6 +89,8 @@ function W.ReadCharacter()
         classMask=W.ClassMasks[classToken],raceMask=W.ClassicRaceMasks[raceID],faction=W.Safe(UnitFactionGroup,"player"),level=W.Safe(UnitLevel,"player") or 1,
         mapID=mapID,zone=mapID and W.MapName(mapID) or W.Safe(GetRealZoneText) or "Unknown area",now=W.Now(),provider=W.ProviderIdentity(),
         activeQuests={},activeByID={},player=W.PlayerPoint(),dead=W.Safe(UnitIsDeadOrGhost,"player")==true,readIssues={}}
+    state.workArea=W.Safe(W.ReadWorkArea,state.player)
+    state.regionMapID=state.workArea and state.workArea.mapID or W.Safe(W.QuestRegion,state.mapID) or state.mapID
     if LibQuestieDB and LibQuestieDB.RequireContract and W.Safe(LibQuestieDB.RequireContract,3) then
         state.raceMask=(LibQuestieDB.Enum and LibQuestieDB.Enum.raceMaskById or {})[raceID] or state.raceMask
     end
@@ -115,7 +142,7 @@ function W.ReadCharacter()
     table.sort(state.activeQuests,function(a,b) return a.id<b.id end)
     state.completed=W.Copy(p.completed);state.completedCount=W.Count(state.completed)
     local progress={state.key,tostring(state.level),tostring(state.classMask),tostring(state.raceMask)}
-    local signature={tostring(mapID),tostring(state.level),tostring(state.questLogReady),tostring(state.historyReady)}
+    local signature={tostring(state.workArea and state.workArea.id),tostring(mapID),tostring(state.level),tostring(state.questLogReady),tostring(state.historyReady)}
     for _,q in ipairs(state.activeQuests) do progress[#progress+1]=tostring(q.id);signature[#signature+1]=q.fingerprint end
     local ids={};for id in pairs(state.completed) do ids[#ids+1]=id end;table.sort(ids)
     for _,id in ipairs(ids) do progress[#progress+1]="c"..id end
@@ -130,6 +157,7 @@ function W.ReadCharacter()
     local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
     state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
+    updateWorkFocus(state)
     if W.CombatSafetySnapshot then state.combatSafety=W.CombatSafetySnapshot(state) end
     if W.ObserveExperienceProgress then
         local status,message=W.Call(W.ObserveExperienceProgress,state)

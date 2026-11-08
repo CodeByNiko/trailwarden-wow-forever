@@ -101,4 +101,11 @@ menu.set(false)
 check("OpenMap visibility toggle persists character preference",not profile.routeOverlay and menu.get()==false)
 profile.routeOverlay=true;W.Navigation={travel={mode="none"}};W.UpdateRouteOverlay()
 check("no actionable route hides pooled icons",icons[1].hidden and icons[2].hidden)
+local priorInfo=C_Map.GetMapInfo;local priorZones=W.Zones
+W.Zones={[1438]={}}
+C_Map.GetMapInfo=function(id) return id==777 and {name="Unmapped floor",parentMapID=1438} or priorInfo(id) end
+check("unknown underground floor resolves its parent quest region",W.QuestRegion(777)==1438)
+C_Map.GetMapInfo=function(id) return {name="Loop",parentMapID=id} end
+check("cyclic map metadata is bounded and retains the original map",W.QuestRegion(777)==777)
+C_Map.GetMapInfo=priorInfo;W.Zones=priorZones
 print(string.format("%d travel/access/map checks passed",passed))

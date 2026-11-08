@@ -4,6 +4,14 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest installable version](https://github.com/CodeByNiko/wayfinder-wow-forever/releases/latest)**
 
+## New in 1.7.1: finish local work and retain nearby opportunities
+
+Unfinished accepted objectives now take priority over distant objectives, not only town returns. XP forecasts cannot override that area boundary. The planner receives the same observed cave context as navigation, treats cave floors as part of their parent quest region, and prefers a known safe item source inside the current cave when one exists.
+
+The same guideline applies beyond named caves: actual quest-progress changes create a temporary local work focus, and live interior/subzone context plus map hierarchy provide location evidence. Focus releases when the quest finishes/fails, the player leaves the area, or the player explicitly skips/changes focus. Unavailable safe targets produce a review step instead of silently abandoning recently engaged work. Enemy-level checks still apply.
+
+Nearby eligible quest offers are retained as opportunities. Escort offers wait until local collection is finished and are considered before leaving; accepting an escort commits guidance to following its NPC until completion/failure. Escort detection uses provider event metadata, not quest-ID exceptions. The UI names nearby opportunities in its existing status area. Fresh provider/client availability is still required: an unknown or unavailable quest cannot be promised, and an escort without recognizable event metadata may need manual guidance.
+
 ## New in 1.7: cave access and map guidance
 
 **No additional navigation addon is required.** Keep your existing Questie and OpenMap enabled. Wayfinder now separates a cave's entrance from the quest target inside it. For Lord Melenas in Fel Rock, the arrow and native waypoint first target the entrance instead of the underground objective's hillside projection.
@@ -17,7 +25,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.7.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.7.1-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever**, **Questie** and your existing **OpenMap** enabled. Questie supplies the map-pin library; the core quest planner still requires QuestieDB.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.

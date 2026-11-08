@@ -155,6 +155,64 @@ local currentSkipped=W.Copy(localSwitch);currentSkipped.state.profile.skipped["q
 check("skip immediately releases committed objective",W.SelectRoute(currentSkipped).key~=workA.key)
 local updated=input({W.Copy(workA)},.65,.6);updated.previous=W.Copy(workA);updated.previous.ownerKey="character";updated.previous.fingerprint="old-count";updated.meta.candidates[1].fingerprint="new-count";updated.meta.candidates[1].point=point(.66,.6);updated.meta.candidates[1].x=.66
 check("partial progress does not chase a different spawn of the same objective",W.SelectRoute(updated).point.x==workA.point.x)
+-- Reported Ban'ethil case: finish the remaining cave collection before Crown.
+local quill=step("objective",9200,.465,.589,1438);quill.workAreaID="banethil";quill.regionMapID=1438;quill.remaining=1
+local rune=W.Copy(quill);rune.key="objective:9200:rune";rune.point=point(.47,.60,1438);rune.x=.47;rune.y=.60
+local crown=step("objective",9201,.424,.671,1438);crown.economyModel=economy(500000)
+local cave=input({crown,quill,rune});cave.state.mapID=1438;cave.state.regionMapID=1438;cave.state.player=point(.447,.589,1438)
+cave.state.workArea={id="banethil",kind="cave",mapID=1438};cave.state.experience=W.Copy(regional.state.experience)
+cave.previous=W.Copy(crown);cave.previous.ownerKey="character"
+local immutable=W.Json(cave);local cr,cq=W.SelectRoute(cave)
+check("cave collection beats a different objective with much higher XP",cr.questID==quill.questID)
+check("remaining cave objective is queued before the exit",cq[1].questID==quill.questID)
+check("work-area selection does not mutate the replay input",W.Json(cave)==immutable)
+local forced=W.Copy(cave);forced.force=true
+check("routine forced refresh does not abandon cave work",W.SelectRoute(forced).questID==quill.questID)
+local oneLeft=W.Copy(cave);oneLeft.meta.candidates={crown,quill};oneLeft.previous=cr
+check("one remaining quest item keeps the cave batch active",W.SelectRoute(oneLeft).key==quill.key)
+local changedCount=W.Copy(oneLeft);changedCount.meta.candidates[2].remaining=1;changedCount.meta.candidates[2].fingerprint="new-item-count"
+check("partial item progress cannot release cave area priority",W.SelectRoute(changedCount).key==quill.key)
+local otherFloor=W.Copy(oneLeft);otherFloor.meta.candidates[2].point.mapID=61;otherFloor.meta.candidates[2].mapID=61
+check("cave floor map is ranked within its parent quest region",W.SelectRoute(otherFloor).key==quill.key)
+local farInside=W.Copy(oneLeft);farInside.meta.candidates[2].point=point(.65,.65,1438)
+check("known cave work stays local even beyond the surface radius",W.SelectRoute(farInside).key==quill.key)
+local outdoor=input({step("objective",9300,.8,.685),step("objective",9301,.5,.3)},.797,.685)
+outdoor.state.experience=W.Copy(regional.state.experience);outdoor.meta.candidates[2].economyModel=economy(500000)
+check("outdoor unfinished work also beats a distant quest objective",W.SelectRoute(outdoor).questID==9300)
+local after=W.Copy(oneLeft);after.meta.candidates={crown}
+check("finishing all cave work permits the next outside objective",W.SelectRoute(after).key==crown.key)
+local skipCave=W.Copy(oneLeft);skipCave.state.profile.skipped["quest:9200"]=1000
+check("explicit skip releases cave work immediately",W.SelectRoute(skipCave).key==crown.key)
+local pinCave=W.Copy(oneLeft);pinCave.state.profile.pinned=crown.key
+check("explicit manual quest focus may leave the cave",W.SelectRoute(pinCave).key==crown.key)
+local dangerCave=W.Copy(oneLeft);dangerCave.state.combatSafety={alert={name="Danger"}}
+check("cave batch never overrides immediate danger stop",W.SelectRoute(dangerCave).key=="danger")
+local unsafeCave=W.Copy(oneLeft);unsafeCave.meta.candidates[2].combatRisk={status="blocked",maxLevel=29,rank=0}
+check("area protection does not make an unsafe candidate actionable",W.SelectRoute(unsafeCave).key~=quill.key)
+local grindCave=W.Copy(oneLeft);grindCave.state.combatSafety={grindAllowed=true};grindCave.state.experience.grind={valid=true,rate=100000000,point=quill.point}
+grindCave.meta.candidates[2].economyModel=economy(4000)
+check("measured grinding cannot interrupt unfinished cave collection",W.SelectRoute(grindCave).key==quill.key)
+local opportunity=W.Copy(quill);opportunity.kind="pickup";opportunity.key="pickup:9400";opportunity.questID=9400;opportunity.activity="escort"
+local caveOffer=W.Copy(cave);caveOffer.meta.candidates={crown,quill,opportunity}
+check("nearby escort offer does not start before unfinished cave work",W.SelectRoute(caveOffer).key==quill.key)
+local nextEscort=W.Copy(caveOffer);nextEscort.meta.candidates={crown,opportunity}
+local er,eq,ed=W.SelectRoute(nextEscort)
+check("nearby cave escort is not skipped for a richer outside objective",er.key==opportunity.key and #ed.opportunities==1)
+local escort=step("escort",9400,.447,.589,1438);escort.point=nil;escort.mapID=nil;escort.x=nil;escort.y=nil
+local activeEscort=W.Copy(cave);activeEscort.meta.candidates={crown,quill,escort}
+check("active escort takes precedence over ordinary quest objectives",W.SelectRoute(activeEscort).kind=="escort")
+activeEscort.state.profile.skipped["quest:9400"]=1000
+check("explicit skip can release an escort commitment",W.SelectRoute(activeEscort).kind~="escort")
+local unknownInterior=W.Copy(oneLeft);unknownInterior.state.workArea={id="interior:1438:Unknown den",kind="interior",mapID=1438};unknownInterior.meta.candidates[2].workAreaID=nil
+unknownInterior.state.workFocus={questID=quill.questID,point=quill.point,context=unknownInterior.state.workArea.id}
+check("actual quest progress protects work in an unmapped interior",W.SelectRoute(unknownInterior).key==quill.key)
+local progressOutside=W.Copy(outdoor);progressOutside.meta.candidates[2].point=point(.84,.685);progressOutside.meta.candidates[2].mapID=1431
+progressOutside.previous=W.Copy(progressOutside.meta.candidates[2]);progressOutside.state.workFocus={questID=9300}
+check("recent local progress corrects an already selected competing objective",W.SelectRoute(progressOutside).questID==9300)
+for _,record in ipairs({{event="banethil-other-objective-wins-XP",value=cave},{event="banethil-last-item",value=oneLeft},{event="banethil-all-local-work-complete",value=after}}) do
+ local r,q,d=W.SelectRoute(record.value);local keys={};for _,v in ipairs(q) do keys[#keys+1]=v.key end
+ fixtureFrames[#fixtureFrames+1]={event=record.event,input=record.value,expected={key=r.key,queue=keys,clearPin=d.clearPin==true}}
+end
 local f=io.open("tests/journey-replay.json","w");f:write(W.Json({schema=1,origin="synthetic-journey",addonVersion=W.Version,frames=fixtureFrames}));f:close()
 print(passed.." pure engine checks passed")
 

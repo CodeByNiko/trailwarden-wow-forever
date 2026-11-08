@@ -1,3 +1,11 @@
+# Validation for 1.7.1
+
+**409 checks and 40 replay frames** pass: 189 scenario/client, 70 pure engine, 21 provider/client, 56 XP, 36 combat safety and 37 access/map checks. Three new replay frames cover cave collection, last-item persistence and release after local completion.
+
+New synthetic integration tests reproduce Ban'ethil local collection versus Crown of the Earth, a closer outside item source, a remaining quest item, an eligible unaccepted Forever escort, discovery from a cave floor, accepted escort guidance and completion. Separate checks cover progress retention in an unnamed interior, missing-safe-source review and leaving an area. Engine tests challenge the policy with exaggerated outside XP, stale previous goals, floor maps, skips, manual focus, danger and unsafe targets. No successful real-client behavior is claimed yet.
+
+The runtime policy uses area/progress/event metadata rather than quest IDs. The real quest ID 99053 appears only in a provider-contract-shaped test fixture, based on current public QuestieDB Forever records; the original screenshot alone does not establish the user's installed database version or exact eligibility gate.
+
 # Validation for 1.7.0
 
 The scoped OpenMap access release passes **368 checks and 37 replay frames**: 171 client/scenario, 49 pure engine, 21 provider/client, 56 experience, 36 combat safety and 35 access/map checks. Access tests cover live POI precedence, reference fallback, cave-stage truth, preserved arrival instructions, inverse map transforms, real callable-table LibStub lookup, HBD colon-call signatures, pin ownership, marker reuse and recovery from transient map errors.

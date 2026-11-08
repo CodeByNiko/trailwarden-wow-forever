@@ -18,7 +18,7 @@ function W.Bearing(target,player)
     return math.atan2((dx*ex+dy*ey)/el,(dx*nx+dy*ny)/nl)
 end
 function W.ComputeNavigation(route,player,facing,previous)
-    if not route or not route.point then return {label=route and route.kind=="item" and "Use the item" or route and route.key=="paused" and "Navigation paused" or "No waypoint"} end
+    if not route or not route.point then return {label=route and route.kind=="escort" and "Stay with the escort" or route and route.kind=="item" and "Use the item" or route and route.key=="paused" and "Navigation paused" or "No waypoint"} end
     if not player or not route.point then return {label="Position unavailable"} end
     local point=route.point;local d=W.Distance(player,point)
     local key=(route.ownerKey or "character")..":"..tostring(route.key)..":"..tostring(point.mapID)..":"..tostring(point.x)..":"..tostring(point.y)
