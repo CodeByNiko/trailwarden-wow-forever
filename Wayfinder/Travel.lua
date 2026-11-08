@@ -32,18 +32,18 @@ function W.ResolveAccess(route,player,facts,records)
     local destination,inside
     for _,cave in ipairs(records) do
         if cave.interiorMaps[route.mapID] or route.mapID==cave.mapID and (inBounds(route.point,cave) or cave.npcs and cave.npcs[route.point.entityID]) then destination=cave end
-        if player and (cave.interiorMaps[player.mapID] or facts.indoors and facts.subzone==names[cave.id]) then inside=cave end
+        if player and (cave.interiorMaps[player.mapID] or facts.indoors and type(names[cave.id])=="string" and facts.subzone==names[cave.id]) then inside=cave end
     end
     local function entrance(cave)
         return facts.entrances and facts.entrances[cave.id]
     end
     if inside then
         return {mode=destination and destination.id==inside.id and "cave-interior" or "cave-exit",caveID=inside.id,caveName=inside.name,entry=entrance(inside),goal=route.point,
-            navRoute={kind="wait",key="tunnel:"..tostring(route.key)},label="Tunnel route unavailable",instruction="Inside "..inside.name..". Follow the cave map; the gold marker is an objective, not a tunnel route."}
+            navRoute={kind="wait",key="tunnel:"..tostring(route.key)},label="Tunnel route unavailable",instruction=destination and destination.id==inside.id and ("Inside "..inside.name..". Use the cave map to reach the gold objective marker.") or ("Leave "..inside.name.." via the cyan entrance marker. Use the cave map; tunnel route unknown.")}
     end
     if destination then
         local point=entrance(destination)
-        if not point then return {mode="access-unavailable",goal=route.point,navRoute={kind="wait",key="access:"..tostring(route.key)},label="Cave entrance data unavailable",instruction="This target is in "..destination.name..". Its entrance could not be positioned reliably; use the map instead of heading straight into the mountain."} end
+        if not point then return {mode="access-unavailable",goal=route.point,navRoute={kind="wait",key="access:"..tostring(route.key)},label="Cave entrance data unavailable",instruction="Target inside "..destination.name..". Entrance position unavailable; inspect the cave map."} end
         local nav=W.Copy(route);nav.point=point;nav.mapID=point.mapID;nav.x=point.x;nav.y=point.y;nav.kind="entrance";nav.key="entrance:"..destination.id
         return {mode="cave-approach",caveID=destination.id,caveName=destination.name,entry=point,goal=route.point,navRoute=nav,label="Find "..destination.name.." entrance",instruction="Head to the "..destination.name.." entrance, then enter the cave. Do not climb toward the objective marker."}
     end
@@ -54,7 +54,7 @@ function W.ReadAccess(route,player)
     local facts={indoors=W.Safe(IsIndoors)==true,subzone=W.Safe(GetSubZoneText),names={},entrances={}}
     for _,cave in ipairs(W.CaveAccess) do
         local name
-        for map in pairs(cave.interiorMaps) do local info=C_Map and W.Safe(C_Map.GetMapInfo,map);if info and type(info.name)=="string" then name=info.name;break end end
+        for map in pairs(cave.interiorMaps) do local info=C_Map and W.Safe(C_Map.GetMapInfo,map);if info and type(info.name)=="string" and info.name~="" then name=info.name;break end end
         facts.names[cave.id]=name or cave.name
         local poi=C_AreaPoiInfo and W.Safe(C_AreaPoiInfo.GetAreaPOIInfo,cave.mapID,cave.poiID)
         local point

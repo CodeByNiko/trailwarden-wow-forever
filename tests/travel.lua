@@ -40,7 +40,7 @@ local outside=W.Copy(route);outside.point=W.Point(1438,.2,.2);outside.x=.2;outsi
 check("leaving cave never invents a straight tunnel path",not W.ResolveAccess(outside,inside,facts).navRoute.point)
 check("unknown terrain explicitly remains direction only",W.ResolveAccess(outside,player,{}).mode=="direction")
 check("missing entrance fails without pointing through mountain",not W.ResolveAccess(route,player,{}).navRoute.point)
-check("indoor fact without name dictionary does not throw",pcall(W.ResolveAccess,route,player,{indoors=true}))
+check("missing indoor names do not fabricate a cave entry",W.ResolveAccess(route,player,{indoors=true,entrances=facts.entrances}).mode=="cave-approach")
 check("no actionable goal clears access overlay context",W.ResolveAccess({kind="wait",key="dead"},inside,{}).mode=="none")
 W.PlayerPoint=function() return player end;GetPlayerFacing=function() return 0 end
 W.CurrentRoute=route;W.Decision={id=1,route=route}
@@ -64,7 +64,7 @@ check("arrival instruction at an ordinary quest giver is preserved",W.Navigation
 W.PlayerPoint=function() return player end
 -- Real minimap projection/rotation belongs to HBD, never a hand-written screen offset.
 local icons={};local methods={}
-for _,name in ipairs({"SetSize","SetAllPoints","SetTexture","SetTexCoord","EnableMouse"}) do methods[name]=function() end end
+for _,name in ipairs({"SetSize","SetPoint","SetAllPoints","SetTexture","SetTexCoord","EnableMouse"}) do methods[name]=function() end end
 function methods:SetScript(name,fn) self.scripts[name]=fn end
 function methods:SetVertexColor(...) self.color={...} end
 function methods:Hide() self.hidden=true end
@@ -78,7 +78,7 @@ function hbd:AddWorldMapIconMap(owner,icon,map,x,y,show) world[#world+1]={owner=
 function hbd:RemoveAllMinimapIcons(owner) assert(ref==nil or owner==ref);removedMini=removedMini+1 end
 function hbd:RemoveAllWorldMapIcons(owner) assert(ref==nil or owner==ref);removedWorld=removedWorld+1 end
 local available=false
-LibStub=function(name,silent) assert(name=="HereBeDragons-Pins-2.0" and silent);return available and hbd or nil end
+LibStub=setmetatable({GetLibrary=function(self,name,silent) assert(self==LibStub and name=="HereBeDragons-Pins-2.0" and silent);return available and hbd or nil end},{__call=function() error("Use callable-table LibStub through GetLibrary") end})
 W.Navigation={travel=a};W.UpdateRouteOverlay()
 check("no HBD is a graceful optional feature absence",#icons==0)
 available=true
@@ -91,6 +91,12 @@ before=#mini;W.UpdateRouteOverlay()
 check("unchanged access points do not rebuild icons",#mini==before)
 W.Navigation={travel=W.ResolveAccess(outside,player,{})};W.UpdateRouteOverlay()
 check("reused marker updates its tooltip and color",mini[#mini].icon.pinLabel=="Quest objective / not walking path" and mini[#mini].icon.pinTexture.color[2]==.78)
+local originalAdd=hbd.AddMinimapIconMap
+hbd.AddMinimapIconMap=function() error("map library refreshing") end
+W.ClearRouteOverlay();W.UpdateRouteOverlay()
+check("failed map-pin update stays retryable",W.OverlayStatus=="Map pin update failed; retrying")
+hbd.AddMinimapIconMap=originalAdd;before=#mini;W.UpdateRouteOverlay()
+check("map pins recover without another quest event",#mini>before and W.OverlayStatus=="Entrance/objective map pins active")
 menu.set(false)
 check("OpenMap visibility toggle persists character preference",not profile.routeOverlay and menu.get()==false)
 profile.routeOverlay=true;W.Navigation={travel={mode="none"}};W.UpdateRouteOverlay()

@@ -30,7 +30,7 @@ function W.ComputeNavigation(route,player,facing,previous)
     if not W.IsFinite(facing) then return {distance=d,arrivalKey=key,label="Facing unavailable"} end
     return {distance=d,bearing=bearing,facing=facing,arrivalKey=key,label=point.mapID~=player.mapID and "Travel via roads / transit" or "Following your step"}
 end
-local function readNavigation(route,previous,live)
+local function readNavigation(route,previous)
     local copy=route and W.Copy(route)
     if copy and copy.point then
         local fresh=W.Point(copy.mapID,copy.x,copy.y)
@@ -59,7 +59,7 @@ function W.NavigationInfo(route)
 end
 function W.UpdateNavigation()
     local decision=W.Decision
-    local n=readNavigation(decision and decision.route or W.CurrentRoute,W.Navigation,true)
+    local n=readNavigation(decision and decision.route or W.CurrentRoute,W.Navigation)
     n.decisionID=decision and decision.id or 0;W.Navigation=n
     if W.SyncWaypoint then W.SyncWaypoint(decision and decision.route or W.CurrentRoute,false) end
     return n

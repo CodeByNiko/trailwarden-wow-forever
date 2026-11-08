@@ -1,10 +1,13 @@
-# Unreleased 1.7 development validation
+# Validation for 1.7.0
 
-The OpenMap-only access foundation passes **366 checks and 37 replay frames**: 171 client/scenario, 49 pure engine, 21 provider/client, 56 experience, 36 combat safety and 33 access/map tests. These check cave-stage truth, live POI precedence, reference fallback, inverse map transforms, actual HBD call signatures, marker ownership/reuse and arrival text. No external navigation engine is used.
+The scoped OpenMap access release passes **368 checks and 37 replay frames**: 171 client/scenario, 49 pure engine, 21 provider/client, 56 experience, 36 combat safety and 35 access/map checks. Access tests cover live POI precedence, reference fallback, cave-stage truth, preserved arrival instructions, inverse map transforms, real callable-table LibStub lookup, HBD colon-call signatures, pin ownership, marker reuse and recovery from transient map errors.
 
-A walking graph and actual minimap walking polyline are still missing. No test establishes terrain connectivity or live success. See [1.7 scope and release prerequisites](V1.7-openmap-navigation.md). This branch is not a release candidate.
+`python3 tools/check.py` runs all suites. The installable package is checked for TOC files, media, ZIP CRCs and a single Wayfinder/ root. Two builds from the same inputs must be byte-identical. Frame renders include cave-access guidance and show synthetic data, not actual gameplay.
 
-# Validation for 1.6.0
+No test establishes real terrain connectivity or successful cave navigation. The accepted 1.7 scope is entrance-first guidance plus minimap/OpenMap markers, **without a continuous walking polyline**. Live validation is next; see [scope and test notes](V1.7-openmap-navigation.md).
+
+## Retained 1.6 coverage
+
 
 Run `python3 tools/check.py`. The fail-fast suite currently passes **332 checks** and **37 replay frames**:
 
