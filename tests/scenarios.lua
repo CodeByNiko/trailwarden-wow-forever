@@ -132,7 +132,7 @@ LibQuestieDB={Quest=db(quests),Npc=db(npcs),Item=db(items),Object=db(objects),co
 local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=function(id) return id==17 end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Navigator","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
+for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
 local W=Wayfinder
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
@@ -546,6 +546,11 @@ QuestieLoader.ImportModule=function(self,name)
  return priorImport(self,name)
 end
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);local cs=W.ActiveSteps(W.State.activeQuests[1],W.State)[1];W.PinStep(cs);snapshot('tests/ui-nightelf.json')
+-- Same real frame code, with a synthetic Melenas destination for spacing review.
+local caveRoute=W.Copy(W.CurrentRoute);caveRoute.questName="Twisted Hatred";caveRoute.title="Twisted Hatred";caveRoute.point.entityID=2038;caveRoute.target="Lord Melenas";caveRoute.level=8;caveRoute.combatRisk={maxLevel=8}
+W.CurrentRoute=caveRoute;W.Decision.route=caveRoute;W.UpdateNavigation();W.UpdateNavigator();W.UpdateUI()
+check("cave-aware panel keeps original quest while navigating to entrance",W.Navigation.travel.mode=="cave-approach" and W.CurrentRoute.point.entityID==2038)
+snapshot('tests/ui-cave.json')
 dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685;log=actualLog;log[2].complete=false;W.GetProfile().deferredLevels={};W.GetProfile().pinned=nil;W.Refresh(true)
 check("XP-aware mode preserves unfinished cemetery batch",W.CurrentRoute.questID==2100 and W.CurrentRoute.kind=="objective" and W.CurrentRoute.economy~=nil)
 check("XP-aware preview retains second objective before town",W.Queue[1] and W.Queue[1].questID==2100)

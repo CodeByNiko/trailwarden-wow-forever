@@ -50,6 +50,7 @@ function W.Refresh(force,trigger)
     if not panelOK and W.MainFrame then W.MainFrame:Hide() end
     if panelOK and W.MainFrame and not W.GetProfile().panelHidden then W.MainFrame:Show() end
     render("navigator",W.UpdateNavigator)
+    render("route overlay",W.UpdateRouteOverlay)
     render("replay",W.RecordDecision,decision)
     if started then W.LastPlanMilliseconds=debugprofilestop()-started end
 end
@@ -70,6 +71,8 @@ function W.Diagnostics()
         "Quest log: "..#s.activeQuests.." active / "..s.completedCount.." completed / revision "..tostring(s.revision),
         "Catalog: "..tostring(W.CatalogState).." / "..tostring(W.CatalogCount or 0).." quests / "..tostring(W.DatabaseStatus),"Catalog error: "..tostring(W.CatalogError or "none"),
         "Step: "..tostring(r.key).." / "..tostring(r.title),"Target: "..tostring(r.target).." / "..tostring(r.mapID).." / "..tostring(r.x)..", "..tostring(r.y),
+        "Map pins: "..tostring(W.OverlayStatus),
+        "Access: "..tostring(n.travel and n.travel.mode).." / cave "..tostring(n.travel and n.travel.caveID).." / source "..tostring(n.travel and n.travel.entry and n.travel.entry.accessSource).." / error "..tostring(W.AccessError or "none"),
         "Navigation: "..(n.label or "none").." / distance "..tostring(n.distance),"Last plan: "..string.format("%.2f",W.LastPlanMilliseconds or 0).." ms / event "..tostring(W.LastEvent),
         "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /wf trace (last 20 decisions)","Deferred / unmapped:"}
     for _,issue in ipairs(s.readIssues or {}) do lines[#lines+1]="Read issue: "..issue end
@@ -94,7 +97,7 @@ function W.Diagnostics()
     for key,value in pairs(W.DataIssues or {}) do lines[#lines+1]=key..": "..value end
     return table.concat(lines,"\n")
 end
-for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
     W.LastEvent=event
     if event=="PLAYER_LOGIN" then
@@ -104,6 +107,10 @@ frame:SetScript("OnEvent",function(_,event,...)
         return
     end
     local args={...}
+    if event=="ADDON_LOADED" then
+        if args[1]=="OpenMap" then if W.State then render("navigation",W.UpdateNavigation);render("route overlay",W.UpdateRouteOverlay) end end
+        return
+    end
     render("XP event",W.ExperienceEvent,event,unpack(args))
     if event=="PLAYER_TARGET_CHANGED" or event=="UPDATE_MOUSEOVER_UNIT" or event=="NAME_PLATE_UNIT_ADDED" or event=="NAME_PLATE_UNIT_REMOVED" then
         W.TrackCombatUnit(event,args[1]);local changed=W.Safe(W.PollCombatSafety)
@@ -127,6 +134,7 @@ frame:SetScript("OnUpdate",function(_,dt)
     navElapsed=navElapsed+dt;planElapsed=planElapsed+dt;xpElapsed=xpElapsed+dt
     if xpElapsed>=1 then
         xpElapsed=0;render("experience",W.SampleExperience)
+        if W.State then render("route overlay",W.UpdateRouteOverlay) end
         if W.Safe(W.PollCombatSafety) then W.Refresh(false,"combat-safety") end
     end
     if navElapsed>=.1 then navElapsed=0;if W.State then render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator);render("live panel",W.UpdateLiveUI) end end
@@ -148,6 +156,7 @@ SlashCmdList.WAYFINDER=function(message)
     if scale or arrowScale then W.SetDisplayScale(scale and "uiScale" or "navigatorScale",tonumber(scale or arrowScale)/100);return end
     if cmd=="" then W.ToggleUI()
     elseif cmd=="arrow" then W.ToggleNavigator()
+    elseif cmd=="routepins" then p.routeOverlay=not p.routeOverlay;W.ClearRouteOverlay();W.UpdateRouteOverlay()
     elseif cmd=="settings" then W.ToggleSettings()
     elseif cmd=="lock" then p.locked=not p.locked;W.Refresh(true)
     elseif cmd=="refresh" then p.pinned=nil;W.Refresh(true,"manual-replan")
@@ -164,6 +173,6 @@ SlashCmdList.WAYFINDER=function(message)
     elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
     elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
     elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Wayfinder|r /wf, arrow, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
+    else print("|cff5dd4d6Wayfinder|r /wf, arrow, routepins, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
 end
 

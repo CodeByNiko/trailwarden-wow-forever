@@ -1,6 +1,6 @@
 Wayfinder = Wayfinder or {}
 local W = Wayfinder
-W.Version = "1.6.0"
+W.Version = "1.7.0"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)

@@ -1,5 +1,5 @@
 local W=Wayfinder
-local defaults={xpRouting=true,includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
+local defaults={routeOverlay=true,xpRouting=true,includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
 local function validID(id) return W.IsFinite(id) and id>0 and id%1==0 end
 local function cleanPosition(pos)
     if type(pos)~="table" or type(pos.point)~="string" or type(pos.relativePoint)~="string" or not W.IsFinite(pos.x) or not W.IsFinite(pos.y) then return nil end

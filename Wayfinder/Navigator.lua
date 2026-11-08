@@ -32,8 +32,25 @@ function W.ComputeNavigation(route,player,facing,previous)
 end
 local function readNavigation(route,previous)
     local copy=route and W.Copy(route)
-    if copy and copy.point then copy.point=W.Point(copy.mapID,copy.x,copy.y) end
-    return W.ComputeNavigation(copy,W.PlayerPoint(),W.Safe(GetPlayerFacing),previous)
+    if copy and copy.point then
+        local fresh=W.Point(copy.mapID,copy.x,copy.y)
+        if fresh then fresh.entityID=copy.point.entityID end
+        copy.point=fresh
+    end
+    local player=W.PlayerPoint()
+    local travel={mode="direction",navRoute=copy,goal=copy and copy.point}
+    if W.ReadAccess then
+        local status,result=W.Call(W.ReadAccess,copy,player)
+        if status=="ok" then travel=result;W.AccessError=nil else travel={mode="error",navRoute={kind="wait"},label="Access data unavailable"};W.AccessError=tostring(result) end
+    end
+    local n=W.ComputeNavigation(travel.navRoute,player,W.Safe(GetPlayerFacing),previous)
+    n.travel=travel;n.navRoute=travel.navRoute
+    if travel.mode=="cave-approach" then
+        if n.arrived then n.label="Enter "..travel.caveName elseif n.bearing then n.label="Following cave entrance" end
+    elseif travel.mode=="direction" then
+        if n.bearing then n.label=travel.label or n.label end
+    elseif travel.label then n.label=travel.label end
+    return n
 end
 local compatibilityNavigation
 function W.NavigationInfo(route)
@@ -44,6 +61,7 @@ function W.UpdateNavigation()
     local decision=W.Decision
     local n=readNavigation(decision and decision.route or W.CurrentRoute,W.Navigation)
     n.decisionID=decision and decision.id or 0;W.Navigation=n
+    if W.SyncWaypoint then W.SyncWaypoint(decision and decision.route or W.CurrentRoute,false) end
     return n
 end
 function W.CreateNavigator()
@@ -74,6 +92,7 @@ function W.UpdateNavigator()
     local r=W.CurrentRoute
     title:SetText(r and (r.questName or r.title) or "Preparing your route")
     local n=W.Navigation or {label="Preparing navigation"}
+    if n.travel and n.travel.mode=="cave-approach" then title:SetText(n.travel.caveName.." entrance") end
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     here:SetShown(n.arrived==true);arrow:Hide()
     if not n.arrived and n.bearing then
@@ -108,6 +127,10 @@ function W.ReleaseWaypoint()
 end
 function W.SyncWaypoint(route,force)
     W.WaypointDecisionID=W.Decision and W.Decision.id or 0
+    local n=W.Navigation
+    if n and n.decisionID==W.WaypointDecisionID and (not route or route==W.CurrentRoute or W.Decision and route==W.Decision.route) then
+        route=n.navRoute
+    end
     if not W.GetProfile().mapSync then W.ReleaseWaypoint();W.WaypointStatus="Map sync off";return end
     if not route or not route.point then W.ReleaseWaypoint();W.WaypointStatus="No mapped step";return end
     local signature=table.concat({route.key,tostring(route.mapID),string.format("%.5f",route.x),string.format("%.5f",route.y)},":")

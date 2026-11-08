@@ -1,7 +1,16 @@
-WAYFINDER 1.6.0 — WORLD OF WARCRAFT: FOREVER
+WAYFINDER 1.7.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
+
+1.7 adds cave entrance guidance and map markers, with no additional navigation
+addon. Keep Questie and OpenMap enabled for minimap/world-map markers.
+Cyan = entrance, gold = objective. Lord Melenas in Fel Rock is approached via
+the entrance first. Shadowthread and Ban'ethil also have access records.
+Live Forever entrance POIs take priority; fallback says Reference entrance.
+Inside recognized caves, use the cave map; unknown tunnel bearings are hidden.
+This version does not draw a continuous walking route or route around all
+terrain. Even an entrance arrow is direction guidance, not a confirmed path.
 
 Your route resumes from the current character's quest log and completion
 history. Accept and turn in quests normally; the route advances from live
@@ -23,6 +32,7 @@ The arrow has a transparent background. Locking prevents wheel resizing.
 
 /wf           show/hide panel
 /wf arrow     show/hide navigator
+/wf routepins toggle Wayfinder entrance/objective map markers
 /wf settings  open character preferences
 /wf lock      lock/unlock window positions
 /wf refresh   explicitly reconsider region and choose an automatic route

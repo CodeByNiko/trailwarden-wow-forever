@@ -4,11 +4,22 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest installable version](https://github.com/CodeByNiko/wayfinder-wow-forever/releases/latest)**
 
+## New in 1.7: cave access and map guidance
+
+**No additional navigation addon is required.** Keep your existing Questie and OpenMap enabled. Wayfinder now separates a cave's entrance from the quest target inside it. For Lord Melenas in Fel Rock, the arrow and native waypoint first target the entrance instead of the underground objective's hillside projection.
+
+- **Cyan marker:** cave entrance; approach this first. **Gold marker:** final quest objective. Markers appear on the minimap and through OpenMap's supported world-map integration.
+- Known access records cover **Fel Rock, Shadowthread Cave and Ban'ethil Barrow Den** in Teldrassil. Matching live Forever entrance POIs take priority; fallback locations are labeled **Reference entrance**.
+- On a recognized cave map, or matching indoor subzone, guidance switches to the cave map. It does not keep pointing through tunnel walls. Getting near the entrance or target alone never completes a quest or proves you entered the cave.
+- Ordinary quests retain the existing routing and arrow. The map library is detected automatically, including its real callable-table LibStub interface; temporary marker failures retry without a quest update.
+
+**This is an entrance-and-marker release for live testing. It does not draw a continuous walking route or calculate a universal path around terrain.** The entrance arrow is still a direction, not a verified approach corridor. Inside caves, use OpenMap's cave layout and the objective marker; outside the known access coverage, normal direction guidance remains. See [1.7 scope and live-test notes](https://github.com/CodeByNiko/wayfinder-wow-forever/blob/main/docs/V1.7-openmap-navigation.md).
+
 ## Install or update
 
-1. Download `Wayfinder-1.6.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.7.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
-3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
+3. Keep **QuestieDB for Forever**, **Questie** and your existing **OpenMap** enabled. Questie supplies the map-pin library; the core quest planner still requires QuestieDB.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
 
 The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When using GitHub's **Code → Download ZIP**, copy the inner `Wayfinder` folder from the repository archive.
@@ -45,6 +56,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | --- | --- |
 | `/wf` | Show/hide the guide |
 | `/wf arrow` | Show/hide the navigator |
+| `/wf routepins` | Toggle Wayfinder entrance/objective markers; also available in OpenMap’s menu |
 | `/wf settings` | Open/close character preferences |
 | `/wf lock` | Lock/unlock window positions |
 | `/wf refresh` | Explicitly reconsider the regional plan and return to automatic routing |
@@ -76,7 +88,7 @@ A grind suggestion also requires recent suitable enemy-level observations in the
 
 Forever quest data is still developing. The provider itself documents incomplete new content, objectives, restrictions and live placement. A database position can be absent or out of date; cave floors, phases, moving NPCs, unusual scripted/spell objectives and transport connections may require Questie or the quest text. A fresh live offer can resolve incorrect static restrictions, but cannot override subsequent confirmed blocking progress. Incomplete quest history or a partial/collapsed quest log suspends database pickups; expand quest headers and run `/wf refresh` if diagnostics report an incomplete log. Unknown active quests can use a client waypoint when one exists; otherwise they are shown as unmapped in diagnostics.
 
-The arrow points toward a target; it does **not** calculate a terrain-safe path, bridge/cave entrances or boat schedules. Follow roads and use normal travel connections. It never displays a stale bearing when position data is missing or a target is on another continent. Distances are direct map distances, not walking distance.
+The arrow points toward a target, with entrance-first access guidance for the three documented Teldrassil caves. It does **not** calculate a terrain-safe walking path, tunnel graph, general bridge access or boat schedules. Follow roads and use normal travel connections. It never displays a stale bearing when position data is missing or a target is on another continent. Distances are direct map distances, not walking distance.
 
 The automated scenarios use synthetic client data modeled on the two character contexts. A successful run does not replace testing in the actual Forever client. See [the V1 implementation analysis](docs/V1-implementation.md) and [validation notes](docs/validation.md).
 
