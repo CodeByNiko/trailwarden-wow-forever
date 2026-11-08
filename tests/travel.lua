@@ -11,8 +11,8 @@ end,GetMapInfo=function(id) return {name=id==59 and "Fel Rock" or "Cave"} end,
 GetUserWaypoint=function() return userWaypoint end,SetUserWaypoint=function(p) userWaypoint=p;mapSets=mapSets+1 end,
 ClearUserWaypoint=function() userWaypoint=nil;mapClears=mapClears+1 end,CanSetUserWaypointOnMap=function() return true end}
 UiMapPoint={CreateFromCoordinates=function(map,x,y) return {uiMapID=map,position=CreateVector2D(x,y)} end}
-for _,name in ipairs({"Common","Travel","Navigator","RouteOverlay"}) do dofile("Wayfinder/"..name..".lua") end
-local W=Wayfinder
+for _,name in ipairs({"Common","Travel","Navigator","RouteOverlay"}) do dofile("Trailwarden/"..name..".lua") end
+local W=Trailwarden
 W.GetProfile=function() return profile end;W.GetCharacterKey=function() return "NightElf" end
 local passed=0
 local function check(name,ok) assert(ok,name);passed=passed+1;print("PASS travel / "..name) end
@@ -52,7 +52,7 @@ C_AreaPoiInfo.GetAreaPOIInfo=function() return {name="Different landmark",positi
 check("reused POI id cannot position an unrelated entrance",W.ReadAccess(route,player).entry.x==entry.x)
 C_AreaPoiInfo=nil
 local n=W.UpdateNavigation()
-check("entrance fallback is built into Wayfinder",n.navRoute.kind=="entrance")
+check("entrance fallback is built into Trailwarden",n.navRoute.kind=="entrance")
 check("native waypoint is entrance rather than Melenas",userWaypoint and math.abs(select(1,userWaypoint.position:GetXY())-entry.x)<.00001)
 local before=mapSets;W.UpdateNavigation()
 check("movement updates do not repeatedly set native waypoint",mapSets==before)
@@ -82,7 +82,7 @@ LibStub=setmetatable({GetLibrary=function(self,name,silent) assert(self==LibStub
 W.Navigation={travel=a};W.UpdateRouteOverlay()
 check("no HBD is a graceful optional feature absence",#icons==0)
 available=true
-local menu;OpenMapAPI={major=1,RegisterMenuToggle=function(owner,definition) menu=definition;check("OpenMap menu uses public addon registration",owner=="Wayfinder") end}
+local menu;OpenMapAPI={major=1,RegisterMenuToggle=function(owner,definition) menu=definition;check("OpenMap menu uses public addon registration",owner=="Trailwarden") end}
 W.UpdateRouteOverlay()
 check("entrance and objective use separate mini and world frames",#mini==2 and #world==2 and mini[1].icon~=world[1].icon)
 check("minimap receives normalized entrance and parent/edge flags",mini[1].map==1438 and mini[1].x==entry.x and mini[1].y==entry.y and mini[1].parent and mini[1].edge)

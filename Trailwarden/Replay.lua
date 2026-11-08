@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local function escape(s)
     return '"'..s:gsub('[%z\1-\31\\"]',function(c)
         local known={['"']='\\"',['\\']='\\\\',['\n']='\\n',['\r']='\\r',['\t']='\\t'}

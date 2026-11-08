@@ -1,7 +1,7 @@
 -- No client/provider/profile API is installed in this process.
 unpack=unpack or table.unpack;math.atan2=math.atan2 or function(y,x) return math.atan(y,x) end
-for _,name in ipairs({"Common","Data","Experience","Planner","Replay","Navigator"}) do dofile("Wayfinder/"..name..".lua") end
-local W=Wayfinder
+for _,name in ipairs({"Common","Data","Experience","Planner","Replay","Navigator"}) do dofile("Trailwarden/"..name..".lua") end
+local W=Trailwarden
 W.Q=function() error("Selector read provider data") end
 W.GetProfile=function() error("Selector read a mutable profile") end
 W.Now=function() error("Selector read live clock") end

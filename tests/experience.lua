@@ -10,8 +10,8 @@ function UnitGUID() return guid end
 function UnitIsAFK() return afk end
 function GetUnitSpeed() return speed end
 function GetMaxPlayerLevel() return 60 end
-for _,name in ipairs({"Common","Data","Experience","Planner","Replay"}) do dofile("Wayfinder/"..name..".lua") end
-local W=Wayfinder;local passed=0
+for _,name in ipairs({"Common","Data","Experience","Planner","Replay"}) do dofile("Trailwarden/"..name..".lua") end
+local W=Trailwarden;local passed=0
 local profiles={}
 function W.GetCharacterKey() return guid end
 function W.GetProfile()

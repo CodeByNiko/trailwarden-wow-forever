@@ -1,9 +1,9 @@
 ## Interface: 16001
-## Title: Wayfinder
+## Title: Trailwarden
 ## Notes: Character-aware quest routing for World of Warcraft: Forever.
 ## Author: CodeByNiko
-## Version: 1.7.1
-## SavedVariables: WayfinderDB
+## Version: 1.7.2
+## SavedVariables: TrailwardenDB
 ## Dependencies: QuestieDB
 ## OptionalDeps: Questie, OpenMap
 

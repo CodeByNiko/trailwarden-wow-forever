@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 W.DataVersion=2
 -- Context/transition hints only. Quest actions use the active Forever database.
 W.Zones={

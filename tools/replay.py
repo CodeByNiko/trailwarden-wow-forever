@@ -1,4 +1,4 @@
-"""Replay local /wf trace JSON through the pure selector. No game APIs or network."""
+"""Replay local /tw trace JSON through the pure selector. No game APIs or network."""
 from pathlib import Path
 import json
 import math
@@ -37,10 +37,10 @@ data=json.loads(path.read_text(encoding='utf-8'),parse_constant=lambda v: (_ for
 if data.get('schema')!=1 or not isinstance(data.get('frames'),list) or not data['frames']:
     raise SystemExit('Expected replay schema 1 with at least one frame')
 program='''unpack=unpack or table.unpack
-for _,name in ipairs({"Common","Data","Experience","Planner"}) do dofile("Wayfinder/"..name..".lua") end
+for _,name in ipairs({"Common","Data","Experience","Planner"}) do dofile("Trailwarden/"..name..".lua") end
 local frames=REPLAY_FRAMES
 for i,frame in ipairs(frames) do
- local route,queue,detail=Wayfinder.SelectRoute(frame.input)
+ local route,queue,detail=Trailwarden.SelectRoute(frame.input)
  assert(route.key==frame.expected.key,"Replay decision mismatch in frame "..i)
  assert(#queue==#frame.expected.queue,"Replay queue length mismatch in frame "..i)
  for j,step in ipairs(queue) do assert(step.key==frame.expected.queue[j],"Replay queue mismatch in frame "..i) end
@@ -48,7 +48,7 @@ for i,frame in ipairs(frames) do
 end
 print(#frames.." replay frames matched")
 '''.replace('REPLAY_FRAMES',literal(data['frames']))
-with tempfile.TemporaryDirectory(prefix='wayfinder-replay-') as directory:
+with tempfile.TemporaryDirectory(prefix='trailwarden-replay-') as directory:
     script=Path(directory)/'replay.lua';script.write_text(program,encoding='utf-8')
     raise SystemExit(subprocess.call([sys.executable,str(root/'tools/run_lua.py'),str(script)],cwd=root))
 

@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local owner={};local pool={};local shownSignature;local menuRegistered
 local function pins()
     -- Real LibStub is a callable table; W.Safe intentionally accepts functions only.
@@ -24,7 +24,7 @@ local function icon(parent)
 end
 function W.UpdateRouteOverlay()
     if not menuRegistered and OpenMapAPI and OpenMapAPI.major==1 and type(OpenMapAPI.RegisterMenuToggle)=="function" then
-        local status=W.Call(OpenMapAPI.RegisterMenuToggle,"Wayfinder",{id="access",label="Wayfinder access points",get=function() return W.GetProfile().routeOverlay~=false end,set=function(on) W.GetProfile().routeOverlay=on;W.ClearRouteOverlay();W.UpdateRouteOverlay() end})
+        local status=W.Call(OpenMapAPI.RegisterMenuToggle,"Trailwarden",{id="access",label="Trailwarden access points",get=function() return W.GetProfile().routeOverlay~=false end,set=function(on) W.GetProfile().routeOverlay=on;W.ClearRouteOverlay();W.UpdateRouteOverlay() end})
         menuRegistered=status=="ok"
     end
     local n=W.Navigation;local travel=n and n.travel;local lib=pins()

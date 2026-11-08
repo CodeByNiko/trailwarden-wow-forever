@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local fieldCache,entityCache,mapLookup={},{},nil
 local capture
 function W.BeginDataCapture() capture={} end
@@ -156,7 +156,7 @@ function W.BuildQuestCatalog(force,attempt)
         local again=W.RebuildPending;W.RebuildPending=nil
         if C_Timer and (again or attempt<3) then
             C_Timer.After(again and .01 or 2,function() if generation==W.CatalogGeneration and not W.BuildingCatalog then W.BuildQuestCatalog(true,again and 1 or attempt+1) end end)
-        elseif not W.CatalogReady then W.CatalogState="failed";W.DatabaseStatus="Quest data unavailable; use /wf rebuild to retry" end
+        elseif not W.CatalogReady then W.CatalogState="failed";W.DatabaseStatus="Quest data unavailable; use /tw rebuild to retry" end
         if W.Refresh then W.Refresh(false,"catalog-failed") end
     end
     if status~="ok" or type(ids)~="table" or #ids==0 then fail("Quest ID list unavailable");return end

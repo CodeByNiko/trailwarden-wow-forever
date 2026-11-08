@@ -3,7 +3,7 @@
 unpack=unpack or table.unpack;loadstring=loadstring or load
 local passed=0
 local function check(name,value) assert(value,name);passed=passed+1;print("PASS contract / "..name) end
-WayfinderDB=nil
+TrailwardenDB=nil
 local epoch=1000;local failLevel=false;local nilLevel=false;local calls={};local timers={}
 local tableFields={startedBy=true,finishedBy=true,objectives=true,objectivesText=true,triggerEnd=true,preQuestGroup=true,preQuestSingle=true,childQuests=true,inGroupWith=true,exclusiveTo=true,requiredSkill=true,requiredMinRep=true,requiredMaxRep=true,requiredSourceItems=true,reputationReward=true,breadcrumbs=true,extraObjectives=true,requiredRanks=true}
 local ids={1,2,3}
@@ -36,8 +36,8 @@ function CreateVector2D(x,y) return {GetXY=function() return x,y end} end
 C_Map={GetBestMapForUnit=function() return 1438 end,GetPlayerMapPosition=function() return CreateVector2D(.4,.6) end,GetMapInfo=function() return {name="Teldrassil",mapType=3} end}
 C_QuestLog={GetNumQuestLogEntries=function() return 0 end,GetAllCompletedQuestIDs=function() return {} end}
 C_Timer={After=function(_,fn) timers[#timers+1]=fn end}
-for _,name in ipairs({"Common","Data","Tracking","Database"}) do dofile("Wayfinder/"..name..".lua") end
-local W=Wayfinder
+for _,name in ipairs({"Common","Data","Tracking","Database"}) do dofile("Trailwarden/"..name..".lua") end
+local W=Trailwarden
 check("entity getter called with documented dot signature",W.DBGet("Quest",1,"name")=="Contract quest 1")
 check("numeric nil fields on known quests are zero",W.Q(1,"requiredLevel")==0)
 check("structured empty objectives remain a table",type(W.Q(1,"objectives"))=="table" and W.Count((W.Q(1,"objectives")))==0)

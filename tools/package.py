@@ -1,12 +1,12 @@
-"""Create a reproducible, directly installable Wayfinder archive."""
+"""Create a reproducible, directly installable Trailwarden archive."""
 from pathlib import Path
 import os
 import re
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 root = Path(__file__).resolve().parents[1]
-addon = root / 'Wayfinder'
-toc = (addon / 'Wayfinder.toc').read_text()
+addon = root / 'Trailwarden'
+toc = (addon / 'Trailwarden.toc').read_text()
 match = re.search(r'^## Version: (\d+\.\d+\.\d+)$', toc, re.M)
 if not match:
     raise SystemExit('Unreleased development version: finish release prerequisites before packaging.')
@@ -17,7 +17,7 @@ for entry in toc.splitlines():
         raise SystemExit(f'Missing TOC dependency: {entry}')
 if not (addon / 'Media/Arrow.tga').is_file():
     raise SystemExit('Missing navigator texture')
-output = root / 'artifacts' / f'Wayfinder-{version}-Forever.zip'
+output = root / 'artifacts' / f'Trailwarden-{version}-Forever.zip'
 output.parent.mkdir(exist_ok=True)
 with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
     for path in sorted(addon.rglob('*')):
@@ -28,8 +28,8 @@ with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
             archive.writestr(info, path.read_bytes())
 with ZipFile(output) as archive:
     assert archive.testzip() is None
-    assert 'Wayfinder/Wayfinder.toc' in archive.namelist()
-    assert all(name.startswith('Wayfinder/') and '..' not in name for name in archive.namelist())
+    assert 'Trailwarden/Trailwarden.toc' in archive.namelist()
+    assert all(name.startswith('Trailwarden/') and '..' not in name for name in archive.namelist())
 print(output)
 if os.environ.get('GITHUB_OUTPUT'):
     with open(os.environ['GITHUB_OUTPUT'], 'a') as file:

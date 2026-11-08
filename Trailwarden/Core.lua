@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local frame=CreateFrame("Frame");W.EventFrame=frame
 local pending=false
 local pendingEvents={}
@@ -35,7 +35,7 @@ function W.Refresh(force,trigger)
             if status=="ok" then for _,step in ipairs(steps) do if step.key==prior.key then route=step;route.ownerKey=state.key;break end end end
         end
         if route then queue={};detail={clearPin=false,candidates={},commitment=W.Decision.commitment,recovering=true}
-        else route={kind="wait",key="error",title="Waiting for reliable quest data",instruction="The current update could not be completed. Wayfinder will retry; /wf debug contains the details.",reason=W.LastError,ownerKey=state.key};queue={};detail={candidates={},clearPin=false} end
+        else route={kind="wait",key="error",title="Waiting for reliable quest data",instruction="The current update could not be completed. Trailwarden will retry; /tw debug contains the details.",reason=W.LastError,ownerKey=state.key};queue={};detail={candidates={},clearPin=false} end
     elseif W.LastError then W.RecoveredError=W.LastError;W.LastError=nil end
     local decision={trigger=trigger or (force and "manual" or "refresh"),id=(W.Decision and W.Decision.id or 0)+1,state=state,route=W.Copy(route),queue=W.Copy(queue),detail=detail or {},commitment=detail and detail.commitment}
     -- Publish one completed decision; every visible output consumes this version.
@@ -65,7 +65,7 @@ local function schedule(force,event)
 end
 function W.Diagnostics()
     local s=W.State or W.ReadCharacter();local r=W.CurrentRoute or {};local n=W.Navigation or {}
-    local lines={"Wayfinder "..W.Version,"Decision: "..tostring(W.Decision and W.Decision.id).." / navigation "..tostring(n.decisionID).." / map "..tostring(W.WaypointDecisionID),
+    local lines={"Trailwarden "..W.Version,"Decision: "..tostring(W.Decision and W.Decision.id).." / navigation "..tostring(n.decisionID).." / map "..tostring(W.WaypointDecisionID),
         "Character: "..s.name.." / "..s.raceName.." "..s.className.." / level "..s.level,
         "Zone: "..s.zone.." / map "..tostring(s.mapID),"Quest log ready: "..tostring(s.questLogReady).." / history ready: "..tostring(s.historyReady),
         "Quest log: "..#s.activeQuests.." active / "..s.completedCount.." completed / revision "..tostring(s.revision),
@@ -74,7 +74,7 @@ function W.Diagnostics()
         "Map pins: "..tostring(W.OverlayStatus),"Planner work area: "..tostring(s.workArea and s.workArea.id).." / region "..tostring(s.regionMapID),
         "Access: "..tostring(n.travel and n.travel.mode).." / cave "..tostring(n.travel and n.travel.caveID).." / source "..tostring(n.travel and n.travel.entry and n.travel.entry.accessSource).." / error "..tostring(W.AccessError or "none"),
         "Navigation: "..(n.label or "none").." / distance "..tostring(n.distance),"Last plan: "..string.format("%.2f",W.LastPlanMilliseconds or 0).." ms / event "..tostring(W.LastEvent),
-        "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /wf trace (last 20 decisions)","Deferred / unmapped:"}
+        "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /tw trace (last 20 decisions)","Deferred / unmapped:"}
     for _,issue in ipairs(s.readIssues or {}) do lines[#lines+1]="Read issue: "..issue end
     for _,q in ipairs(W.Unmapped or {}) do lines[#lines+1]=q.id.." / "..q.title.." / "..q.reason end
     local e=W.SafeExperienceStats()
@@ -103,7 +103,7 @@ frame:SetScript("OnEvent",function(_,event,...)
     if event=="PLAYER_LOGIN" then
         W.ResetExperience();W.Safe(W.PollCombatSafety);W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
-        print("|cff5dd4d6Wayfinder "..W.Version.."|r / Your character's route is ready. |cffffc366/wf|r opens the guide; |cffffc366/wf help|r lists controls.")
+        print("|cff5dd4d6Trailwarden "..W.Version.."|r / Your character's route is ready. |cffffc366/tw|r opens the guide; |cffffc366/tw help|r lists controls.")
         return
     end
     local args={...}
@@ -151,8 +151,8 @@ frame:SetScript("OnUpdate",function(_,dt)
         end
     end
 end)
-SLASH_WAYFINDER1="/wayfinder";SLASH_WAYFINDER2="/wf"
-SlashCmdList.WAYFINDER=function(message)
+SLASH_TRAILWARDEN1="/trailwarden";SLASH_TRAILWARDEN2="/tw"
+SlashCmdList.TRAILWARDEN=function(message)
     local cmd=string.lower((message or ""):match("^%s*(.-)%s*$"));local p=W.GetProfile()
     local scale=cmd:match("^scale%s+(%d+)$");local arrowScale=cmd:match("^arrowscale%s+(%d+)$")
     if scale or arrowScale then W.SetDisplayScale(scale and "uiScale" or "navigatorScale",tonumber(scale or arrowScale)/100);return end
@@ -175,6 +175,6 @@ SlashCmdList.WAYFINDER=function(message)
     elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
     elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
     elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Wayfinder|r /wf, arrow, routepins, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
+    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
 end
 

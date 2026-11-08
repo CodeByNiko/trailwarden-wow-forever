@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 W.CombatLevelMargin=2
 local revision=0
 local units={target=true,mouseover=true}

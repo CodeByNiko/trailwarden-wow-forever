@@ -1,13 +1,13 @@
-name: Verify and release Wayfinder
+name: Verify and release Trailwarden
 on:
   push:
     branches: [main]
-    paths: ['Wayfinder/**', 'tools/**', 'tests/**', '.github/workflows/release.yml', 'docs/release-notes-*.md']
+    paths: ['Trailwarden/**', 'tools/**', 'tests/**', '.github/workflows/release.yml', 'docs/release-notes-*.md']
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: wayfinder-release-main
+  group: trailwarden-release-main
   cancel-in-progress: false
 jobs:
   verify-and-release:
@@ -24,17 +24,17 @@ jobs:
       - name: Publish version if it does not exist
         env:
           GH_TOKEN: ${{ github.token }}
-          WAYFINDER_VERSION: ${{ steps.package.outputs.version }}
-          WAYFINDER_ASSET: ${{ steps.package.outputs.asset }}
+          TRAILWARDEN_VERSION: ${{ steps.package.outputs.version }}
+          TRAILWARDEN_ASSET: ${{ steps.package.outputs.asset }}
         run: |
-          tag="v${WAYFINDER_VERSION}"
+          tag="v${TRAILWARDEN_VERSION}"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $tag already exists; keeping the published archive."
           else
-            gh release create "$tag" "$WAYFINDER_ASSET" \
+            gh release create "$tag" "$TRAILWARDEN_ASSET" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "Wayfinder $WAYFINDER_VERSION" \
-              --notes-file "docs/release-notes-${WAYFINDER_VERSION}.md"
+              --title "Trailwarden $TRAILWARDEN_VERSION" \
+              --notes-file "docs/release-notes-${TRAILWARDEN_VERSION}.md"
           fi
 

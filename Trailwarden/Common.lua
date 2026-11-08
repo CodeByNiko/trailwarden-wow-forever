@@ -1,6 +1,6 @@
-Wayfinder = Wayfinder or {}
-local W = Wayfinder
-W.Version = "1.7.1"
+Trailwarden = Trailwarden or {}
+local W = Trailwarden
+W.Version = "1.7.2"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)

@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local sessions={}
 local function clock() return W.Safe(GetTime) or W.Now() end
 local function finite(v) return W.IsFinite(v) and v>=0 end

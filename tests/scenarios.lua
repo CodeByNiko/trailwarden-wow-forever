@@ -132,8 +132,8 @@ LibQuestieDB={Quest=db(quests),Npc=db(npcs),Item=db(items),Object=db(objects),co
 local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=function(id) return id==17 end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
-local W=Wayfinder
+for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Trailwarden/"..file..".lua") end
+local W=Trailwarden
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
 local function button(prefix)
@@ -235,9 +235,9 @@ log[1].rows[1].finished=true;W.Refresh(false);check("finished objective releases
 -- Level 7 stays in Kalimdor even with an unrelated Eastern Kingdoms quest.
 ne();log={{id=10,title="The Night Watch",level=23,rows={{type="monster",objectiveID=300,text="Skeleton"}}}};scan();local rr=plan();check("night elf route stays local",rr.mapID==1438)
 -- Old 0.3.0 stages do not leak into a new profile.
-WayfinderDB.profiles["Fresh - Forever"]={waterTotemStage=5,navigatorHidden=true};player.name="Fresh";player.guid="Player-Fresh";local fresh=W.GetProfile()
+TrailwardenDB.profiles["Fresh - Forever"]={waterTotemStage=5,navigatorHidden=true};player.name="Fresh";player.guid="Player-Fresh";local fresh=W.GetProfile()
 check("migration preserves display preference",fresh.navigatorHidden==true)
-check("migration removes class-specific manual stage",fresh.waterTotemStage==nil and fresh.completed~=WayfinderDB.profiles["Player-Dwarf"].completed)
+check("migration removes class-specific manual stage",fresh.waterTotemStage==nil and fresh.completed~=TrailwardenDB.profiles["Player-Dwarf"].completed)
 
 -- All UI and login code executes against a strict frame API double.
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
@@ -438,9 +438,9 @@ C_QuestLog.GetMaxNumQuestsCanAccept=function() error("temporarily unavailable") 
 MAX_QUESTLOG_QUESTS=40;check("capacity falls back safely when client call fails",W.ReadCharacter().logLimit==40)
 MAX_QUESTLOG_QUESTS=nil;C_QuestLog.GetMaxNumQuestsCanAccept=nil
 -- Display adjustments are independent, persistent and bounded.
-SlashCmdList.WAYFINDER("scale 75");SlashCmdList.WAYFINDER("arrowscale 85")
+SlashCmdList.TRAILWARDEN("scale 75");SlashCmdList.TRAILWARDEN("arrowscale 85")
 check("panel and arrow accept independent exact scales",W.MainFrame.scale==.75 and W.NavigatorFrame.scale==.85)
-SlashCmdList.WAYFINDER("scale 1");SlashCmdList.WAYFINDER("arrowscale 999")
+SlashCmdList.TRAILWARDEN("scale 1");SlashCmdList.TRAILWARDEN("arrowscale 999")
 check("display scales clamp to usable limits",W.MainFrame.scale==.6 and W.NavigatorFrame.scale==1.5)
 W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
 local scaleHeader;for _,n in ipairs(nodes) do if n.parent==W.MainFrame and n.scripts.OnDragStart then scaleHeader=n end end
@@ -465,8 +465,8 @@ check("client XP event refreshes the live session",W.ExperienceStats().totalXP==
 local xpText=false;for _,node in ipairs(nodes) do if node.kind=="font" and node.text=="12,000" then xpText=true end end
 check("panel shows measured XP rate and next-level estimate",xpText and W.ExperienceStats().eta==210)
 check("XP gain and rewarded-kill events are registered",W.EventFrame.events.PLAYER_XP_UPDATE and W.EventFrame.events.CHAT_MSG_COMBAT_XP_GAIN)
-SlashCmdList.WAYFINDER("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
-SlashCmdList.WAYFINDER("xp");SlashCmdList.WAYFINDER("xpreset");check("session reset retains learned character preferences",W.ExperienceStats().totalXP==0 and W.GetProfile().xpRouting and W.GetProfile().queueRows==2)
+SlashCmdList.TRAILWARDEN("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
+SlashCmdList.TRAILWARDEN("xp");SlashCmdList.TRAILWARDEN("xpreset");check("session reset retains learned character preferences",W.ExperienceStats().totalXP==0 and W.GetProfile().xpRouting and W.GetProfile().queueRows==2)
 -- Leave a measured synthetic session for development UI renders.
 epoch=epoch+120;testXP=500;W.SampleExperience()
 

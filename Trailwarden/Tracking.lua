@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local defaults={routeOverlay=true,xpRouting=true,includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
 local function validID(id) return W.IsFinite(id) and id>0 and id%1==0 end
 local function cleanPosition(pos)
@@ -23,14 +23,14 @@ function W.GetCharacterKey()
     return W.Safe(UnitGUID,"player") or ((W.Safe(UnitName,"player") or "Unknown").." - "..(W.Safe(GetRealmName) or "Realm"))
 end
 function W.GetProfile()
-    if type(WayfinderDB)~="table" then WayfinderDB={} end
-    if type(WayfinderDB.profiles)~="table" then WayfinderDB.profiles={} end
+    if type(TrailwardenDB)~="table" then TrailwardenDB={} end
+    if type(TrailwardenDB.profiles)~="table" then TrailwardenDB.profiles={} end
     local key=W.GetCharacterKey()
-    local p=WayfinderDB.profiles[key]
+    local p=TrailwardenDB.profiles[key]
     if type(p)~="table" then
         local oldKey=(W.Safe(UnitName,"player") or "Unknown").." - "..(W.Safe(GetRealmName) or "Realm")
-        p=type(WayfinderDB.profiles[oldKey])=="table" and W.Copy(WayfinderDB.profiles[oldKey]) or {}
-        WayfinderDB.profiles[key]=p
+        p=type(TrailwardenDB.profiles[oldKey])=="table" and W.Copy(TrailwardenDB.profiles[oldKey]) or {}
+        TrailwardenDB.profiles[key]=p
     end
     for k,v in pairs(defaults) do if type(p[k])~=type(v) then p[k]=v end end
     if p.displayVersion~=2 then

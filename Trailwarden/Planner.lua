@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local labels={pickup="Accept: ",turnin="Turn in: ",objective="Quest: ",escort="Escort: ",deliver="Speak about: ",item="Start: "}
 local function makeStep(kind,q,point,target,suffix,source,objectiveText)
     local name=q.title or q.name or W.Q(q.id,"name") or ("Quest "..q.id)
@@ -336,11 +336,11 @@ end
 local function fallback(input)
     local s,m=input.state,input.meta
     local title,text="Finding your next quest"
-    if not s.questLogReady then title="Waiting for your quest log";text="The live quest log is not ready. Wayfinder will retry without guessing your progress."
+    if not s.questLogReady then title="Waiting for your quest log";text="The live quest log is not ready. Trailwarden will retry without guessing your progress."
     elseif not m.ready then text=m.databaseStatus
     elseif not s.historyReady then text="Waiting for completed quest history. Active quests remain usable; database pickups wait for confirmation."
     elseif s.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
-    elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /wf debug for details."
+    elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /tw debug for details."
     else text="No eligible mapped step is available. Inspect a quest giver, restore skipped quests or refresh your quest data." end
     local unsafe=0
     for _,q in ipairs(m.deferred) do if q.safety then unsafe=unsafe+1 end end
@@ -350,7 +350,7 @@ end
 -- Pure selector: plain snapshot in, plain decision out. No game/provider/profile writes.
 function W.SelectRoute(input)
     local state=input.state;local w=input.weights or W.RouteWeights
-    if state.profile.paused then return {kind="wait",key="paused",title="Route paused",instruction="Resume when you want Wayfinder to plan your next quest step.",reason="Quest progress is still recorded.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
+    if state.profile.paused then return {kind="wait",key="paused",title="Route paused",instruction="Resume when you want Trailwarden to plan your next quest step.",reason="Quest progress is still recorded.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
     if state.dead then return {kind="wait",key="dead",title="Return to your character",instruction="Quest navigation resumes after you are alive again.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
     if not state.questLogReady then return fallback(input),{},{clearPin=false,candidates={}} end
     local danger=state.combatSafety and state.combatSafety.alert

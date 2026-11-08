@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.2
+
+- Rename to Trailwarden across the addon, commands, settings, map registration and release packaging.
+- Add one-time settings migration instructions and a copy utility that preserves the original.
+- Retain the 1.7.1 routing behavior.
+
 ## 1.7.1
 
 - Protect unfinished local work against remote objectives as well as town returns; XP cannot override the boundary.
@@ -57,7 +63,7 @@
 - Combine nearby accepted work and shared hand-ins without duplicating rewards or common sources.
 - Rank modeled cycles by conservative XP return while retaining local batching and manual focus.
 - Compare verified local kill XP with quest estimates and offer bounded, dismissible grind breaks.
-- Add compact XP lines, tooltips, XP-aware routing setting and /wf xp /wf xpreset.
+- Add compact XP lines, tooltips, XP-aware routing setting and /tw xp /tw xpreset.
 - 270 checks and 16 replay frames; live-client verification remains outstanding.
 
 ## 1.3.0
@@ -90,7 +96,7 @@
 - Reject non-finite/degenerate map data and clear owned markers after rejected updates.
 - Avoid full idle planning every two seconds while retaining event and movement updates.
 - Reuse successful module imports; recover from temporary missing modules.
-- Add visible Undo skip, empty-plan guidance, window locking and `/wf settings`.
+- Add visible Undo skip, empty-plan guidance, window locking and `/tw settings`.
 - Fix Resume route, bound long titles, repair invalid saved display preferences,
   and improve recovery diagnostics.
 - Expand automated coverage from 59 to 93 checks.

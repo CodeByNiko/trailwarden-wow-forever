@@ -1,7 +1,11 @@
-WAYFINDER 1.7.1 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.7.2 — WORLD OF WARCRAFT: FOREVER
 
-Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
+Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
+
+Renamed from Wayfinder in 1.7.2. Commands: /tw and /trailwarden.
+For existing settings, exit WoW and follow:
+https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md
 
 1.7.1 keeps accepted local collection ahead of distant quest objectives,
 even when an outside XP estimate is higher. Recent actual quest progress
@@ -31,33 +35,33 @@ not a terrain-safe walking path: use roads, bridges and cave entrances.
 Click a planned step to focus it; Auto route restores automatic selection.
 Accepted above-range quests remain visible. Skip for now saves one until it
 fits your level range; Later queue entries can be clicked to resume now.
-Skip 15 min remains available through /wf skip; /wf undo restores either skip.
+Skip 15 min remains available through /tw skip; /tw undo restores either skip.
 
 Mouse wheel over the header resizes the panel, over the arrow resizes the
 navigator. Both scales are independent. Settings offer 0/2/4 planned steps.
 The arrow has a transparent background. Locking prevents wheel resizing.
 
-/wf           show/hide panel
-/wf arrow     show/hide navigator
-/wf routepins toggle Wayfinder entrance/objective map markers
-/wf settings  open character preferences
-/wf lock      lock/unlock window positions
-/wf refresh   explicitly reconsider region and choose an automatic route
-/wf rebuild   rebuild the data index
-/wf skip      defer current quest for 15 minutes
-/wf later     save above-range accepted quest until within level range
-/wf undo      undo last skip
-/wf scale 80  panel size in percent (60-130)
-/wf arrowscale 90  arrow size in percent (60-150)
-/wf pause     pause navigation
-/wf resume    resume navigation
-/wf group     include/exclude known group quests
-/wf auto      toggle the native map waypoint
-/wf reset     restore window positions
-/wf xp        toggle XP-aware route ranking
-/wf xpreset   reset current XP session; retain learned pace
-/wf debug     copy local diagnostics
-/wf trace     copy recent local decisions for replay (before reload/logout)
+/tw           show/hide panel
+/tw arrow     show/hide navigator
+/tw routepins toggle Trailwarden entrance/objective map markers
+/tw settings  open character preferences
+/tw lock      lock/unlock window positions
+/tw refresh   explicitly reconsider region and choose an automatic route
+/tw rebuild   rebuild the data index
+/tw skip      defer current quest for 15 minutes
+/tw later     save above-range accepted quest until within level range
+/tw undo      undo last skip
+/tw scale 80  panel size in percent (60-130)
+/tw arrowscale 90  arrow size in percent (60-150)
+/tw pause     pause navigation
+/tw resume    resume navigation
+/tw group     include/exclude known group quests
+/tw auto      toggle the native map waypoint
+/tw reset     restore window positions
+/tw xp        toggle XP-aware route ranking
+/tw xpreset   reset current XP session; retain learned pace
+/tw debug     copy local diagnostics
+/tw trace     copy recent local decisions for replay (before reload/logout)
 
 Automatic combat targets require known enemy levels no more than +2 above you.
 Quest level does not override enemy level. Unknown/dangerous sources are held;
@@ -71,7 +75,7 @@ This is not a danger-free terrain pathfinder; remain aware of surroundings.
 Regional batches remain committed while useful mapped work exists. XP events
 update measurement without rebuilding the whole plan after each kill. Accepted
 quests still advance from real progress. Auto route respects this region;
-Replan region now in settings or /wf refresh can reconsider other zones.
+Replan region now in settings or /tw refresh can reconsider other zones.
 
 XP/h and next-level ETA use actual XP bar gains, including kills and quests.
 Travel/downtime count; explicit pause/AFK do not. The first minute collects data.
@@ -85,5 +89,5 @@ quests use Questie and the quest text. Progress, preferences and skips belong
 to this character; no shaman-specific manual stages are reused on alts.
 
 Source, documentation and releases:
-https://github.com/CodeByNiko/wayfinder-wow-forever
+https://github.com/CodeByNiko/trailwarden-wow-forever
 

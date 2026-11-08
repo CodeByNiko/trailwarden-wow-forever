@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 local C={bg={0.025,0.043,0.065,0.97},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},line={0.15,0.25,0.31,1},text={0.93,0.94,0.94},muted={0.59,0.69,0.74},cyan={0.36,0.83,0.84},gold={0.98,0.76,0.40},green={0.48,0.83,0.64}}
 W.Colors=C
 function W.Font(parent,size,color)
@@ -60,12 +60,12 @@ end
 function W.CreateUI()
     if frame then return end
     local p=W.GetProfile()
-    frame=CreateFrame("Frame","WayfinderMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
+    frame=CreateFrame("Frame","TrailwardenMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
     frame:SetSize(360,526);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(358,50);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
-    atText(head,"WAYFINDER",15,C.text,15,8,210,20)
+    atText(head,"TRAILWARDEN",15,C.text,15,8,210,20)
     fields.subtitle=atText(head,"",9,C.muted,15,29,320,16)
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(358,1)
     local close=W.Button(head,"x",22,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-9,-10);close:SetHeight(22)
@@ -119,7 +119,7 @@ function W.CreateUI()
             "Quest projections include remaining work, travel and reward collection. New unaccepted quest quantities may be uncertain.",
             "Grind comparison: "..W.FormatXP(e.grind and e.grind.rate).." XP/h from verified local kills.",
             "The current region and unfinished objective stay committed; XP changes do not send you back and forth between zones.",
-            W.ForecastError and "Forecast temporarily unavailable. Normal quest guidance remains active." or "Grind comparison needs at least 8 verified kills over 2 minutes. /wf xpreset resets session statistics."})
+            W.ForecastError and "Forecast temporarily unavailable. Normal quest guidance remains active." or "Grind comparison needs at least 8 verified kills over 2 minutes. /tw xpreset resets session statistics."})
     end)
     xpHover:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     fields.skip=W.Button(body,"Skip 15 min",96,function() local r=W.CurrentRoute;local state=W.State;if W.DeferLevel(r,state) then W.DeferCurrent() else W.SkipCurrent() end end);fields.skip:SetPoint("BOTTOMLEFT",16,12)
@@ -156,7 +156,7 @@ function W.CreateUI()
     local back=W.Button(settings,"Back to your route",328,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-510)
     head:EnableMouseWheel(true)
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
-    head:SetScript("OnEnter",function(self) W.Tooltip(self,"Wayfinder",{"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
+    head:SetScript("OnEnter",function(self) W.Tooltip(self,"Trailwarden",{"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
     head:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     W.ApplyPositions();layout();if p.panelHidden then frame:Hide() end
 end
@@ -185,9 +185,9 @@ function W.UpdateUI()
         if step then row.title:SetText(step.safetyHeld and step.title or step.levelDeferred and ("Later: "..(step.questName or step.title)) or step.title);row.detail:SetText(step.safetyHeld and (step.resumeLevel and ("Enemy levels / reconsider at level "..step.resumeLevel) or "Combat level data unverified") or step.levelDeferred and ("Returns at level "..step.resumeLevel.." / click to resume now") or (step.target or W.MapName(step.mapID)).."  /  "..(step.mapID and W.MapName(step.mapID) or "Your bags")) end
     end
     local status=string.format("%s  /  %d active  /  %d completed  /  %d free slots",state.zone,#state.activeQuests,state.completedCount,state.freeSlots)
-    if W.CatalogError then status=status.."\nQuest catalog needs attention / /wf debug"
+    if W.CatalogError then status=status.."\nQuest catalog needs attention / /tw debug"
     elseif not W.CatalogReady then status=status.."\n"..(W.DatabaseStatus or "Waiting for data")
-    elseif #(W.Unmapped or {})>0 then status=status.."\n"..#W.Unmapped.." deferred or unmapped quest(s)  /  /wf debug" end
+    elseif #(W.Unmapped or {})>0 then status=status.."\n"..#W.Unmapped.." deferred or unmapped quest(s)  /  /tw debug" end
     if not state.historyReady and not W.CatalogError and W.CatalogReady and #(W.Unmapped or {})==0 then status=status.."\nAwaiting completed quest history" end
     local safetyCount=0;local safetyReason
     for _,q in ipairs(W.Unmapped or {}) do if q.safety then safetyCount=safetyCount+1;safetyReason=safetyReason or q.reason end end
@@ -240,8 +240,8 @@ function W.ToggleUI()
 end
 function W.ShowDiagnostics(content)
     if not W.DiagnosticsFrame then
-        local f=CreateFrame("Frame","WayfinderDiagnosticsFrame",UIParent,"BackdropTemplate");f:SetSize(510,370);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");f:EnableMouse(true);W.Backdrop(f)
-        atText(f,"WAYFINDER / DIAGNOSTICS",12,C.cyan,16,16,470,20)
+        local f=CreateFrame("Frame","TrailwardenDiagnosticsFrame",UIParent,"BackdropTemplate");f:SetSize(510,370);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");f:EnableMouse(true);W.Backdrop(f)
+        atText(f,"TRAILWARDEN / DIAGNOSTICS",12,C.cyan,16,16,470,20)
         local scroll=CreateFrame("ScrollFrame",nil,f,"UIPanelScrollFrameTemplate");scroll:SetPoint("TOPLEFT",16,-48);scroll:SetSize(452,265)
         local edit=CreateFrame("EditBox",nil,scroll);edit:SetMultiLine(true);edit:SetAutoFocus(false);edit:SetFontObject(ChatFontNormal);edit:SetWidth(450)
         scroll:SetScrollChild(edit);edit:SetScript("OnEscapePressed",function() f:Hide() end)

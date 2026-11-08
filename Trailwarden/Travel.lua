@@ -1,4 +1,4 @@
-local W=Wayfinder
+local W=Trailwarden
 -- Cave bounds from OpenMap's MIT-licensed Forever Caves.lua (build 1.60.1.70245).
 -- Entrance world coordinates are the game's AreaPOI positions (908/909/911).
 -- These are access points, not a terrain mesh or a tunnel graph.
