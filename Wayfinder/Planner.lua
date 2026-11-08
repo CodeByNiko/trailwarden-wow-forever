@@ -21,17 +21,34 @@ local function relationPoint(q,field,kind,state)
     return W.NearestPoint(W.RelationPoints(q.id,field),state.player,state.mapID),"QuestieDB"
 end
 local typeName={[1]="monster",[2]="object",[3]="item"}
-local function objectiveFinished(q,group,index,entry,total)
+local function objectiveFinished(q,group,index,entry,entries)
     local kind=typeName[group]
     local entityKind=group==1 and "Npc" or group==2 and "Object" or "Item"
-    local name=W.DBGet(entityKind,entry[1],"name")
     local typed={}
-    for _,row in ipairs(q.objectives) do
-        if row.type==kind then typed[#typed+1]=row end
-        if row.id==entry[1] or (name and name~="" and string.find(string.lower(row.text),string.lower(name),1,true)) then return row.finished,row.text end
+    for _,row in ipairs(q.objectives) do if row.type==kind then typed[#typed+1]=row end end
+    local assigned,used={},{}
+    for rowIndex,row in ipairs(typed) do
+        local winner,length,tied=nil,0,false
+        for i,candidate in ipairs(entries) do
+            local name=W.DBGet(entityKind,candidate[1],"name")
+            if name and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
+                if #name>length then winner,length,tied=i,#name,false elseif #name==length then tied=true end
+            end
+        end
+        if winner and not tied and not assigned[winner] then assigned[winner]=row;used[rowIndex]=true end
     end
-    if #typed==total and typed[index] then return typed[index].finished,typed[index].text end
-    return false
+    if #typed==#entries then
+        local missingEntries,missingRows={},{}
+        for i=1,#entries do if not assigned[i] then missingEntries[#missingEntries+1]=i end end
+        for i,row in ipairs(typed) do if not used[i] then missingRows[#missingRows+1]=row end end
+        if #missingEntries==1 and #missingRows==1 then assigned[missingEntries[1]]=missingRows[1]
+        elseif #missingEntries==#entries then
+            -- If no names are available, retain the provider's type-local order.
+            for i,row in ipairs(typed) do assigned[i]=row end
+        end
+    end
+    local row=assigned[index]
+    return row and row.finished or false,row and row.text
 end
 local function entityObjectivePoints(kind,id,state)
     if kind=="Npc" and not state.profile.includeGroup then
@@ -44,7 +61,10 @@ local function itemPoints(id,state)
     local out={}
     for field,kind in pairs({npcDrops="Npc",objectDrops="Object",vendors="Npc"}) do
         for _,entityID in ipairs(W.DBGet("Item",id,field) or {}) do
-            for _,point in ipairs(entityObjectivePoints(kind,entityID,state)) do out[#out+1]=point end
+            for _,point in ipairs(entityObjectivePoints(kind,entityID,state)) do
+                local source={};for k,v in pairs(point) do source[k]=v end
+                source.acquisition=field;out[#out+1]=source
+            end
         end
     end
     return out
@@ -69,7 +89,7 @@ function W.ActiveSteps(q,state)
     for group=1,3 do
         local entries=objectives[group] or {}
         for i,entry in ipairs(entries) do
-            local finished,text=objectiveFinished(q,group,i,entry,#entries)
+            local finished,text=objectiveFinished(q,group,i,entry,entries)
             if not finished then
                 local kind=group==1 and "Npc" or "Object"
                 local points=group==3 and itemPoints(entry[1],state) or entityObjectivePoints(kind,entry[1],state)
@@ -77,6 +97,10 @@ function W.ActiveSteps(q,state)
                 if p then
                     local target=W.DBGet(group==3 and "Item" or kind,entry[1],"name") or p.name or "the objective area"
                     local detail=text or (group==1 and "Defeat " or group==2 and "Interact with " or "Collect ")..target.."."
+                    if group==3 then
+                        local action=p.acquisition=="vendors" and "Buy from " or p.acquisition=="objectDrops" and "Search " or "Defeat "
+                        detail=(text and (text..". ") or ("Collect "..target..". "))..action..(p.name or "the source").."."
+                    end
                     out[#out+1]=makeStep("objective",q,p,target,typeName[group]..":"..entry[1],"QuestieDB",detail)
                 end
             end

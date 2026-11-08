@@ -18,6 +18,9 @@ function methods:SetWidth(w) self.w=w end
 function methods:SetHeight(h) self.h=h end
 function methods:SetText(t) self.text=t or "" end
 function methods:SetFont(path,size) self.fontSize=size end
+function methods:GetStringHeight()
+ return math.max(1,math.ceil(#self.text*(self.fontSize or 10)*.52/math.max(1,self.w)))*(self.fontSize or 10)*1.2
+end
 function methods:SetTextColor(...) self.textColor={...} end
 function methods:SetBackdropColor(...) self.bgColor={...} end
 function methods:SetColorTexture(...) self.bgColor={...} end
@@ -112,6 +115,12 @@ local npcs={
 }
 local items={[400]={name="Wolf pelt",npcDrops={300}},[401]={name="First item",npcDrops={301}},[402]={name="Second item",objectDrops={501}},[900]={name="Quest letter"}}
 local objects={[500]={name="Ancient sign",spawns={[20]={{57,60}}}},[501]={name="Quest chest",spawns={[20]={{70,65}}}}}
+quests[40]={name="Similar creature names",questLevel=7,objectives={{{303},{304}}}}
+quests[41]={name="Vendor supplies",questLevel=7,objectives={[3]={{403}}}}
+npcs[303]={name="Wolf",spawns={[20]={{58,60}}}}
+npcs[304]={name="Dire Wolf",spawns={[20]={{68,60}}}}
+npcs[202]={name="Quartermaster",spawns={[20]={{57,61}}}}
+items[403]={name="Supply pack",vendors={202}}
 local numeric={requiredLevel=true,questLevel=true,requiredRaces=true,requiredClasses=true,requiredMaxLevel=true,requiredSpell=true,requiredSpecialization=true,specialFlags=true,questFlags=true,rank=true}
 local function db(data)
  return {Get=function(id,key) local r=data[id];if not r then return nil end if r[key]~=nil then return r[key] end if numeric[key] then return 0 end if key=="startedBy" or key=="finishedBy" or key=="objectives" then return {} end end,
@@ -125,6 +134,11 @@ QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qm
 for _,file in ipairs({"Common","Data","Tracking","Database","Planner","UI","Navigator","Core"}) do dofile("Wayfinder/"..file..".lua") end
 local W=Wayfinder
 local passed=0
+function methods:StartMoving() self.moves=(self.moves or 0)+1 end
+local function button(prefix)
+ for _,n in ipairs(nodes) do if n.kind=="Button" and n.label and n.label.text:sub(1,#prefix)==prefix then return n end end
+ error("Button not found: "..prefix)
+end
 local function check(name,condition) assert(condition,"FAILED: "..name);passed=passed+1;print("PASS "..name) end
 local function drain() local n=0 while #tasks>0 do local fn=table.remove(tasks,1);fn();n=n+1;assert(n<2000,"timer loop") end end
 local function scan() W.CurrentRoute=nil;return W.ScanCharacter() end
@@ -230,6 +244,80 @@ check("main and navigator created",W.MainFrame and W.NavigatorFrame)
 check("main panel compact enough",W.MainFrame.w==400 and W.MainFrame.h==626)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
+-- 1.1 quality regressions.
+ne();log={{id=40,title="Similar creature names",rows={{type="monster",objectiveID=9901,text="Dire Wolf: 4/4",finished=true},{type="monster",objectiveID=9902,text="Wolf: 0/4",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("similar names and reversed objective order do not suppress unfinished target",#activeSteps==1 and activeSteps[1].target=="Wolf")
+log={{id=41,title="Vendor supplies",rows={{type="item",text="Supply pack: 0/1",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("vendor item instruction says buy",activeSteps[1] and activeSteps[1].instruction:find("Buy from Quartermaster",1,true)~=nil)
+check("source annotations do not mutate cached NPC points",W.EntityPoints("Npc",202)[1].acquisition==nil)
+log={{id=31,title="Two items",rows={{type="item",text="First item",finished=true},{type="item",text="Second item",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("object item instruction says search",activeSteps[1] and activeSteps[1].instruction:find("Search Quest chest",1,true)~=nil)
+dwarf();log={{id=15,title="Gather wolf pelts",rows={{type="item",text="Wolf pelt",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("creature item instruction says defeat",activeSteps[1] and activeSteps[1].instruction:find("Defeat Skeleton",1,true)~=nil)
+check("non-finite map inputs rejected",W.Point(1431,0/0,.5)==nil and W.Point(1431,math.huge,.5)==nil)
+local worldAPI=C_Map.GetWorldPosFromMapPos
+C_Map.GetWorldPosFromMapPos=function(id,p) if id==999 then return 0,CreateVector2D(0,0) end return worldAPI(id,p) end
+check("degenerate map transform does not report false position",W.Point(999,.5,.5).wx==nil)
+C_Map.GetWorldPosFromMapPos=worldAPI;maps[999]={c=0,ox=0,oy=0,w=4000,h=3000}
+check("map transform recovers when data becomes valid",W.Point(999,.5,.5).wx~=nil)
+local facingAPI=GetPlayerFacing;GetPlayerFacing=function() return nil end
+local pnt=W.Point(1431,.8,.5)
+check("missing facing is explicit",W.NavigationInfo({kind="objective",key="facing",point=pnt,mapID=1431,x=.8,y=.5}).label=="Facing unavailable")
+GetPlayerFacing=facingAPI
+player.x=.5;player.y=.5
+local near=W.Point(1431,.5033,.5);local arrival={kind="pickup",key="arrival",point=near,mapID=1431,x=near.x,y=near.y}
+check("arrival enters within interaction radius",W.NavigationInfo(arrival).arrived==true)
+player.x=.4986;check("arrival tolerates small position jitter",W.NavigationInfo(arrival).arrived==true)
+player.x=.496;check("arrival releases after leaving area",W.NavigationInfo(arrival).arrived~=true)
+W.SyncWaypoint(arrival,true);old=clearCount
+local setAPI=C_Map.SetUserWaypoint;C_Map.SetUserWaypoint=function() return false end
+W.SyncWaypoint({kind="pickup",key="rejected",point=pnt,mapID=1431,x=.8,y=.5},true)
+check("rejected replacement clears stale owned marker",clearCount==old+1 and W.WaypointStatus=="Map waypoint rejected")
+C_Map.SetUserWaypoint=setAPI
+local p=W.GetProfile();p.uiScale=0/0;p.maxLevelAbove=999;p.locked="bad";p=W.GetProfile()
+check("invalid saved preference values repaired",p.uiScale==1 and p.maxLevelAbove==2 and p.locked==false)
+p.skipped.expired=epoch-1;p.lastSkipped="expired";W.GetProfile();check("expired skip clears undo state",p.lastSkipped==nil)
+local moduleAPI=QuestieLoader.ImportModule;local moduleCalls=0;local late=nil
+QuestieLoader.ImportModule=function(self,name) if name=="LateModule" then moduleCalls=moduleCalls+1;return late end return moduleAPI(self,name) end
+check("unavailable modules can be retried",W.Import("LateModule")==nil);late={ready=true};check("late module becomes available",W.Import("LateModule")==late)
+W.Import("LateModule");check("available module imports are reused",moduleCalls==2)
+QuestieLoader.ImportModule=moduleAPI
+-- Idle work is throttled, while movement/events still update the route.
+ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false}}}};W.Refresh(true)
+local executions=W.PlanExecutions
+for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2) end
+check("standing still avoids repeated full planning",W.PlanExecutions==executions)
+epoch=epoch+6;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
+player.x=player.x+.01;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
+W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+3)
+local planAPI=W.PlanRoute;W.PlanRoute=function() error("synthetic planner failure") end;W.Refresh(true)
+check("planning failure produces recoverable visible state",W.CurrentRoute.key=="error" and W.LastError~=nil)
+W.PlanRoute=planAPI;W.Refresh(true);check("successful refresh clears current error and retains recovery details",W.LastError==nil and W.RecoveredError~=nil)
+-- Visible UI controls perform their advertised actions.
+W.ToggleSettings();local group=button("Quest difficulty:");group.scripts.OnClick();check("group setting callback updates character preference",W.GetProfile().includeGroup==true);group.scripts.OnClick()
+local lock=button("Window positions:");lock.scripts.OnClick();check("window lock preference enabled",W.GetProfile().locked==true)
+local header
+for _,n in ipairs(nodes) do if n.parent==W.MainFrame and n.scripts.OnDragStart then header=n end end
+local mainMoves=W.MainFrame.moves or 0;local navMoves=W.NavigatorFrame.moves or 0
+header.scripts.OnDragStart();W.NavigatorFrame.scripts.OnDragStart(W.NavigatorFrame)
+check("locked windows ignore accidental drags",(W.MainFrame.moves or 0)==mainMoves and (W.NavigatorFrame.moves or 0)==navMoves)
+lock.scripts.OnClick();header.scripts.OnDragStart();W.NavigatorFrame.scripts.OnDragStart(W.NavigatorFrame)
+check("unlocked windows remain draggable",W.MainFrame.moves==mainMoves+1 and W.NavigatorFrame.moves==navMoves+1)
+button("Back to your route").scripts.OnClick()
+W.GetProfile().paused=true;W.Refresh(true);button("Resume route").scripts.OnClick();check("resume button actually resumes routing",not W.GetProfile().paused and W.CurrentRoute.key~="paused")
+W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately visible",undo.shown==true);undo.scripts.OnClick();check("undo control restores quest",W.GetProfile().lastSkipped==nil and undo.shown==false)
+W.Queue={};W.UpdateUI();local empty
+for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
+check("empty planned list explains what happens next",empty and empty.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==382 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=false;W.Refresh(true)
+local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
+W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
+local titleNode
+for _,n in ipairs(nodes) do if n.kind=="font" and n.text==longTitle then titleNode=n end end
+check("long current titles shrink within their allocated text area",titleNode and titleNode.fontSize<16 and titleNode:GetStringHeight()<=43)
+W.CurrentRoute=originalRoute;W.UpdateUI()
+
 print(string.format("%d scenario checks passed",passed))
 -- Export actual frame calls, not an independently designed mockup.
 local function quote(v) return string.format('%q',v):gsub('\\\n','\\n') end
@@ -246,3 +334,6 @@ local function snapshot(path)
 end
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);local cs=W.ActiveSteps(W.State.activeQuests[1],W.State)[1];W.PinStep(cs);snapshot('tests/ui-nightelf.json')
 dwarf();log={{id=10,title="The Night Watch",level=23,rows={{type="monster",objectiveID=300,text="Skeleton: 0/8",numFulfilled=0,numRequired=8}}}};W.Refresh(true);snapshot('tests/ui-dwarf.json')
+
+W.ToggleSettings();snapshot('tests/ui-settings.json');button("Back to your route").scripts.OnClick()
+W.Queue={};W.UpdateUI();snapshot('tests/ui-empty.json')

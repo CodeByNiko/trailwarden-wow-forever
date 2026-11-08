@@ -1,6 +1,6 @@
-# Validation for 1.0.0
+# Validation for 1.1.0
 
-59 deterministic scenario checks pass locally. The local runner used system Lua 5.4 with test-only compatibility aliases for Lua 5.1 globals; the release workflow installs and runs Lua 5.1 before it can publish a package.
+93 deterministic scenario checks pass locally. The local runner used system Lua 5.4 with test-only compatibility aliases for Lua 5.1 globals; the release workflow installs and runs Lua 5.1 before it can publish a package.
 
 The scenarios cover:
 
@@ -34,3 +34,13 @@ screenshots from the Forever client and use a substitute font.
 Live-client testing is still outstanding. In particular, actual database coverage,
 quest objective ordering, map/phase placement and native client behavior need the
 user's gameplay feedback. Automated scenarios cannot prove those external facts.
+
+## Additional 1.1 regressions
+
+Similar creature names and reordered objectives; buy/search/defeat item instructions;
+non-mutating source metadata; invalid/degenerate/recovering map projections; missing
+facing; arrival jitter and exit; rejected native waypoint updates; saved display
+preference repair; expired undo state; retry/caching of optional modules; idle,
+movement and event refresh behavior; recovery after planner failure; actual settings
+callbacks; locked/unlocked drags; resume, visible undo, empty-list and compact-mode
+behavior; fitting long current titles inside their text allocation.

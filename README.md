@@ -6,14 +6,14 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.0.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.1.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
 
 The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When using GitHub's **Code → Download ZIP**, copy the inner `Wayfinder` folder from the repository archive.
 
-## What 1.0 does
+## What Wayfinder does
 
 - Resumes existing characters and new characters from their own live progress. Profiles, skips, preferences and learned completion history are separate per character.
 - Plans **accept → quest objective → return → turn in → unlocked follow-up** actions. It never marks a quest complete simply because you arrived somewhere.
@@ -27,16 +27,24 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 
 This is balanced quest routing, with a preference for coherent nearby work. It is a heuristic planner, not a claim of a globally fastest leveling route.
 
+## New in 1.1
+
+The polish release adds stable arrival transitions, clearer buy/search/defeat instructions for item quests, an immediate Undo skip control, a useful empty-plan message and window locking. It fixes similar-name objective matching, rejected/stale map markers and the Resume route button. Stationary characters no longer trigger a full route plan every two seconds; quest events and meaningful movement still refresh the plan.
+
+See [1.1 quality review](docs/V1.1-quality-review.md).
+
 ## Using it
 
 The main window explains the next action. The arrow shows direction to that action. At the quest giver it says **Accept at quest giver** or **Turn in here**; in an objective area it says **Work in this area**. Accept, quest and turn in normally, and Wayfinder selects the next step from the updated quest log.
 
-Drag the window's header or the navigator to move them. **−/+** collapses the planned list. **…** opens character preferences: solo/group quests, comfort level (+2/+4), automatic map waypoint, navigator visibility, scale and pause/resume. Closing the main window leaves the navigator available.
+Drag the window's header or the navigator to move them. **−/+** collapses the planned list. **…** opens character preferences: solo/group quests, comfort level (+2/+4), automatic map waypoint, navigator visibility, scale, window locking and pause/resume. Closing the main window leaves the navigator available.
 
 | Command | Action |
 | --- | --- |
 | `/wf` | Show/hide the guide |
 | `/wf arrow` | Show/hide the navigator |
+| `/wf settings` | Open/close character preferences |
+| `/wf lock` | Lock/unlock window positions |
 | `/wf refresh` | Rescan progress and return to automatic routing |
 | `/wf skip`, `/wf undo` | Defer the current quest for 15 minutes / undo the last skip |
 | `/wf pause`, `/wf resume` | Pause/resume route navigation |

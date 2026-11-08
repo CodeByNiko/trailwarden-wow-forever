@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0
+
+- Match similar objective names by specificity, including reordered live rows.
+- Explain whether an item is bought, looted from a creature or searched for in an object.
+- Stabilize arrival states and show missing facing explicitly.
+- Reject non-finite/degenerate map data and clear owned markers after rejected updates.
+- Avoid full idle planning every two seconds while retaining event and movement updates.
+- Reuse successful module imports; recover from temporary missing modules.
+- Add visible Undo skip, empty-plan guidance, window locking and `/wf settings`.
+- Fix Resume route, bound long titles, repair invalid saved display preferences,
+  and improve recovery diagnostics.
+- Expand automated coverage from 59 to 93 checks.
+
 ## 1.0.0
 
 - Replaced character-specific zone fallbacks with a common live quest planner.

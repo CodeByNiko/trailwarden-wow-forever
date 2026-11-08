@@ -1,4 +1,4 @@
-WAYFINDER 1.0.0 — WORLD OF WARCRAFT: FOREVER
+WAYFINDER 1.1.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -17,6 +17,8 @@ Skip 15 min defers a missing or unwanted quest; /wf undo restores it.
 
 /wf           show/hide panel
 /wf arrow     show/hide navigator
+/wf settings  open character preferences
+/wf lock      lock/unlock window positions
 /wf refresh   rescan and choose an automatic route
 /wf rebuild   rebuild the data index
 /wf skip      defer current quest for 15 minutes

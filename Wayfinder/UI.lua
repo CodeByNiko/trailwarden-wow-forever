@@ -13,6 +13,8 @@ function W.Button(parent,label,width,onClick)
     local b=CreateFrame("Button",nil,parent,"BackdropTemplate");b:SetSize(width,28);W.Backdrop(b,C.raised)
     b.label=W.Font(b,10,C.text);b.label:SetPoint("CENTER");b.label:SetJustifyH("CENTER");b.label:SetText(label)
     b:SetScript("OnClick",onClick)
+    b:SetScript("OnDisable",function(self) self.label:SetTextColor(unpack(C.muted)) end)
+    b:SetScript("OnEnable",function(self) self.label:SetTextColor(unpack(C.text)) end)
     b:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan)) end)
     b:SetScript("OnLeave",function(self) self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
     return b
@@ -42,6 +44,8 @@ local function layout()
     frame:SetHeight(compact and 382 or 626)
     if settingsOpen then body:Hide();settings:Show() else body:Show();settings:Hide() end
     fields.thenLabel:SetShown(not compact);fields.status:SetShown(not compact)
+    fields.empty:SetShown(not compact and #(W.Queue or {})==0)
+    fields.undo:SetShown(not compact and p.lastSkipped~=nil)
     for _,r in ipairs(rows) do r:SetShown(not compact and r.step~=nil) end
     fields.fold.label:SetText(p.collapsed and "+" or "-")
 end
@@ -51,14 +55,14 @@ function W.CreateUI()
     frame=CreateFrame("Frame","WayfinderMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
     frame:SetSize(400,626);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(398,60);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
-    head:SetScript("OnDragStart",function() frame:StartMoving() end)
+    head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
     atText(head,"WAYFINDER",15,C.text,15,12,220,20)
     fields.subtitle=atText(head,"",9,C.muted,15,35,300,16)
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(398,1)
     local close=W.Button(head,"x",22,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-9,-10);close:SetHeight(22)
     fields.fold=W.Button(head,"-",22,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-36,-10);fields.fold:SetHeight(22)
-    local config=W.Button(head,"...",28,function() settingsOpen=not settingsOpen;W.UpdateUI();layout() end);config:SetPoint("TOPRIGHT",-63,-10);config:SetHeight(22)
+    local config=W.Button(head,"...",28,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-63,-10);config:SetHeight(22)
     body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
     fields.eyebrow=atText(body,"YOUR NEXT STEP",10,C.cyan,16,75,220,14)
     fields.mode=atText(body,"SOLO",9,C.muted,250,75,134,14);fields.mode:SetJustifyH("RIGHT")
@@ -76,7 +80,9 @@ function W.CreateUI()
     local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");strip:SetPoint("TOPLEFT",16,-296);strip:SetSize(368,34);W.Backdrop(strip,C.raised)
     fields.distance=atText(strip,"",12,C.gold,11,9,175,18)
     fields.navStatus=atText(strip,"",9,C.muted,175,11,180,14);fields.navStatus:SetJustifyH("RIGHT")
-    fields.thenLabel=atText(body,"PLANNED NEXT  /  adapts as you play",9,C.cyan,16,346,368,14)
+    fields.thenLabel=atText(body,"PLANNED NEXT",9,C.cyan,16,346,250,14)
+    fields.undo=W.Button(body,"Undo skip",84,W.UndoSkip);fields.undo:SetPoint("TOPRIGHT",-16,-339);fields.undo:SetHeight(22)
+    fields.empty=atText(body,"",11,C.muted,30,383,340,100);fields.empty:SetJustifyV("TOP");fields.empty:SetWordWrap(true)
     rows={}
     for i=1,4 do
         local row=CreateFrame("Button",nil,body,"BackdropTemplate");row:SetPoint("TOPLEFT",16,-(367+(i-1)*43));row:SetSize(368,40);W.Backdrop(row,C.card)
@@ -90,7 +96,8 @@ function W.CreateUI()
     end
     fields.status=atText(body,"",9,C.muted,16,547,368,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP")
     fields.skip=W.Button(body,"Skip 15 min",110,W.SkipCurrent);fields.skip:SetPoint("BOTTOMLEFT",16,14)
-    fields.refresh=W.Button(body,"Auto route",110,function() W.GetProfile().pinned=nil;W.CurrentRoute=nil;W.Refresh(true) end);fields.refresh:SetPoint("BOTTOMLEFT",136,14)
+    fields.skip:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Defer this quest",{"Skip the whole current quest for 15 minutes on this character.","Use Undo skip or /wf undo to bring it back immediately."}) end)
+    fields.refresh=W.Button(body,"Auto route",110,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true) end);fields.refresh:SetPoint("BOTTOMLEFT",136,14)
     fields.arrow=W.Button(body,"Navigator: on",128,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,14)
     settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(368,535)
     atText(settings,"YOUR JOURNEY",10,C.cyan,0,0,368,16)
@@ -102,13 +109,14 @@ function W.CreateUI()
         {"Navigator",function(p) return p.navigatorHidden and "Hidden" or "Visible" end,function(p) p.navigatorHidden=not p.navigatorHidden end},
         {"Interface scale",function(p) return math.floor(p.uiScale*100+0.5).."%" end,function(p) p.uiScale=p.uiScale==1 and 1.15 or p.uiScale==1.15 and 0.85 or 1 end},
         {"Route planning",function(p) return p.paused and "Paused" or "Automatic" end,function(p) p.paused=not p.paused end},
+        {"Window positions",function(p) return p.locked and "Locked" or "Drag to move" end,function(p) p.locked=not p.locked end},
     }
     settingRows={}
     for i,d in ipairs(definitions) do
         local b=W.Button(settings,"",368,function() local profile=W.GetProfile();d[3](profile);W.ApplyPositions();W.Refresh(true) end)
-        b:SetPoint("TOPLEFT",0,-(66+(i-1)*47));b:SetHeight(40);settingRows[i]={button=b,definition=d}
+        b:SetPoint("TOPLEFT",0,-(58+(i-1)*42));b:SetHeight(36);settingRows[i]={button=b,definition=d}
     end
-    local undo=W.Button(settings,"Restore skipped quests",368,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-358)
+    local undo=W.Button(settings,"Restore skipped quests",368,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-362)
     local reset=W.Button(settings,"Reset window positions",368,function() local profile=W.GetProfile();profile.panelPoint=nil;profile.navigatorPoint=nil;W.ApplyPositions() end);reset:SetPoint("TOPLEFT",0,-398)
     local debug=W.Button(settings,"Copy diagnostics",368,function() W.ShowDiagnostics() end);debug:SetPoint("TOPLEFT",0,-438)
     local back=W.Button(settings,"Back to your route",368,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-486)
@@ -121,7 +129,14 @@ function W.UpdateUI()
     fields.subtitle:SetText(string.format("%s  /  %s %s  /  %d",state.name,state.raceName,state.className,state.level))
     fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED STEP" or (p.includeGroup and "GROUP QUESTS" or "SOLO"))
     fields.action:SetText((W.ActionLabels[r.kind] or "ROUTE")..(r.level and r.level>0 and ("  /  LEVEL "..r.level) or ""))
+    fields.title:SetFont("Fonts\\FRIZQT__.TTF",16,"")
     fields.title:SetText(r.questName or r.title or "Preparing your route")
+    if fields.title.GetStringHeight then
+        for size=15,12,-1 do
+            if fields.title:GetStringHeight()<=43 then break end
+            fields.title:SetFont("Fonts\\FRIZQT__.TTF",size,"")
+        end
+    end
     fields.target:SetText(r.target or state.zone)
     fields.instruction:SetText(r.instruction or "Reading your quest progress...")
     local location=r.point and string.format("%s  /  %.1f, %.1f",W.MapName(r.mapID),r.x*100,r.y*100) or state.zone
@@ -133,7 +148,13 @@ function W.UpdateUI()
     local status=string.format("%s  /  %d active  /  %d completed  /  %d free slots",state.zone,#state.activeQuests,state.completedCount,state.freeSlots)
     if not W.CatalogReady then status=status.."\n"..(W.DatabaseStatus or "Waiting for data")
     elseif #(W.Unmapped or {})>0 then status=status.."\n"..#W.Unmapped.." deferred or unmapped quest(s)  /  /wf debug" end
+    if not state.historyReady then status=status.."\nAwaiting completed quest history" end
     fields.status:SetText(status)
+    local empty=not W.CatalogReady and "Reading quest data. Your next steps will appear here shortly."
+        or #(W.Unmapped or {})>0 and "No further mapped steps yet. Some active quests need Questie, a different comfort setting or more complete quest data."
+        or "This is the only mapped step right now. The plan will update when you accept, complete or turn in a quest."
+    fields.empty:SetText(empty)
+    fields.refresh.label:SetText(p.paused and "Resume route" or "Auto route")
     fields.arrow.label:SetText(p.navigatorHidden and "Navigator: off" or "Navigator: on")
     fields.skip:SetEnabled(r.questID~=nil)
     for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":  "..v.definition[2](p)) end
@@ -144,6 +165,10 @@ function W.UpdateLiveUI()
     local n=W.NavigationInfo and W.NavigationInfo(W.CurrentRoute) or {}
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))
     fields.navStatus:SetText(n.label or "")
+end
+function W.ToggleSettings()
+    if not frame then W.CreateUI() end
+    W.GetProfile().panelHidden=false;frame:Show();settingsOpen=not settingsOpen;W.UpdateUI()
 end
 function W.ToggleUI()
     if not frame then W.CreateUI() end

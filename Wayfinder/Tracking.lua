@@ -1,5 +1,5 @@
 local W=Wayfinder
-local defaults={includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=1,paused=false}
+local defaults={includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=1,paused=false,locked=false}
 function W.GetCharacterKey()
     return W.Safe(UnitGUID,"player") or ((W.Safe(UnitName,"player") or "Unknown").." - "..(W.Safe(GetRealmName) or "Realm"))
 end
@@ -12,9 +12,13 @@ function W.GetProfile()
         WayfinderDB.profiles[key]={navigatorPoint=old.navigatorPoint,navigatorHidden=old.navigatorHidden}
     end
     local p=WayfinderDB.profiles[key]
-    for k,v in pairs(defaults) do if p[k]==nil then p[k]=v end end
+    for k,v in pairs(defaults) do if type(p[k])~=type(v) then p[k]=v end end
+    if not W.IsFinite(p.uiScale) then p.uiScale=1 end
+    p.uiScale=math.max(0.75,math.min(1.3,p.uiScale))
+    if p.maxLevelAbove~=2 and p.maxLevelAbove~=4 then p.maxLevelAbove=2 end
     p.completed=p.completed or {};p.skipped=p.skipped or {};p.offers=p.offers or {};p.locations=p.locations or {};p.gossip=p.gossip or {};p.schema=2
     for k,untilTime in pairs(p.skipped) do if untilTime<W.Now() then p.skipped[k]=nil end end
+    if p.lastSkipped and not p.skipped[p.lastSkipped] then p.lastSkipped=nil end
     return p
 end
 function W.RememberTurnIn(id) if type(id)=="number" and id>0 then W.GetProfile().completed[id]=true end end

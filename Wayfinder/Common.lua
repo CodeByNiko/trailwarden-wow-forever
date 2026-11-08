@@ -1,6 +1,6 @@
 Wayfinder = Wayfinder or {}
 local W = Wayfinder
-W.Version = "1.0.0"
+W.Version = "1.1.0"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)
@@ -13,8 +13,15 @@ function W.HasFlag(mask,flag)
     if not flag or flag==0 then return false end
     return math.floor(mask/flag)%2==1
 end
+function W.IsFinite(v) return type(v)=="number" and v==v and v~=math.huge and v~=-math.huge end
+local modules={}
 function W.Import(name)
-    if QuestieLoader and QuestieLoader.ImportModule then return W.Safe(QuestieLoader.ImportModule,QuestieLoader,name) end
+    if modules[name] then return modules[name] end
+    if QuestieLoader and QuestieLoader.ImportModule then
+        local value=W.Safe(QuestieLoader.ImportModule,QuestieLoader,name)
+        if type(value)=="table" then modules[name]=value end
+        return value
+    end
 end
 function W.MapName(id)
     local info=C_Map and W.Safe(C_Map.GetMapInfo,id)
@@ -22,7 +29,7 @@ function W.MapName(id)
 end
 local transforms={}
 function W.Point(mapID,x,y)
-    if type(mapID)~="number" or mapID<=0 or type(x)~="number" or type(y)~="number" then return nil end
+    if not W.IsFinite(mapID) or mapID<=0 or not W.IsFinite(x) or not W.IsFinite(y) then return nil end
     if x>1 or y>1 then x,y=x/100,y/100 end
     if x<0 or x>1 or y<0 or y>1 then return nil end
     local p={mapID=mapID,x=x,y=y}
@@ -30,14 +37,17 @@ function W.Point(mapID,x,y)
         local t=transforms[mapID]
         if not t then
             local continent,a=W.Safe(C_Map.GetWorldPosFromMapPos,mapID,CreateVector2D(0,0))
-            local _,b=W.Safe(C_Map.GetWorldPosFromMapPos,mapID,CreateVector2D(1,0))
-            local _,c=W.Safe(C_Map.GetWorldPosFromMapPos,mapID,CreateVector2D(0,1))
+            local bc,b=W.Safe(C_Map.GetWorldPosFromMapPos,mapID,CreateVector2D(1,0))
+            local cc,c=W.Safe(C_Map.GetWorldPosFromMapPos,mapID,CreateVector2D(0,1))
             local ax,ay,bx,by,cx,cy
             if a then ax,ay=W.Safe(a.GetXY,a) end
             if b then bx,by=W.Safe(b.GetXY,b) end
             if c then cx,cy=W.Safe(c.GetXY,c) end
-            if ax and ay and bx and by and cx and cy then
-                t={continent=continent,x=ax,y=ay,ex=bx-ax,ey=by-ay,sx=cx-ax,sy=cy-ay};transforms[mapID]=t
+            if W.IsFinite(continent) and continent==bc and continent==cc and W.IsFinite(ax) and W.IsFinite(ay) and W.IsFinite(bx) and W.IsFinite(by) and W.IsFinite(cx) and W.IsFinite(cy) then
+                local determinant=(bx-ax)*(cy-ay)-(by-ay)*(cx-ax)
+                if math.abs(determinant)>0.000001 then
+                    t={continent=continent,x=ax,y=ay,ex=bx-ax,ey=by-ay,sx=cx-ax,sy=cy-ay};transforms[mapID]=t
+                end
             end
         end
         if t then p.continent=t.continent;p.wx=t.x+x*t.ex+y*t.sx;p.wy=t.y+x*t.ey+y*t.sy end

@@ -1,13 +1,16 @@
 """Inspect the real frame layout recorded by tests; this is not a WoW screenshot."""
 import json
+import re
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 root=Path(__file__).resolve().parents[1]
 font_path='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
-for subject in ('nightelf','dwarf'):
+version=re.search(r'## Version: (.+)',(root/'Wayfinder/Wayfinder.toc').read_text()).group(1)
+for subject in ('nightelf','dwarf','settings','empty'):
     data=json.loads((root/f'tests/ui-{subject}.json').read_text())
     image=Image.new('RGBA',(700,780),(15,23,32,255));draw=ImageDraw.Draw(image)
-    draw.text((28,20),f'WAYFINDER 1.0  /  {"TELDRASSIL" if subject=="nightelf" else "DUSKWOOD"}',font=ImageFont.truetype(font_path,18),fill='#e4eced')
+    label=dict(nightelf='TELDRASSIL',dwarf='DUSKWOOD',settings='PREFERENCES',empty='PLANNED STEPS')[subject]
+    draw.text((28,20),f'WAYFINDER {version}  /  {label}',font=ImageFont.truetype(font_path,18),fill='#e4eced')
     coords={};visible={}
     def color(values,default):
         return tuple(round(v*255) for v in values[:3])+(round(values[3]*255) if len(values)>3 else 255,) if values else default
