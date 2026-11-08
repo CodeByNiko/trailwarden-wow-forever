@@ -1,15 +1,17 @@
 ## Interface: 16001
 ## Title: Wayfinder
-## Notes: A calm, adaptive quest guide for World of Warcraft: Forever.
-## Author: Wayfinder
-## Version: 0.3.0
+## Notes: Character-aware quest routing for World of Warcraft: Forever.
+## Author: CodeByNiko
+## Version: 1.0.0
 ## SavedVariables: WayfinderDB
 ## Dependencies: QuestieDB
 ## OptionalDeps: Questie
 
+Common.lua
 Data.lua
 Tracking.lua
+Database.lua
 Planner.lua
+UI.lua
 Navigator.lua
 Core.lua
-UI.lua

@@ -1,237 +1,164 @@
-Wayfinder = Wayfinder or {}
-local W = Wayfinder
-
-local C = {
-    bg = {0.025, 0.055, 0.085, 0.98},
-    panel = {0.045, 0.085, 0.12, 1},
-    raised = {0.065, 0.11, 0.15, 1},
-    border = {0.16, 0.29, 0.37, 1},
-    cyan = {0.38, 0.84, 0.91},
-    gold = {0.96, 0.72, 0.31},
-    text = {0.91, 0.93, 0.94},
-    muted = {0.63, 0.71, 0.75},
-    green = {0.46, 0.82, 0.61},
-}
-local frame, body, titleText, subtitleText, routeTitle, routeZone, routeReason, detailText, distanceText, arrowText, stops, rerouteButton, arrowButton
-local routeKey
-
-local function font(parent, size, color, template)
-    local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontNormal")
-    fs:SetFont("Fonts\\FRIZQT__.TTF", size, "")
-    fs:SetTextColor(unpack(color))
-    return fs
+local W=Wayfinder
+local C={bg={0.025,0.043,0.065,0.97},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},line={0.15,0.25,0.31,1},text={0.93,0.94,0.94},muted={0.59,0.69,0.74},cyan={0.36,0.83,0.84},gold={0.98,0.76,0.40},green={0.48,0.83,0.64}}
+W.Colors=C
+function W.Font(parent,size,color)
+    local f=parent:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    f:SetFont("Fonts\\FRIZQT__.TTF",size,"");f:SetTextColor(unpack(color or C.text));f:SetJustifyH("LEFT");return f
 end
-
-local function backdrop(f, color, edge)
-    f:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8X8", edgeFile="Interface\\Buttons\\WHITE8X8", edgeSize=1,
-        insets={left=1,right=1,top=1,bottom=1}})
-    f:SetBackdropColor(unpack(color))
-    f:SetBackdropBorderColor(unpack(edge or C.border))
+function W.Backdrop(frame,color)
+    frame:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8X8",edgeFile="Interface\\Buttons\\WHITE8X8",edgeSize=1,insets={left=1,right=1,top=1,bottom=1}})
+    frame:SetBackdropColor(unpack(color or C.bg));frame:SetBackdropBorderColor(unpack(C.line))
 end
-
-local function button(parent, label, width, callback)
-    local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
-    b:SetSize(width, 28)
-    backdrop(b, C.raised, C.border)
-    local t = font(b, 11, C.text)
-    t:SetPoint("CENTER")
-    t:SetText(label)
-    b.label = t
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.09,0.16,0.21,1); self.label:SetTextColor(unpack(C.cyan)) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(C.raised)); self.label:SetTextColor(unpack(C.text)) end)
-    b:SetScript("OnClick", callback)
+function W.Button(parent,label,width,onClick)
+    local b=CreateFrame("Button",nil,parent,"BackdropTemplate");b:SetSize(width,28);W.Backdrop(b,C.raised)
+    b.label=W.Font(b,10,C.text);b.label:SetPoint("CENTER");b.label:SetJustifyH("CENTER");b.label:SetText(label)
+    b:SetScript("OnClick",onClick)
+    b:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan)) end)
+    b:SetScript("OnLeave",function(self) self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
     return b
 end
-
-local function makeStop(parent, index)
-    local row = CreateFrame("Frame", nil, parent)
-    row:SetHeight(30)
-    local dot = row:CreateTexture(nil, "ARTWORK")
-    dot:SetSize(6,6); dot:SetColorTexture(unpack(index == 1 and C.gold or C.cyan)); dot:SetPoint("TOPLEFT", 2, -7)
-    local title = font(row, 11, C.text)
-    title:SetPoint("TOPLEFT", 16, -2); title:SetPoint("RIGHT", -2, 0); title:SetJustifyH("LEFT"); title:SetWordWrap(false)
-    local sub = font(row, 9, C.muted)
-    sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3); sub:SetPoint("RIGHT", -2, 0); sub:SetJustifyH("LEFT"); sub:SetWordWrap(false)
-    row.dot, row.title, row.sub = dot, title, sub
-    return row
+function W.Tooltip(owner,title,lines)
+    if not GameTooltip then return end
+    GameTooltip:SetOwner(owner,"ANCHOR_LEFT");GameTooltip:SetText(title,unpack(C.gold))
+    for _,line in ipairs(lines) do if line and line~="" then GameTooltip:AddLine(line,0.85,0.9,0.92,true) end end
+    GameTooltip:Show()
 end
-
+local frame,body,settings,settingsOpen,rows,settingRows
+local fields={}
+local function atText(parent,text,size,color,x,y,width,height)
+    local f=W.Font(parent,size,color);f:SetPoint("TOPLEFT",x,-y);f:SetSize(width,height);f:SetText(text);return f
+end
+function W.ApplyPositions()
+    if frame then
+        local p=W.GetProfile();frame:ClearAllPoints()
+        local pos=p.panelPoint
+        if pos then frame:SetPoint(pos.point,UIParent,pos.relativePoint,pos.x,pos.y) else frame:SetPoint("RIGHT",UIParent,"RIGHT",-56,35) end
+        frame:SetScale(p.uiScale)
+    end
+    if W.PositionNavigator then W.PositionNavigator() end
+end
+local function layout()
+    local p=W.GetProfile();local compact=p.collapsed and not settingsOpen
+    frame:SetHeight(compact and 382 or 626)
+    if settingsOpen then body:Hide();settings:Show() else body:Show();settings:Hide() end
+    fields.thenLabel:SetShown(not compact);fields.status:SetShown(not compact)
+    for _,r in ipairs(rows) do r:SetShown(not compact and r.step~=nil) end
+    fields.fold.label:SetText(p.collapsed and "+" or "-")
+end
 function W.CreateUI()
-    if frame then return frame end
-    frame = CreateFrame("Frame", "WayfinderMainFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(370, 488)
-    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetClampedToScreen(true)
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    frame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    backdrop(frame, C.bg, C.border)
-    frame:SetScript("OnUpdate", function(_, elapsed)
-        frame._elapsed = (frame._elapsed or 0) + elapsed
-        if frame._elapsed > 0.5 then frame._elapsed = 0; W.UpdateDistance() end
+    if frame then return end
+    local p=W.GetProfile()
+    frame=CreateFrame("Frame","WayfinderMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
+    frame:SetSize(400,626);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
+    local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(398,60);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
+    head:SetScript("OnDragStart",function() frame:StartMoving() end)
+    head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
+    atText(head,"WAYFINDER",15,C.text,15,12,220,20)
+    fields.subtitle=atText(head,"",9,C.muted,15,35,300,16)
+    local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(398,1)
+    local close=W.Button(head,"x",22,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-9,-10);close:SetHeight(22)
+    fields.fold=W.Button(head,"-",22,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-36,-10);fields.fold:SetHeight(22)
+    local config=W.Button(head,"...",28,function() settingsOpen=not settingsOpen;W.UpdateUI();layout() end);config:SetPoint("TOPRIGHT",-63,-10);config:SetHeight(22)
+    body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
+    fields.eyebrow=atText(body,"YOUR NEXT STEP",10,C.cyan,16,75,220,14)
+    fields.mode=atText(body,"SOLO",9,C.muted,250,75,134,14);fields.mode:SetJustifyH("RIGHT")
+    local card=CreateFrame("Frame",nil,body,"BackdropTemplate");card:SetPoint("TOPLEFT",16,-96);card:SetSize(368,190);W.Backdrop(card,C.card);card:EnableMouse(true)
+    fields.action=atText(card,"",9,C.gold,14,12,338,14)
+    fields.title=atText(card,"",16,C.text,14,34,338,43);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
+    fields.target=atText(card,"",11,C.cyan,14,82,338,18);fields.target:SetWordWrap(false)
+    fields.instruction=atText(card,"",11,C.text,14,108,338,48);fields.instruction:SetJustifyV("TOP");fields.instruction:SetWordWrap(true)
+    fields.source=atText(card,"",9,C.muted,14,165,338,15);fields.source:SetWordWrap(false)
+    card:SetScript("OnEnter",function(self)
+        local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
+        W.Tooltip(self,r.title or "Why this step?",{r.instruction,r.reason,z and z.hint,"Source: "..(r.source or "Live character state"),"The arrow shows direction, not a terrain-safe path. Use roads and entrances.","Click a planned step to focus it. The plan updates as your quests change."})
     end)
-
-    local head = CreateFrame("Frame", nil, frame)
-    head:SetPoint("TOPLEFT", 1, -1); head:SetPoint("TOPRIGHT", -1, -1); head:SetHeight(52)
-    local line = head:CreateTexture(nil, "ARTWORK")
-    line:SetHeight(1); line:SetPoint("BOTTOMLEFT", 0, 0); line:SetPoint("BOTTOMRIGHT", 0, 0); line:SetColorTexture(unpack(C.border))
-    titleText = font(head, 15, C.text, "GameFontNormalLarge")
-    titleText:SetPoint("TOPLEFT", 16, -10); titleText:SetText("WAYFINDER")
-    subtitleText = font(head, 9, C.muted)
-    subtitleText:SetPoint("TOPLEFT", titleText, "BOTTOMLEFT", 0, -3); subtitleText:SetPoint("RIGHT", -42, 0); subtitleText:SetJustifyH("LEFT")
-    local close = CreateFrame("Button", nil, head, "BackdropTemplate")
-    close:SetSize(24,24); close:SetPoint("TOPRIGHT", -9,-8); backdrop(close, C.raised, C.border)
-    local x = font(close, 14, C.text); x:SetPoint("CENTER",0,1); x:SetText("×")
-    close:SetScript("OnClick", function() frame:Hide() end)
-
-    body = CreateFrame("Frame", nil, frame)
-    body:SetPoint("TOPLEFT", 16, -67); body:SetPoint("BOTTOMRIGHT", -16, 15)
-    local eyebrow = font(body, 10, C.cyan)
-    eyebrow:SetPoint("TOPLEFT"); eyebrow:SetText("YOUR NEXT ROUTE")
-
-    local card = CreateFrame("Frame", nil, body, "BackdropTemplate")
-    card:SetPoint("TOPLEFT", 0, -19); card:SetPoint("TOPRIGHT", 0, -19); card:SetHeight(192)
-    backdrop(card, C.panel, C.border)
-    routeZone = font(card, 10, C.gold)
-    routeZone:SetPoint("TOPLEFT", 13,-13); routeZone:SetPoint("RIGHT", -13, 0); routeZone:SetJustifyH("LEFT")
-    routeTitle = font(card, 18, C.text, "GameFontNormalLarge")
-    routeTitle:SetPoint("TOPLEFT", routeZone, "BOTTOMLEFT", 0,-7); routeTitle:SetPoint("RIGHT", -13,0); routeTitle:SetJustifyH("LEFT"); routeTitle:SetWordWrap(true)
-    routeReason = font(card, 11, C.text)
-    routeReason:SetPoint("TOPLEFT", routeTitle, "BOTTOMLEFT", 0,-10); routeReason:SetPoint("RIGHT", -13,0); routeReason:SetJustifyH("LEFT"); routeReason:SetWordWrap(true)
-    detailText = font(card, 9, C.muted)
-    detailText:SetPoint("BOTTOMLEFT", 13,12); detailText:SetPoint("RIGHT", -13,0); detailText:SetJustifyH("LEFT"); detailText:SetWordWrap(false)
-
-    local distanceBox = CreateFrame("Frame", nil, body, "BackdropTemplate")
-    distanceBox:SetPoint("TOPLEFT", card, "BOTTOMLEFT", 0,-10); distanceBox:SetPoint("TOPRIGHT", card, "BOTTOMRIGHT", 0,-10); distanceBox:SetHeight(38)
-    backdrop(distanceBox, C.raised, C.border)
-    arrowText = font(distanceBox, 10, C.cyan)
-    arrowText:SetPoint("LEFT", 11,0); arrowText:SetWidth(178); arrowText:SetJustifyH("LEFT")
-    distanceText = font(distanceBox, 10, C.text)
-    distanceText:SetPoint("RIGHT", -11,0); distanceText:SetWidth(115); distanceText:SetJustifyH("RIGHT")
-
-    local stopHead = font(body, 10, C.cyan)
-    stopHead:SetPoint("TOPLEFT", distanceBox, "BOTTOMLEFT", 0,-17); stopHead:SetText("QUESTING STEPS")
-    stops = { makeStop(body,1), makeStop(body,2) }
-    for i,row in ipairs(stops) do
-        row:SetPoint("TOPLEFT", stopHead, "BOTTOMLEFT", 0, -7 - (i-1)*32)
-        row:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, 0)
+    card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
+    local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");strip:SetPoint("TOPLEFT",16,-296);strip:SetSize(368,34);W.Backdrop(strip,C.raised)
+    fields.distance=atText(strip,"",12,C.gold,11,9,175,18)
+    fields.navStatus=atText(strip,"",9,C.muted,175,11,180,14);fields.navStatus:SetJustifyH("RIGHT")
+    fields.thenLabel=atText(body,"PLANNED NEXT  /  adapts as you play",9,C.cyan,16,346,368,14)
+    rows={}
+    for i=1,4 do
+        local row=CreateFrame("Button",nil,body,"BackdropTemplate");row:SetPoint("TOPLEFT",16,-(367+(i-1)*43));row:SetSize(368,40);W.Backdrop(row,C.card)
+        local number=atText(row,string.format("%02d",i+1),10,C.muted,9,12,24,14)
+        row.title=atText(row,"",11,C.text,39,5,315,16);row.title:SetWordWrap(false)
+        row.detail=atText(row,"",9,C.muted,39,23,315,12);row.detail:SetWordWrap(false)
+        row:SetScript("OnClick",function(self) W.PinStep(self.step) end)
+        row:SetScript("OnEnter",function(self) if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,"Click to focus this quest step."}) end end)
+        row:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
+        rows[i]=row
     end
-
-    local status = font(body, 9, C.muted)
-    status:SetPoint("BOTTOMLEFT", 0, 39); status:SetPoint("RIGHT", 0,0); status:SetJustifyH("LEFT")
-    frame.statusText = status
-    rerouteButton = button(body, "Refresh route", 160, function()
-        W.ScanCharacter(); W.RefreshUI(true)
-    end)
-    rerouteButton:SetPoint("BOTTOMLEFT", 0,0)
-    arrowButton = button(body, "Navigator · On", 160, function()
-        if W.ToggleNavigator then W.ToggleNavigator() end
-        W.RefreshUI()
-    end)
-    arrowButton:SetPoint("BOTTOMRIGHT", 0,0)
-    return frame
+    fields.status=atText(body,"",9,C.muted,16,547,368,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP")
+    fields.skip=W.Button(body,"Skip 15 min",110,W.SkipCurrent);fields.skip:SetPoint("BOTTOMLEFT",16,14)
+    fields.refresh=W.Button(body,"Auto route",110,function() W.GetProfile().pinned=nil;W.CurrentRoute=nil;W.Refresh(true) end);fields.refresh:SetPoint("BOTTOMLEFT",136,14)
+    fields.arrow=W.Button(body,"Navigator: on",128,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,14)
+    settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(368,535)
+    atText(settings,"YOUR JOURNEY",10,C.cyan,0,0,368,16)
+    atText(settings,"Preferences are saved for this character.",10,C.muted,0,25,368,28)
+    local definitions={
+        {"Quest difficulty",function(p) return p.includeGroup and "Include group quests" or "Solo quests" end,function(p) p.includeGroup=not p.includeGroup end},
+        {"Comfort level",function(p) return "Up to +"..p.maxLevelAbove.." quest levels" end,function(p) p.maxLevelAbove=p.maxLevelAbove==2 and 4 or 2 end},
+        {"Map waypoint",function(p) return p.mapSync and "Automatic" or "Off" end,function(p) p.mapSync=not p.mapSync end},
+        {"Navigator",function(p) return p.navigatorHidden and "Hidden" or "Visible" end,function(p) p.navigatorHidden=not p.navigatorHidden end},
+        {"Interface scale",function(p) return math.floor(p.uiScale*100+0.5).."%" end,function(p) p.uiScale=p.uiScale==1 and 1.15 or p.uiScale==1.15 and 0.85 or 1 end},
+        {"Route planning",function(p) return p.paused and "Paused" or "Automatic" end,function(p) p.paused=not p.paused end},
+    }
+    settingRows={}
+    for i,d in ipairs(definitions) do
+        local b=W.Button(settings,"",368,function() local profile=W.GetProfile();d[3](profile);W.ApplyPositions();W.Refresh(true) end)
+        b:SetPoint("TOPLEFT",0,-(66+(i-1)*47));b:SetHeight(40);settingRows[i]={button=b,definition=d}
+    end
+    local undo=W.Button(settings,"Restore skipped quests",368,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-358)
+    local reset=W.Button(settings,"Reset window positions",368,function() local profile=W.GetProfile();profile.panelPoint=nil;profile.navigatorPoint=nil;W.ApplyPositions() end);reset:SetPoint("TOPLEFT",0,-398)
+    local debug=W.Button(settings,"Copy diagnostics",368,function() W.ShowDiagnostics() end);debug:SetPoint("TOPLEFT",0,-438)
+    local back=W.Button(settings,"Back to your route",368,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-486)
+    W.ApplyPositions();layout();if p.panelHidden then frame:Hide() end
 end
-
-local function routeSignature(route)
-    if not route then return "none" end
-    return table.concat({tostring(route.mapID), tostring(route.x), tostring(route.y), tostring(route.questID), tostring(route.title)}, ":")
-end
-
-function W.SetRouteWaypoint(route, force)
-    local profile = W.GetProfile()
-    if profile.autoArrow == nil then profile.autoArrow = true end
-    if not profile.autoArrow or not route or not route.mapID or not route.x or not route.y then
-        if arrowText then arrowText:SetText(profile.autoArrow and "No mapped waypoint" or "Auto arrow paused") end
-        return false
-    end
-    local key = routeSignature(route)
-    if not force and key == routeKey then return true end
-    if not C_Map or not C_Map.SetUserWaypoint or not UiMapPoint or not UiMapPoint.CreateFromCoordinates then
-        arrowText:SetText("Navigation arrow unavailable")
-        return false
-    end
-    local x, y = route.x, route.y
-    if not route.normalized and (x > 1 or y > 1) then x, y = x/100, y/100 end
-    local point = UiMapPoint.CreateFromCoordinates(route.mapID, x, y)
-    local ok = pcall(C_Map.SetUserWaypoint, point)
-    if not ok then
-        arrowText:SetText("WoW rejected this waypoint")
-        return false
-    end
-    if not C_SuperTrack or not C_SuperTrack.SetSuperTrackedUserWaypoint then
-        arrowText:SetText("Waypoint set · tracking API unavailable")
-        return false
-    end
-    local trackedCall = pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
-    local isTracked = C_SuperTrack.IsSuperTrackingUserWaypoint and C_SuperTrack.IsSuperTrackingUserWaypoint()
-    if not trackedCall or isTracked == false then
-        arrowText:SetText("Waypoint set · unable to track")
-        return false
-    end
-    routeKey = key
-    arrowText:SetText("Native arrow guiding to waypoint")
-    return true
-end
-
-function W.UpdateDistance()
-    if not distanceText or not W.CurrentRoute then return end
-    local route = W.CurrentRoute
-    local d = W.GetNavigationDistance and W.GetNavigationDistance()
-    if d then
-        distanceText:SetText(string.format("%.0f yd away", d))
-    else
-        distanceText:SetText("Waypoint set")
-    end
-    local action = W.GetPickupAction and W.GetPickupAction(route)
-    routeTitle:SetText(action or route.title or "Next route")
-    if route.kind == "pickup" and d and d <= 22 then
-        routeReason:SetText("You’re at the quest giver. Accept this quest and I’ll select your next step.")
-        detailText:SetText("Ready to accept · route advances from your quest log")
-    elseif route.kind == "pickup" then
-        routeReason:SetText("Follow the arrow to this quest giver. Accept the quest there; I’ll then route you to the next nearby pickup.")
-    end
-    if W.UpdateNavigator then W.UpdateNavigator() end
-end
-
-function W.RefreshUI(force)
+function W.UpdateUI()
     if not frame then W.CreateUI() end
-    local state = W.State or W.ScanCharacter()
-    local route = W.PlanRoute and W.PlanRoute(state) or W.GetRecommendation(state)
-    W.CurrentRoute = route
-    titleText:SetText("WAYFINDER")
-    subtitleText:SetText(string.format("%s  ·  Level %d  ·  %s", state.name or "Adventurer", state.level or 1, state.zone or "Unknown"))
-    routeZone:SetText(route and (route.zone or state.zone) or state.zone or "Nearby")
-    routeTitle:SetText(route and route.title or "No route available")
-    routeReason:SetText(route and (route.reason or "Follow this waypoint to continue your route.") or "Check back after Questie and QuestieDB load their quest data.")
-    local smallDetail = "Recommended next hub · gather nearby quests together"
-    if route and route.npcName then smallDetail = "Quest giver: " .. route.npcName
-    elseif route and route.kind == "active" then smallDetail = "Current quest target · follow the objective"
-    elseif route and route.detail then smallDetail = route.detail end
-    detailText:SetText(smallDetail)
-
-    local routeStops = route and route.routeStops or {}
-    for i,row in ipairs(stops) do
-        local stop = routeStops[i]
-        if stop then
-            row:Show()
-            row.title:SetText(stop.title or stop.name or "Quest hub")
-            row.sub:SetText(stop.npcName or stop.zone or "Nearby quest stop")
-        else
-            row:Hide()
-        end
+    local state=W.State;if not state then return end
+    local p=state.profile;local r=W.CurrentRoute or {}
+    fields.subtitle:SetText(string.format("%s  /  %s %s  /  %d",state.name,state.raceName,state.className,state.level))
+    fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED STEP" or (p.includeGroup and "GROUP QUESTS" or "SOLO"))
+    fields.action:SetText((W.ActionLabels[r.kind] or "ROUTE")..(r.level and r.level>0 and ("  /  LEVEL "..r.level) or ""))
+    fields.title:SetText(r.questName or r.title or "Preparing your route")
+    fields.target:SetText(r.target or state.zone)
+    fields.instruction:SetText(r.instruction or "Reading your quest progress...")
+    local location=r.point and string.format("%s  /  %.1f, %.1f",W.MapName(r.mapID),r.x*100,r.y*100) or state.zone
+    fields.source:SetText(location.."  /  "..(r.source or "Live state"))
+    for i,row in ipairs(rows) do
+        local step=(W.Queue or {})[i];row.step=step
+        if step then row.title:SetText(step.title);row.detail:SetText((step.target or W.MapName(step.mapID)).."  /  "..(step.mapID and W.MapName(step.mapID) or "Your bags")) end
     end
-    local profile = W.GetProfile()
-    if profile.autoArrow == nil then profile.autoArrow = true end
-    arrowButton.label:SetText(profile.navigatorHidden and "Navigator · Off" or "Navigator · On")
-    frame.statusText:SetText(string.format("Progress-aware  ·  %d active  ·  %d completed  ·  /wf arrow", #state.activeQuests, state.completedCount or 0))
-    if route then W.SetRouteWaypoint(route, force) end
-    W.UpdateDistance()
+    local status=string.format("%s  /  %d active  /  %d completed  /  %d free slots",state.zone,#state.activeQuests,state.completedCount,state.freeSlots)
+    if not W.CatalogReady then status=status.."\n"..(W.DatabaseStatus or "Waiting for data")
+    elseif #(W.Unmapped or {})>0 then status=status.."\n"..#W.Unmapped.." deferred or unmapped quest(s)  /  /wf debug" end
+    fields.status:SetText(status)
+    fields.arrow.label:SetText(p.navigatorHidden and "Navigator: off" or "Navigator: on")
+    fields.skip:SetEnabled(r.questID~=nil)
+    for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":  "..v.definition[2](p)) end
+    layout();W.UpdateLiveUI()
 end
-
+function W.UpdateLiveUI()
+    if not fields.distance or not W.CurrentRoute then return end
+    local n=W.NavigationInfo and W.NavigationInfo(W.CurrentRoute) or {}
+    fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))
+    fields.navStatus:SetText(n.label or "")
+end
 function W.ToggleUI()
     if not frame then W.CreateUI() end
-    if frame:IsShown() then frame:Hide() else frame:Show(); W.RefreshUI() end
+    local p=W.GetProfile();p.panelHidden=not p.panelHidden;frame:SetShown(not p.panelHidden)
+    if not p.panelHidden then W.Refresh(true) end
+end
+function W.ShowDiagnostics()
+    if not W.DiagnosticsFrame then
+        local f=CreateFrame("Frame","WayfinderDiagnosticsFrame",UIParent,"BackdropTemplate");f:SetSize(510,370);f:SetPoint("CENTER");f:SetFrameStrata("DIALOG");f:EnableMouse(true);W.Backdrop(f)
+        atText(f,"WAYFINDER / DIAGNOSTICS",12,C.cyan,16,16,470,20)
+        local scroll=CreateFrame("ScrollFrame",nil,f,"UIPanelScrollFrameTemplate");scroll:SetPoint("TOPLEFT",16,-48);scroll:SetSize(452,265)
+        local edit=CreateFrame("EditBox",nil,scroll);edit:SetMultiLine(true);edit:SetAutoFocus(false);edit:SetFontObject(ChatFontNormal);edit:SetWidth(450)
+        scroll:SetScrollChild(edit);edit:SetScript("OnEscapePressed",function() f:Hide() end)
+        local close=W.Button(f,"Close",110,function() f:Hide() end);close:SetPoint("BOTTOMRIGHT",-16,14)
+        f.edit=edit;W.DiagnosticsFrame=f
+    end
+    local f=W.DiagnosticsFrame;f.edit:SetText(W.Diagnostics());f:Show();f.edit:SetFocus();f.edit:HighlightText()
 end

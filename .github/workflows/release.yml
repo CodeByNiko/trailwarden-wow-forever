@@ -1,0 +1,39 @@
+name: Verify and release Wayfinder
+on:
+  push:
+    branches: [main]
+    paths: ['Wayfinder/**', 'tools/**', 'tests/**', '.github/workflows/release.yml', 'docs/release-notes-*.md']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: wayfinder-release-main
+  cancel-in-progress: false
+jobs:
+  verify-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lua 5.1
+        run: sudo apt-get update -qq && sudo apt-get install -y lua5.1
+      - name: Run character and routing scenarios
+        run: python3 tools/run_lua.py
+      - name: Build installable addon
+        id: package
+        run: python3 tools/package.py
+      - name: Publish version if it does not exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAYFINDER_VERSION: ${{ steps.package.outputs.version }}
+          WAYFINDER_ASSET: ${{ steps.package.outputs.asset }}
+        run: |
+          tag="v${WAYFINDER_VERSION}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists; keeping the published archive."
+          else
+            gh release create "$tag" "$WAYFINDER_ASSET" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Wayfinder $WAYFINDER_VERSION" \
+              --notes-file "docs/release-notes-${WAYFINDER_VERSION}.md"
+          fi

@@ -1,201 +1,87 @@
-Wayfinder = Wayfinder or {}
-local W = Wayfinder
-
-local function safeCall(fn, ...)
-    if type(fn) ~= "function" then return nil end
-    local ok, a, b, c = pcall(fn, ...)
-    if ok then return a, b, c end
-    return nil
-end
-
+local W=Wayfinder
+local defaults={includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=1,paused=false}
 function W.GetCharacterKey()
-    local name = UnitName and UnitName("player") or "Unknown"
-    local realm = GetRealmName and GetRealmName() or "Realm"
-    return tostring(name) .. " - " .. tostring(realm)
+    return W.Safe(UnitGUID,"player") or ((W.Safe(UnitName,"player") or "Unknown").." - "..(W.Safe(GetRealmName) or "Realm"))
 end
-
 function W.GetProfile()
-    WayfinderDB = WayfinderDB or {}
-    WayfinderDB.profiles = WayfinderDB.profiles or {}
-    local key = W.GetCharacterKey()
-    WayfinderDB.profiles[key] = WayfinderDB.profiles[key] or {
-        mode = "Balanced",
-        waterTotemStage = 0,
-        dismissedWelcome = false,
-        collapsed = false,
-    }
-    return WayfinderDB.profiles[key]
+    WayfinderDB=WayfinderDB or {};WayfinderDB.profiles=WayfinderDB.profiles or {}
+    local key=W.GetCharacterKey()
+    if not WayfinderDB.profiles[key] then
+        local oldKey=(W.Safe(UnitName,"player") or "Unknown").." - "..(W.Safe(GetRealmName) or "Realm")
+        local old=WayfinderDB.profiles[oldKey] or {}
+        WayfinderDB.profiles[key]={navigatorPoint=old.navigatorPoint,navigatorHidden=old.navigatorHidden}
+    end
+    local p=WayfinderDB.profiles[key]
+    for k,v in pairs(defaults) do if p[k]==nil then p[k]=v end end
+    p.completed=p.completed or {};p.skipped=p.skipped or {};p.offers=p.offers or {};p.locations=p.locations or {};p.gossip=p.gossip or {};p.schema=2
+    for k,untilTime in pairs(p.skipped) do if untilTime<W.Now() then p.skipped[k]=nil end end
+    return p
 end
-
+function W.RememberTurnIn(id) if type(id)=="number" and id>0 then W.GetProfile().completed[id]=true end end
+local function done(v) return v==true or v==1 end
 function W.ScanCharacter()
-    local classToken
-    if UnitClass then
-        local localized, token = UnitClass("player")
-        classToken = token or localized
+    local p=W.GetProfile()
+    local className,classToken,classID=W.Safe(UnitClass,"player")
+    local raceName,raceToken,raceID=W.Safe(UnitRace,"player")
+    local mapID=C_Map and W.Safe(C_Map.GetBestMapForUnit,"player")
+    local state={key=W.GetCharacterKey(),name=W.Safe(UnitName,"player") or "Adventurer",className=className or "Unknown",classToken=classToken,raceName=raceName or "Unknown",raceToken=raceToken,raceID=raceID,
+        classMask=W.ClassMasks[classToken],raceMask=W.ClassicRaceMasks[raceID],faction=W.Safe(UnitFactionGroup,"player"),level=W.Safe(UnitLevel,"player") or 1,
+        mapID=mapID,zone=mapID and W.MapName(mapID) or W.Safe(GetRealZoneText) or "Unknown area",profile=p,
+        activeQuests={},activeByID={},completed=p.completed,player=W.PlayerPoint(),dead=W.Safe(UnitIsDeadOrGhost,"player")==true}
+    if LibQuestieDB and LibQuestieDB.RequireContract and W.Safe(LibQuestieDB.RequireContract,3) then
+        state.raceMask=(LibQuestieDB.Enum and LibQuestieDB.Enum.raceMaskById or {})[raceID] or state.raceMask
     end
-    local raceName, raceToken
-    if UnitRace then raceName, raceToken = UnitRace("player") end
-    local faction = UnitFactionGroup and UnitFactionGroup("player") or "Unknown"
-    local level = UnitLevel and UnitLevel("player") or 1
-    local zone = (GetRealZoneText and GetRealZoneText()) or (GetZoneText and GetZoneText()) or "Unknown"
-    local mapID = C_Map and C_Map.GetBestMapForUnit and safeCall(C_Map.GetBestMapForUnit, "player")
-    local mapInfo = mapID and C_Map and C_Map.GetMapInfo and safeCall(C_Map.GetMapInfo, mapID)
-    if mapInfo and mapInfo.name then zone = mapInfo.name end
-
-    local active, activeByID = {}, {}
-    if C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetInfo then
-        local count = safeCall(C_QuestLog.GetNumQuestLogEntries) or 0
-        for i = 1, count do
-            local info = safeCall(C_QuestLog.GetInfo, i)
-            if info and not info.isHeader and info.questID and info.questID > 0 then
-                local title = info.title or (C_QuestLog.GetTitleForLogIndex and safeCall(C_QuestLog.GetTitleForLogIndex, i)) or "Quest"
-                local objectives = {}
-                if C_QuestLog.GetQuestObjectives then
-                    local rows = safeCall(C_QuestLog.GetQuestObjectives, info.questID) or {}
-                    for _, objective in ipairs(rows) do
-                        if objective and objective.text then
-                            objectives[#objectives + 1] = {
-                                text = objective.text,
-                                fulfilled = objective.numFulfilled or 0,
-                                required = objective.numRequired or 0,
-                                finished = objective.finished or false,
-                            }
-                        end
-                    end
-                end
-                local questZoneMapID, questZoneName
-                local waypoint
-                if C_QuestLog.GetNextWaypoint then
-                    local wpMapID, wpX, wpY = safeCall(C_QuestLog.GetNextWaypoint, info.questID)
-                    if wpMapID and wpX and wpY then
-                        waypoint = { mapID=wpMapID, x=wpX, y=wpY, normalized=true }
-                    end
-                end
-                if C_TaskQuest and C_TaskQuest.GetQuestZoneID then
-                    questZoneMapID = safeCall(C_TaskQuest.GetQuestZoneID, info.questID)
-                    if questZoneMapID and C_Map and C_Map.GetMapInfo then
-                        local questMapInfo = safeCall(C_Map.GetMapInfo, questZoneMapID)
-                        questZoneName = questMapInfo and questMapInfo.name
-                    end
-                end
-                local row = {
-                    id = info.questID,
-                    title = title,
-                    isComplete = info.isComplete or (C_QuestLog.IsComplete and safeCall(C_QuestLog.IsComplete, info.questID)) or false,
-                    objectives = objectives,
-                    zoneMapID = questZoneMapID,
-                    zoneName = questZoneName,
-                    waypoint = waypoint,
-                }
-                active[#active + 1] = row
-                activeByID[row.id] = true
+    local completed=C_QuestLog and W.Safe(C_QuestLog.GetAllCompletedQuestIDs)
+    if type(completed)=="table" then for _,id in ipairs(completed) do if type(id)=="number" then p.completed[id]=true end end end
+    if not completed and GetQuestsCompleted then
+        local into={};local result=W.Safe(GetQuestsCompleted,into) or into
+        for id,v in pairs(result) do if v==true then p.completed[id]=true elseif type(v)=="number" then p.completed[v]=true end end
+    end
+    state.historyReady=type(completed)=="table" or next(p.completed)~=nil
+    local ql=C_QuestLog or {};local count=W.Safe(ql.GetNumQuestLogEntries) or 0
+    local sig={tostring(mapID),tostring(state.level)}
+    for i=1,count do
+        local info=W.Safe(ql.GetInfo,i)
+        if info and not info.isHeader and info.questID and info.questID>0 then
+            local id=info.questID
+            local q={id=id,title=info.title or "Quest",level=info.level,logIndex=i,objectives={},isComplete=done(info.isComplete) or done(W.Safe(ql.IsComplete,id)) or done(W.Safe(ql.ReadyForTurnIn,id)),failed=info.isComplete==-1}
+            local rows=W.Safe(ql.GetQuestObjectives,id) or {};local fingerprint={tostring(id),tostring(q.isComplete)}
+            for j,o in ipairs(rows) do
+                q.objectives[j]={text=o.text or "",type=o.type,id=o.objectiveID,fulfilled=o.numFulfilled or 0,required=o.numRequired or 0,finished=done(o.finished)}
+                fingerprint[#fingerprint+1]=tostring(o.numFulfilled or 0)..":"..tostring(o.finished)
             end
+            local m,x,y=W.Safe(ql.GetNextWaypoint,id);q.waypoint=W.Point(m,x,y)
+            q.fingerprint=table.concat(fingerprint,"/");sig[#sig+1]=q.fingerprint
+            state.activeQuests[#state.activeQuests+1]=q;state.activeByID[id]=q
         end
     end
-
-    local completed = {}
-    if C_QuestLog and C_QuestLog.GetAllCompletedQuestIDs then
-        local ids = safeCall(C_QuestLog.GetAllCompletedQuestIDs) or {}
-        for _, id in ipairs(ids) do completed[id] = true end
-    elseif GetQuestsCompleted then
-        local ids = safeCall(GetQuestsCompleted) or {}
-        for id, done in pairs(ids) do
-            if type(id) == "number" and done then completed[id] = true end
-            if type(done) == "number" then completed[done] = true end
-        end
-    end
-
-    local profile = W.GetProfile()
-    W.State = {
-        key = W.GetCharacterKey(),
-        name = UnitName and UnitName("player") or "Adventurer",
-        realm = GetRealmName and GetRealmName() or "",
-        className = (UnitClass and UnitClass("player")) or "Unknown",
-        classToken = classToken or "UNKNOWN",
-        raceName = raceName or "Unknown",
-        raceToken = raceToken or "UNKNOWN",
-        faction = faction,
-        level = level,
-        zone = zone,
-        mapID = mapID,
-        activeQuests = active,
-        activeByID = activeByID,
-        currentZoneQuests = {},
-        zoneQuestMappingAvailable = C_TaskQuest and type(C_TaskQuest.GetQuestZoneID) == "function" or false,
-        completed = completed,
-        completedCount = (function() local n=0 for _ in pairs(completed) do n=n+1 end return n end)(),
-        profile = profile,
-    }
-    for _, quest in ipairs(active) do
-        if (mapID and quest.zoneMapID == mapID) or (quest.zoneName and quest.zoneName == zone) then
-            W.State.currentZoneQuests[#W.State.currentZoneQuests + 1] = quest
-        end
-    end
-    return W.State
+    state.completedCount=W.Count(p.completed);state.signature=table.concat(sig,"|")..":"..state.completedCount
+    state.logLimit=type(MAX_QUESTLOG_QUESTS)=="number" and MAX_QUESTLOG_QUESTS or 25
+    state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
+    W.State=state;return state
 end
-
-function W.GetRecommendation(state)
-    state = state or W.State or W.ScanCharacter()
-    local level = state.level or 1
-    local zone = state.zone or "Unknown"
-    local localQuests = state.currentZoneQuests or {}
-    if #localQuests > 0 then
-        local ready = 0
-        local nextQuest
-        for _, quest in ipairs(localQuests) do
-            if quest.isComplete then
-                ready = ready + 1
-                if not nextQuest then nextQuest = quest end
-            elseif not nextQuest then
-                nextQuest = quest
-            end
-        end
-        local title = nextQuest and (nextQuest.isComplete and ("Turn in: " .. nextQuest.title) or ("Continue: " .. nextQuest.title)) or "Finish active quests in " .. zone
-        local reason
-        if ready > 0 then
-            reason = string.format("%d active quest(s) are mapped to this zone; %d appear ready to turn in. Clear these before adding more travel.", #localQuests, ready)
-        else
-            reason = string.format("%d active quest(s) are mapped to this zone. Follow the next objective before moving to another hub.", #localQuests)
-        end
-        local waypoint = nextQuest and nextQuest.waypoint
-        return {
-            title = title,
-            zone = waypoint and C_Map and C_Map.GetMapInfo and ((safeCall(C_Map.GetMapInfo, waypoint.mapID) or {}).name) or zone,
-            mapID = waypoint and waypoint.mapID,
-            x = waypoint and waypoint.x,
-            y = waypoint and waypoint.y,
-            normalized = waypoint and waypoint.normalized,
-            reason = reason,
-            instruction = nextQuest and nextQuest.title or "Use the Quests tab to review objectives. When this zone is clear, choose Duskwood or Wetlands as your next route.",
-        }
-    end
-    local route = W.ZoneRoutes and W.ZoneRoutes[zone]
-    if route and level >= (route.minLevel or 1) and level <= (route.maxLevel or 60) then
-        return route
-    end
-    if level >= 18 and level <= 24 then
-        return W.DefaultRoute
-    end
-    if level >= 25 and level <= 30 then
-        return {
-            title="Choose a level-appropriate nearby hub",
-            zone="Duskwood or Wetlands", mapID=1437, x=10.5, y=59.7,
-            reason="Both zones have questing for the upper 20s; your current quest log and travel position should decide.",
-            instruction="Check your active quest list and choose the hub with the least travel from where you are now.",
-        }
-    end
-    return {
-        title="Review quests available around you",
-        zone=zone, mapID=state.mapID,
-        reason="The first route pack is focused on the 18–24 range and your Dwarf Shaman class journey.",
-        instruction="Open the Quests tab to review active objectives. The route catalog will grow as Forever quest data is verified.",
-    }
+function W.ObserveQuest(id,title,kind)
+    if type(id)~="number" or id<=0 then return end
+    local p=W.GetProfile();local point=W.PlayerPoint();local npc=W.Safe(UnitName,"npc") or "Quest giver"
+    if point and W.Safe(UnitName,"npc") then p.locations[kind..":"..id]={mapID=point.mapID,x=point.x,y=point.y,name=npc,seen=W.Now()} end
+    if kind=="pickup" then p.offers[id]={title=title,seen=W.Now()} end
 end
-
-function W.GetCurrentWaterStep()
-    local profile = W.GetProfile()
-    local steps = W.WaterTotemRoute or {}
-    local index = (profile.waterTotemStage or 0) + 1
-    if index > #steps then return nil, #steps end
-    return steps[index], #steps
+function W.ObserveGossip()
+    local g=C_GossipInfo or {}
+    local available=W.Safe(g.GetAvailableQuests)
+    local offered={}
+    for _,q in ipairs(available or {}) do
+        if type(q.questID)=="number" and q.questID>0 then W.ObserveQuest(q.questID,q.title,"pickup");offered[q.questID]=true end
+    end
+    local guid=W.Safe(UnitGUID,"npc") or ""
+    local npcID=tonumber(guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
+    if npcID and type(available)=="table" then W.GetProfile().gossip[npcID]={offers=offered,seen=W.Now(),signature=W.State and W.State.signature} end
+    for _,q in ipairs(W.Safe(g.GetActiveQuests) or {}) do if q.isComplete==true or q.isComplete==1 then W.ObserveQuest(q.questID,q.title,"turnin") end end
+end
+function W.SkipCurrent()
+    local r=W.CurrentRoute
+    if r and r.key then local p=W.GetProfile();local key=r.questID and ("quest:"..r.questID) or r.key;p.skipped[key]=W.Now()+900;p.lastSkipped=key;p.pinned=nil;W.CurrentRoute=nil;W.Refresh(true) end
+end
+function W.UndoSkip()
+    local p=W.GetProfile();if p.lastSkipped then p.skipped[p.lastSkipped]=nil;p.lastSkipped=nil end;W.Refresh(true)
 end

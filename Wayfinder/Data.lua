@@ -1,85 +1,38 @@
-Wayfinder = Wayfinder or {}
-local W = Wayfinder
-
-W.DataVersion = 1
-W.RouteModes = { "Balanced", "Fast leveling", "Explore Forever" }
-
--- Zone recommendations are deliberately broad in this first installable build.
--- Quest-level steps will expand as in-game records are gathered and verified.
-W.ZoneRoutes = {
-    ["Redridge Mountains"] = {
-        minLevel = 20, maxLevel = 24,
-        title = "Continue in Duskwood",
-        zone = "Duskwood",
-        mapID = 1431, x = 73.6, y = 46.8,
-        reason = "A natural next hub from Redridge, with a broad level 18–30 quest range.",
-        instruction = "From Three Corners, follow the road south to Darkshire. Finish any worthwhile Redridge quests already in your log before you leave.",
-    },
-    ["Duskwood"] = {
-        minLevel = 20, maxLevel = 26,
-        title = "Keep working through Duskwood",
-        zone = "Duskwood",
-        mapID = 1431, x = 73.6, y = 46.8,
-        reason = "Duskwood has a strong set of Alliance quests for the low-to-mid 20s.",
-        instruction = "Use Darkshire as your hub. Pick up nearby quests together and turn them in in batches to limit backtracking.",
-    },
-    ["Wetlands"] = {
-        minLevel = 20, maxLevel = 29,
-        title = "Quest around Menethil Harbor",
-        zone = "Wetlands",
-        mapID = 1437, x = 10.5, y = 59.7,
-        reason = "Wetlands suits the 20–30 bracket and overlaps with the Dwarf Shaman Water Totem journey.",
-        instruction = "Use Menethil Harbor as your hub. The Excavation Site is a new Forever dungeon; its quests are optional if you find a group.",
-    },
-    ["Loch Modan"] = {
-        minLevel = 20, maxLevel = 24,
-        title = "Continue toward Duskwood",
-        zone = "Duskwood",
-        mapID = 1431, x = 73.6, y = 46.8,
-        reason = "At level 22, Duskwood is a suitable next questing hub. Your Shaman class chain also begins or returns through Loch Modan.",
-        instruction = "If Call of Water is active, follow its current quest waypoint. Otherwise travel south through the Wetlands or back through the established Alliance roads.",
-    },
-    ["Ashenvale"] = {
-        minLevel = 20, maxLevel = 29,
-        title = "Continue around Astranaar",
-        zone = "Ashenvale",
-        mapID = 1440, x = 37.0, y = 51.6,
-        reason = "Ashenvale offers suitable quests in the 20s and is one stop in the Dwarf Shaman Water Totem journey.",
-        instruction = "Astranaar is a convenient hub. Follow your active quests and pick up the flight path while passing through.",
-    },
+local W=Wayfinder
+W.DataVersion=2
+-- Context/transition hints only. Quest actions use the active Forever database.
+W.Zones={
+ [1438]={name="Teldrassil",region="Kalimdor",min=1,max=12,next={1439},hint="Follow the paths between Shadowglen, Dolanaar and the outlying settlements. For caves, find the entrance; the arrow points to the objective area."},
+ [1439]={name="Darkshore",region="Kalimdor",min=10,max=20,next={1440},hint="Use Auberdine as your return hub. Combine quests along the coast before returning."},
+ [1440]={name="Ashenvale",region="Kalimdor",min=18,max=30,next={1442,1443},hint="Use Astranaar and the roads to connect quest areas. Watch for higher-level enemies away from the road."},
+ [1442]={name="Stonetalon Mountains",region="Kalimdor",min=20,max=30,next={1443}},
+ [1443]={name="Desolace",region="Kalimdor",min=30,max=40,next={1444}},
+ [1444]={name="Feralas",region="Kalimdor",min=40,max=50,next={1446,1448}},
+ [1446]={name="Tanaris",region="Kalimdor",min=40,max=50,next={1449}},
+ [1447]={name="Azshara",region="Kalimdor",min=45,max=55,next={1452}},
+ [1448]={name="Felwood",region="Kalimdor",min=48,max=55,next={1452}},
+ [1449]={name="Un'Goro Crater",region="Kalimdor",min=50,max=55,next={1451}},
+ [1451]={name="Silithus",region="Kalimdor",min=55,max=60,next={1452}},
+ [1452]={name="Winterspring",region="Kalimdor",min=55,max=60,next={1451}},
+ [1426]={name="Dun Morogh",region="Eastern Kingdoms",min=1,max=12,next={1432}},
+ [1429]={name="Elwynn Forest",region="Eastern Kingdoms",min=1,max=12,next={1436,1433}},
+ [1432]={name="Loch Modan",region="Eastern Kingdoms",min=10,max=20,next={1437,1433}},
+ [1436]={name="Westfall",region="Eastern Kingdoms",min=10,max=20,next={1433,1431}},
+ [1433]={name="Redridge Mountains",region="Eastern Kingdoms",min=15,max=25,next={1431,1437}},
+ [1431]={name="Duskwood",region="Eastern Kingdoms",min=18,max=30,next={1437,1434},hint="Darkshire is the eastern hub. Gather nearby pickups before going west, and combine objectives around the same farm or cemetery. Use the main road across the zone."},
+ [1437]={name="Wetlands",region="Eastern Kingdoms",min=20,max=30,next={1417,1434}},
+ [1417]={name="Arathi Highlands",region="Eastern Kingdoms",min=30,max=40,next={1425,1418}},
+ [1424]={name="Hillsbrad Foothills",region="Eastern Kingdoms",min=20,max=30,next={1417}},
+ [1434]={name="Stranglethorn Vale",region="Eastern Kingdoms",min=30,max=45,next={1418,1425}},
+ [1418]={name="Badlands",region="Eastern Kingdoms",min=35,max=45,next={1427}},
+ [1425]={name="The Hinterlands",region="Eastern Kingdoms",min=40,max=50,next={1427,1422}},
+ [1435]={name="Swamp of Sorrows",region="Eastern Kingdoms",min=35,max=45,next={1419}},
+ [1419]={name="Blasted Lands",region="Eastern Kingdoms",min=45,max=55,next={1428}},
+ [1427]={name="Searing Gorge",region="Eastern Kingdoms",min=45,max=50,next={1428}},
+ [1428]={name="Burning Steppes",region="Eastern Kingdoms",min=50,max=58,next={1422}},
+ [1422]={name="Western Plaguelands",region="Eastern Kingdoms",min=50,max=58,next={1423}},
+ [1423]={name="Eastern Plaguelands",region="Eastern Kingdoms",min=55,max=60,next={1422}},
 }
-
-W.DefaultRoute = {
-    title = "Duskwood is a good next hub",
-    zone = "Duskwood",
-    mapID = 1431, x = 73.6, y = 46.8,
-    reason = "Duskwood has a broad level 18–30 quest range and is a practical follow-up to Redridge.",
-    instruction = "Head to Darkshire and gather nearby quests before choosing a direction. If Redridge still has worthwhile quests in your log, finish those first.",
-}
-
--- Dwarf Shaman level-20 Call of Water route. Coordinates are normalized map
--- percentages and should be confirmed in the live Forever client by the player.
-W.WaterTotemRoute = {
-    { title="Find Norric Lochthane", zone="Loch Modan", mapID=1432, x=41.9, y=19.0,
-      detail="Start Call of Water with a Shaman trainer if it is not already in your quest log. Speak with Norric near the loch shore." },
-    { title="Visit Hervdana Saegrund", zone="Wetlands", mapID=1437, x=65.7, y=76.4,
-      detail="Find Hervdana in the cave behind the waterfall in southern Wetlands and follow her instructions for the first sample." },
-    { title="Collect the Redridge water sample", zone="Redridge Mountains", mapID=1433, x=73.7, y=61.6,
-      detail="Use the red waterskin at the water location, then return to Hervdana when the quest asks." },
-    { title="Collect the Ashenvale water sample", zone="Ashenvale", mapID=1440, x=37.0, y=51.6,
-      detail="Fill the blue waterskin in the lake around Astranaar. Return to Hervdana to continue the chain." },
-    { title="Return to Norric", zone="Loch Modan", mapID=1432, x=41.9, y=19.0,
-      detail="After receiving Water Sapta from Hervdana, return to Norric and follow the next quest instruction." },
-    { title="Visit the Forgotten Shrine", zone="Westfall", mapID=1436, x=47.5, y=60.4,
-      detail="Use Water Sapta at the shrine when instructed, handle the manifestation encounter, then return to Norric to finish." },
-}
-
-W.LevelBands = {
-    { min=1, max=9, label="Starting zone" },
-    { min=10, max=17, label="Early journey" },
-    { min=18, max=24, label="Mid 20s route" },
-    { min=25, max=30, label="Late 20s route" },
-    { min=31, max=39, label="30s route" },
-    { min=40, max=49, label="40s route" },
-    { min=50, max=60, label="Endgame journey" },
-}
+W.ClassMasks={WARRIOR=1,PALADIN=2,HUNTER=4,ROGUE=8,PRIEST=16,DEATHKNIGHT=32,SHAMAN=64,MAGE=128,WARLOCK=256,MONK=512,DRUID=1024}
+W.ClassicRaceMasks={[1]=1,[2]=2,[3]=4,[4]=8,[5]=16,[6]=32,[7]=64,[8]=128,[10]=512,[11]=1024}
+W.ActionLabels={pickup="ACCEPT",objective="QUEST",turnin="TURN IN",deliver="SPEAK",item="USE ITEM",travel="TRAVEL",wait="ROUTE STATUS"}

@@ -1,3 +1,4 @@
 *.zip
-*.bak
-SavedVariables/
+artifacts/
+__pycache__/
+tests/ui-*.json

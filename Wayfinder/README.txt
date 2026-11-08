@@ -1,46 +1,36 @@
-WAYFINDER 0.3.0 — ROUTE COMPANION FOR WOW: FOREVER
+WAYFINDER 1.0.0 — WORLD OF WARCRAFT: FOREVER
 
-Wayfinder focuses on choosing useful quest hubs and guiding you to them. It is
-not a speed-leveling addon and does not duplicate Questie's quest tracker.
+Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
+enabled. Questie is strongly recommended. Exit and restart WoW when updating.
 
-INSTALL
-1. Install the Forever-compatible Questie release (QuestieDB is its required database addon).
-2. Extract the Wayfinder folder into the game client's Interface/AddOns directory.
-3. Enable Wayfinder and Questie at the character-select AddOns screen.
-4. Log in. Wayfinder opens automatically and starts choosing a route.
+Your route resumes from the current character's quest log and completion
+history. Accept and turn in quests normally; the route advances from live
+quest changes. Arrival alone never completes a quest step.
 
-HOW ROUTING WORKS
-• Active quest waypoints are preferred. Wayfinder reads your live quest log,
-  objective waypoints and completed quest records, then updates as you progress.
-• When there is no usable active waypoint, it looks for eligible quest givers
-  from QuestieDB and favors nearby hubs with several level-appropriate quests.
-• Questie remains the source of quest tracking and map markers; Wayfinder gives
-  a route recommendation and can list a few nearby pickup stops.
-• The Blizzard navigation arrow automatically points to the selected waypoint
-  while Auto arrow is on. This uses WoW's user waypoint and may replace the
-  currently tracked user waypoint. Toggle Auto arrow off to pause it.
-• A separate, draggable on-screen navigator arrow points to the current route
-  destination and shows its name and distance.
-• In WoW Forever, enable Options > Interface > Display > In Game Navigation to
-  show Blizzard's on-screen navigation arrow.
+Drag the panel header and the separate navigator. The custom arrow does not
+require Blizzard's native navigation display. It shows target direction,
+not a terrain-safe walking path: use roads, bridges and cave entrances.
 
-CONTROLS
-• Drag the header to move the window.
-• X hides the window; /wf shows or hides it.
-• Refresh route rescans current progress and route data.
-• Navigator · On/Off shows or hides the custom arrow; drag it to reposition.
-• /wf arrow toggles the custom arrow. /wf auto toggles native waypoint tracking.
+... opens character settings. Solo mode and +2 comfort level are defaults.
+Click a planned step to focus it; Auto route restores automatic selection.
+Skip 15 min defers a missing or unwanted quest; /wf undo restores it.
 
-CURRENT LIMITS
-The first route pack is a foundation. Dynamic pickup routing depends on QuestieDB
-having quest giver and spawn data that maps to a WoW map. Some quests may be
-excluded when their source data is incomplete, and route quality can vary by
-Forever-specific changes. When no dynamic location is available, Wayfinder uses
-its included zone recommendations. Please share in-game feedback so the data
-and routing priorities can be tuned against the Forever server.
+/wf           show/hide panel
+/wf arrow     show/hide navigator
+/wf refresh   rescan and choose an automatic route
+/wf rebuild   rebuild the data index
+/wf skip      defer current quest for 15 minutes
+/wf undo      undo last skip
+/wf pause     pause navigation
+/wf resume    resume navigation
+/wf group     include/exclude known group quests
+/wf auto      toggle the native map waypoint
+/wf reset     restore window positions
+/wf debug     copy local diagnostics
 
-When a pickup route is active, Wayfinder lists the next quests to accept at the
-current nearby hub. It moves the route forward after a quest is accepted, and
-changes the instruction from travel to accept when you reach the quest giver.
+Data gaps in Forever can cause missing or inaccurate targets. For unmapped
+quests use Questie and the quest text. Progress, preferences and skips belong
+to this character; no shaman-specific manual stages are reused on alts.
 
-This addon does not contain or redistribute Questie data.
+Source, documentation and releases:
+https://github.com/CodeByNiko/wayfinder-wow-forever
