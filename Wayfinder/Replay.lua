@@ -28,7 +28,7 @@ end
 local function portableInput(input)
     local out=W.Copy(input);local s=out.state
     s.key="character";s.name=nil;s.signature=nil
-    s.profile={paused=s.profile.paused,pinned=s.profile.pinned,skipped=W.Copy(s.profile.skipped),deferredLevels=W.Copy(s.profile.deferredLevels),includeGroup=s.profile.includeGroup,maxLevelAbove=s.profile.maxLevelAbove}
+    s.profile={xpRouting=s.profile.xpRouting,paused=s.profile.paused,pinned=s.profile.pinned,skipped=W.Copy(s.profile.skipped),deferredLevels=W.Copy(s.profile.deferredLevels),includeGroup=s.profile.includeGroup,maxLevelAbove=s.profile.maxLevelAbove}
     if s.player then s.player.ownerKey="character" end
     if out.previous then out.previous.ownerKey="character" end
     for _,candidate in ipairs(out.meta.candidates) do candidate.ownerKey="character" end

@@ -44,7 +44,7 @@ local function objectiveFinished(q,group,index,entry,entries)
         end
     end
     local row=assigned[index]
-    return row and row.finished or false,row and row.text
+    return row and row.finished or false,row and row.text,row
 end
 local function entityObjectivePoints(kind,id,state)
     if kind=="Npc" and not state.profile.includeGroup then
@@ -86,7 +86,7 @@ function W.ActiveSteps(q,state)
     for group=1,3 do
         local entries=objectives[group] or {}
         for i,entry in ipairs(entries) do
-            local finished,text=objectiveFinished(q,group,i,entry,entries)
+            local finished,text,live=objectiveFinished(q,group,i,entry,entries)
             if not finished then
                 local kind=group==1 and "Npc" or "Object"
                 local points=group==3 and itemPoints(entry[1],state) or entityObjectivePoints(kind,entry[1],state)
@@ -98,7 +98,11 @@ function W.ActiveSteps(q,state)
                         local action=p.acquisition=="vendors" and "Buy from " or p.acquisition=="objectDrops" and "Search " or "Defeat "
                         detail=(text and (text..". ") or ("Collect "..target..". "))..action..(p.name or "the source").."."
                     end
-                    out[#out+1]=makeStep("objective",q,p,target,typeName[group]..":"..entry[1],"QuestieDB",detail)
+                    local step=makeStep("objective",q,p,target,typeName[group]..":"..entry[1],"QuestieDB",detail)
+                    step.objectiveKind=typeName[group];step.objectiveID=entry[1]
+                    step.remaining=live and math.max(0,live.required-live.fulfilled);step.required=live and live.required
+                    if live then for index,row in ipairs(q.objectives) do if row==live then step.objectiveIndex=index;break end end end
+                    out[#out+1]=step
                 end
             end
         end
@@ -185,7 +189,7 @@ function W.CollectCandidates(state)
         if state.freeSlots>0 then appendPickups(out,state.mapID,state,gates);itemPickups(out,state) end
         local localActions=0
         for _,c in ipairs(out) do if c.mapID==state.mapID or c.kind=="item" then localActions=localActions+1 end end
-        if localActions==0 and state.freeSlots>0 and W.CatalogReady then
+        if (localActions==0 or state.experience and state.experience.enabled) and state.freeSlots>0 and W.CatalogReady then
             local zone=W.Zones[state.mapID];local maps={}
             for _,id in ipairs(zone and zone.next or {}) do maps[id]=true end
             if next(maps)==nil then for id,z in pairs(W.Zones) do if zone and z.region==zone.region and z.min<=state.level and z.max>=state.level then maps[id]=true end end end
@@ -194,9 +198,10 @@ function W.CollectCandidates(state)
         end
     end
     for _,c in ipairs(out) do c.ownerKey=state.key end
+    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then W.PrepareQuestEconomies(out,state) end
     return {candidates=out,deferred=deferred,gates=gates,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
-W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75}
+W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
 local function score(c,state,all,origin,w)
     local d=c.kind=="item" and 0 or W.TravelCost(origin,c.point)
     local cluster=0;local seen={}
@@ -221,7 +226,18 @@ local function score(c,state,all,origin,w)
             end
         end
     end
-    local value=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
+    parts.efficiency=0
+    if state.experience and state.experience.enabled and c.economyModel then
+        local projected=W.ProjectQuestXP(c.economyModel,origin,state.experience)
+        if projected then
+            local certainty=projected.confidence=="medium" and 1 or .6
+            local baseline=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
+            -- Full-cycle XP already includes travel/work. Do not charge distance
+            -- a second time: rank known cycles by conservative XP return instead.
+            parts.efficiency=-baseline-(w.xpBias or 1000)*(projected.xpPerHour/math.max(1,state.experience.referenceRate or 6000))*certainty
+        end
+    end
+    local value=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching+parts.efficiency
     return value,parts,cluster,blocked
 end
 local function fallback(input)
@@ -265,6 +281,7 @@ function W.SelectRoute(input)
             or c.kind=="item" and "A quest-starting item is already in your bags."
             or "Continue a quest already in your log."
         if c.cluster>0 then c.reason=c.reason.." "..c.cluster.." other quest step(s) are nearby." end
+        if c.economy then c.reason=c.reason.." Quest cycle: ~"..math.floor(c.economy.xpPerHour).." XP/h ("..c.economy.confidence.." confidence)." end
     end
     local function before(a,b)
         if a.batchBlocked~=b.batchBlocked then return not a.batchBlocked end
@@ -305,6 +322,10 @@ function W.SelectRoute(input)
         end
         if not nextStep then break end
         queue[#queue+1]=nextStep;used[nextStep.key]=true;from=nextStep.point or from
+    end
+    if W.ChooseGrindBreak then
+        local chosen=W.ChooseGrindBreak(best,state,previous,detail)
+        if chosen~=best then table.insert(queue,1,best);while #queue>4 do table.remove(queue) end;best=chosen end
     end
     return best,withDeferred(queue),detail
 end

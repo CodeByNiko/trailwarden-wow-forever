@@ -31,3 +31,4 @@ if result:
     print(lib.lua_tolstring(state, -1, None).decode(), file=sys.stderr)
 lib.lua_close(state)
 raise SystemExit(1 if result else 0)
+

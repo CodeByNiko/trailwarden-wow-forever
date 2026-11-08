@@ -11,3 +11,4 @@ Wayfinder 1.1.0 polishes the first full version before live gameplay testing.
 Download **Wayfinder-1.1.0-Forever.zip**. Exit WoW and replace `Interface/AddOns/Wayfinder` with the ZIP's `Wayfinder` folder. Keep QuestieDB for Forever and Questie enabled. Your existing character progress and preferences are retained.
 
 Live-client testing is still outstanding. The direction arrow is not a terrain pathfinder, and some Forever quest/phase data may remain incomplete. `/wf settings` opens preferences; `/wf lock` locks window positions; `/wf debug` opens copyable local diagnostics.
+

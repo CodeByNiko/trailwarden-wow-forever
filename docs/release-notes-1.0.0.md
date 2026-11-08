@@ -11,3 +11,4 @@ Wayfinder 1.0.0 resumes quest routing from the character you are playing, with a
 Download **Wayfinder-1.0.0-Forever.zip** below. Exit WoW, replace the `Wayfinder` folder under `Interface/AddOns`, then restart. Keep QuestieDB for Forever enabled; Questie is strongly recommended.
 
 This version was checked with deterministic client doubles and package validation. Actual Forever gameplay still needs live confirmation. QuestieDB may lack some new Forever content, cave/phase targets or scripted objectives. The arrow gives direction rather than a terrain-safe path. Use `/wf debug` for local diagnostics if a step does not match the game.
+

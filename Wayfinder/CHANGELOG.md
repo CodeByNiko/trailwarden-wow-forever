@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+- Measure rolling/session XP per hour from actual bar deltas and estimate time to next level.
+- Handle level-up ordering, pause/AFK, source attribution, character changes and session reset.
+- Project complete remaining quest cycles for accepted and eligible unaccepted Forever quests.
+- Learn movement/progress timing; use current provider rewards and keep unknown data explicit.
+- Combine nearby accepted work and shared hand-ins without duplicating rewards or common sources.
+- Rank modeled cycles by conservative XP return while retaining local batching and manual focus.
+- Compare verified local kill XP with quest estimates and offer bounded, dismissible grind breaks.
+- Add compact XP lines, tooltips, XP-aware routing setting and /wf xp /wf xpreset.
+- 270 checks and 16 replay frames; live-client verification remains outstanding.
+
 ## 1.3.0
 
 - Keep accepted above-range quests available instead of applying pickup comfort filters.

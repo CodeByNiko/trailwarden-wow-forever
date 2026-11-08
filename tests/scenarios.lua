@@ -131,7 +131,7 @@ LibQuestieDB={Quest=db(quests),Npc=db(npcs),Item=db(items),Object=db(objects),co
 local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=function(id) return id==17 end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Data","Tracking","Database","Planner","UI","Navigator","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
+for _,file in ipairs({"Common","Data","Tracking","Database","Experience","Planner","UI","Navigator","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
 local W=Wayfinder
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
@@ -241,7 +241,7 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 -- All UI and login code executes against a strict frame API double.
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
-check("main panel compact enough",W.MainFrame.w==360 and W.MainFrame.h==462)
+check("main panel compact enough",W.MainFrame.w==360 and W.MainFrame.h==492)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 -- 1.1 quality regressions.
@@ -309,7 +309,7 @@ W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately v
 W.Queue={};W.UpdateUI();local empty
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
 check("empty planned list explains what happens next",empty and empty.shown)
-W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==310 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==340 and not empty.shown and not undo.shown)
 W.GetProfile().collapsed=false;W.Refresh(true)
 local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
 W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
@@ -450,11 +450,24 @@ W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.Na
 check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
 W.GetProfile().locked=false
 check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==130 and W.NavigatorFrame.h==88)
-W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==538)
-W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==386)
+W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==568)
+W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==416)
 W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
 
-print(string.format("%d scenario checks passed",passed))
+-- XP event wiring and real panel values, in addition to the isolated XP suite.
+local testXP=100
+UnitXP=function() return testXP end;UnitXPMax=function() return 1000 end
+W.ResetExperience();epoch=epoch+60;testXP=300
+W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player");drain()
+check("client XP event refreshes the live session",W.ExperienceStats().totalXP==200 and W.ExperienceStats().rate==12000)
+local xpText=false;for _,node in ipairs(nodes) do if node.kind=="font" and node.text:find("12000 XP/h",1,true) then xpText=true end end
+check("panel shows measured XP rate and next-level estimate",xpText and W.ExperienceStats().eta==210)
+check("XP gain and rewarded-kill events are registered",W.EventFrame.events.PLAYER_XP_UPDATE and W.EventFrame.events.CHAT_MSG_COMBAT_XP_GAIN)
+SlashCmdList.WAYFINDER("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
+SlashCmdList.WAYFINDER("xp");SlashCmdList.WAYFINDER("xpreset");check("session reset retains learned character preferences",W.ExperienceStats().totalXP==0 and W.GetProfile().xpRouting and W.GetProfile().queueRows==2)
+-- Leave a measured synthetic session for development UI renders.
+epoch=epoch+120;testXP=500;W.SampleExperience()
+
 -- Export actual frame calls, not an independently designed mockup.
 local function quote(v) return string.format('%q',v):gsub('\\\n','\\n') end
 local function array(t) local a={} for _,v in ipairs(t or {}) do a[#a+1]=tostring(v) end return '['..table.concat(a,',')..']' end
@@ -468,9 +481,20 @@ local function snapshot(path)
  end
  local f=io.open(path,'w');f:write('['..table.concat(dump,',')..']');f:close()
 end
+-- Synthetic reward estimates for the render fixtures; not claimed game rewards.
+local priorImport=QuestieLoader.ImportModule
+QuestieLoader.ImportModule=function(self,name)
+ if name=="QuestXP" then return {GetQuestLogRewardXP=function(_,id) return id==2100 and 2000 or id==10 and 1500 or id==2 and 500 or 0 end} end
+ return priorImport(self,name)
+end
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);local cs=W.ActiveSteps(W.State.activeQuests[1],W.State)[1];W.PinStep(cs);snapshot('tests/ui-nightelf.json')
-dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685;log=actualLog;log[2].complete=false;W.GetProfile().deferredLevels={};W.GetProfile().pinned=nil;W.Refresh(true);snapshot('tests/ui-dwarf.json')
+dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685;log=actualLog;log[2].complete=false;W.GetProfile().deferredLevels={};W.GetProfile().pinned=nil;W.Refresh(true)
+check("XP-aware mode preserves unfinished cemetery batch",W.CurrentRoute.questID==2100 and W.CurrentRoute.kind=="objective" and W.CurrentRoute.economy~=nil)
+check("XP-aware preview retains second objective before town",W.Queue[1] and W.Queue[1].questID==2100)
+snapshot('tests/ui-dwarf.json')
 
 W.ToggleSettings();snapshot('tests/ui-settings.json');button("Back to your route").scripts.OnClick()
 W.Queue={};W.UpdateUI();snapshot('tests/ui-empty.json')
 
+
+print(string.format("%d scenario checks passed",passed))

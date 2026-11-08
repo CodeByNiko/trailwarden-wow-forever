@@ -37,7 +37,7 @@ data=json.loads(path.read_text(encoding='utf-8'),parse_constant=lambda v: (_ for
 if data.get('schema')!=1 or not isinstance(data.get('frames'),list) or not data['frames']:
     raise SystemExit('Expected replay schema 1 with at least one frame')
 program='''unpack=unpack or table.unpack
-for _,name in ipairs({"Common","Data","Planner"}) do dofile("Wayfinder/"..name..".lua") end
+for _,name in ipairs({"Common","Data","Experience","Planner"}) do dofile("Wayfinder/"..name..".lua") end
 local frames=REPLAY_FRAMES
 for i,frame in ipairs(frames) do
  local route,queue,detail=Wayfinder.SelectRoute(frame.input)

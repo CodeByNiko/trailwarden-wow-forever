@@ -6,7 +6,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.3.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.4.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
@@ -25,15 +25,15 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 - Provides an independent direction arrow and distance. Blizzard's native navigation display can remain disabled.
 - Handles Teldrassil and Duskwood with the same planner, with Alliance zone context and onward suggestions across level 1–60.
 
-This is balanced quest routing, with a preference for coherent nearby work. It is a heuristic planner, not a claim of a globally fastest leveling route.
+XP-aware mode ranks available modeled cycles by estimated XP return, with a conservative discount for uncertain data. Local batching, eligibility and explicit focus remain constraints. Unknown cycles retain the normal questing fallback. This is a continuously updated heuristic, not a proof of a globally optimal route.
 
-## New in 1.3
+## New in 1.4
 
-Finish a local batch before returning to town. Accepted quests stay visible even above your pickup level range; **Skip for now** saves an above-range quest until it fits your level settings. It remains a **Later** entry in the plan and can be resumed manually. The planner retains multiple objectives from the same quest and uses the client's actual quest-log capacity.
+**XP-aware questing and short grind comparisons.** The panel shows measured rolling XP/hour and estimated time to the next level. Quest projections consider eligible unaccepted quests as well as your current log, including travel, remaining work, kill XP and hand-ins. Compatible accepted quests sharing work areas/hand-in hubs are valued together without counting rewards twice.
 
-The panel is narrower, shorter and defaults to two planned steps at 90% scale. The navigator has no background or header. Resize the panel with the mouse wheel over its header; resize the arrow with the wheel over the navigator. Scales and planned-step count are also available under **…**. Window locking prevents wheel resizing.
+The current Forever provider supplies rewards and quest targets, including its new quest corrections. Missing rewards stay unknown; unseen objective quantities and drop times remain explicitly uncertain. The model learns from your own movement and progress. With enough verified local kill data and a reliable quest alternative, it can suggest a short grind break and then resume questing. Existing local batching, manual focus, level deferrals and compact navigation remain.
 
-See [the live-feedback review](docs/V1.3-live-feedback.md). Audit point 7 remains deferred.
+See [XP calculation and limits](docs/V1.4-experience.md). Audit point 7 remains deferred.
 
 ## Using it
 
@@ -58,7 +58,13 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | `/wf reset` | Reset both window positions |
 | `/wf rebuild` | Rebuild the QuestieDB index after data changes |
 | `/wf trace` | Copy a bounded local decision replay; export before reload/logout |
+| `/wf xp` | Toggle XP-aware routing; measured statistics remain available |
+| `/wf xpreset` | Reset this character’s current XP session, retaining learned pace |
 | `/wf debug` | Copyable local diagnostics; nothing is transmitted |
+
+Measured XP/h appears after 60 seconds. It includes actual XP from kills, quests and exploration, with travel and ordinary downtime in the denominator. Pause and AFK are excluded. Hover the XP lines for session statistics, estimate confidence and calculation details. Unknown rates show `--`; a zero measured rate has no finite level ETA.
+
+A grind suggestion requires at least eight locally observed, verified rewarded kills over two minutes, a modeled quest alternative of medium confidence and at least a 25% rate advantage. It lasts at most three minutes, is rechecked as progress changes and can be dismissed with **Questing now**. A two-minute cooldown prevents immediate repetition. No fixed Classic grinding guide is bundled.
 
 ## First evening with your characters
 
@@ -76,7 +82,7 @@ The automated scenarios use synthetic client data modeled on the two character c
 
 ## Development and releases
 
-Lua files live in `Wayfinder/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts and replay verification. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs all checks under Lua 5.1 and publishes a release for a new TOC version.
+Lua files live in `Wayfinder/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts, XP accounting/projection checks and replay verification. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs all checks under Lua 5.1 and publishes a release for a new TOC version.
 
 MIT license for Wayfinder's code and original arrow asset. Questie and QuestieDB are separate dependencies; no database or paid guide content is bundled.
 

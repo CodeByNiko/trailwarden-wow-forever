@@ -31,3 +31,4 @@ print(output)
 if os.environ.get('GITHUB_OUTPUT'):
     with open(os.environ['GITHUB_OUTPUT'], 'a') as file:
         file.write(f'version={version}\nasset={output}\n')
+

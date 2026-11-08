@@ -37,3 +37,4 @@ jobs:
               --title "Wayfinder $WAYFINDER_VERSION" \
               --notes-file "docs/release-notes-${WAYFINDER_VERSION}.md"
           fi
+

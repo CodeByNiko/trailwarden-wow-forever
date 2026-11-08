@@ -78,3 +78,4 @@ C_QuestLog.GetNumQuestLogEntries=function() return 2,1 end
 C_QuestLog.GetQuestObjectives=function() return nil end
 s=W.ReadCharacter();check("nullable objectives remain unknown",s.questLogReady and not s.activeQuests[1].objectivesReady)
 print(passed.." provider and client contract checks passed")
+

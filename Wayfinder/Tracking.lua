@@ -1,5 +1,5 @@
 local W=Wayfinder
-local defaults={includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
+local defaults={xpRouting=true,includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
 local function validID(id) return W.IsFinite(id) and id>0 and id%1==0 end
 local function cleanPosition(pos)
     if type(pos)~="table" or type(pos.point)~="string" or type(pos.relativePoint)~="string" or not W.IsFinite(pos.x) or not W.IsFinite(pos.y) then return nil end
@@ -130,6 +130,7 @@ function W.ReadCharacter()
     local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
     state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
+    if W.ObserveExperienceProgress then W.ObserveExperienceProgress(state);state.experience=W.ExperienceStats() end
     return state
 end
 function W.ScanCharacter() local state=W.ReadCharacter();W.State=state;return state end
@@ -159,6 +160,7 @@ function W.ObserveGossip()
 end
 function W.SkipCurrent()
     local r=W.CurrentRoute
+    if r and r.kind=="grind" then W.EndGrindBreak();W.Refresh(true);return end
     if r and r.key then local p=W.GetProfile();local key=r.questID and ("quest:"..r.questID) or r.key;p.skipped[key]=W.Now()+900;p.lastSkipped=key;p.lastDeferred=nil;p.pinned=nil;W.CurrentRoute=nil;W.Refresh(true) end
 end
 function W.DeferLevel(r,s)

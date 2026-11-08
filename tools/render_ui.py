@@ -53,3 +53,4 @@ for subject in ('nightelf','dwarf','settings','empty'):
     draw.text((28,749),'Fonts and textures may appear slightly different in the game client.',font=ImageFont.truetype(font_path,11),fill='#8398a5')
     out=root/f'docs/previews/{subject}.png';out.parent.mkdir(parents=True,exist_ok=True);image.convert('RGB').save(out)
     print(out)
+

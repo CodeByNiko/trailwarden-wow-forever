@@ -1,16 +1,18 @@
-# Validation for 1.3.0
+# Validation for 1.4.0
 
-Run `python3 tools/check.py`. The fail-fast suite currently passes **208 checks** and **15 replay frames**:
+Run `python3 tools/check.py`. The fail-fast suite currently passes **270 checks** and **16 replay frames**:
 
 | Suite | Count | Coverage |
 | --- | ---: | --- |
-| Client/scenario integration | 147 | Existing 1.0/1.1 regressions, quest truth, profiles, catalog recovery, coordinates, decision ownership, UI callbacks and trace export |
+| Client/scenario integration | 154 | Existing 1.0/1.1 regressions, quest truth, profiles, catalog recovery, coordinates, decision ownership, UI callbacks and trace export |
 | Pure route engine | 40 | No-client execution, immutable inputs, deterministic ordering, score sums, queue legs, nearby work, Duskwood and Teldrassil journeys, four-quest batching and level-aware deferral |
 | Provider/client contracts | 21 | Dot-call signatures, numeric zero/nil semantics, percent spawns, support strings, transient failures, race masks, observations, nullable client rows and shown/total log counts |
+| Experience | 55 | XP accounting, level-up ordering/correction, new rewards, full cycles, learning, ranking and grind decisions |
+| XP replay | 1 frame | XP-aware unaccepted quest choice through the pure engine |
 | Journey replay | 11 frames | Expected decisions reproduced from synthetic serialized inputs |
 | Export replay | 4 frames | Exported synthetic integration decisions reproduced |
 
-Local execution uses system Lua 5.4 with test-only Lua 5.1 compatibility globals. GitHub Actions installs Lua 5.1 and repeats all suites before release publication. A failing suite prevents packaging/release. See [1.3 live-feedback regressions](V1.3-live-feedback.md) for the new scenario coverage.
+Local execution uses system Lua 5.4 with test-only Lua 5.1 compatibility globals. GitHub Actions installs Lua 5.1 and repeats all suites before release publication. A failing suite prevents packaging/release. See [XP validation and limits](V1.4-experience.md) and [1.3 regressions](V1.3-live-feedback.md).
 
 Contract fixtures follow primary sources pinned for review:
 

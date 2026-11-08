@@ -22,7 +22,7 @@ function W.ComputeNavigation(route,player,facing,previous)
     if not player or not route.point then return {label="Position unavailable"} end
     local point=route.point;local d=W.Distance(player,point)
     local key=(route.ownerKey or "character")..":"..tostring(route.key)..":"..tostring(point.mapID)..":"..tostring(point.x)..":"..tostring(point.y)
-    local radius=route.kind=="objective" and 45 or 22
+    local radius=(route.kind=="objective" or route.kind=="grind") and 45 or 22
     local threshold=previous and previous.arrivalKey==key and previous.arrived and radius+12 or radius
     if d and d<=threshold then return {distance=d,arrived=true,arrivalKey=key,label=route.kind=="pickup" and "Accept at quest giver" or route.kind=="turnin" and "Turn in here" or route.kind=="deliver" and "Speak with quest receiver" or "Work in this area"} end
     local bearing=W.Bearing(point,player)

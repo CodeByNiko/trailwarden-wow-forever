@@ -13,6 +13,7 @@ function W.Refresh(force,trigger)
     W.PlanExecutions=(W.PlanExecutions or 0)+1;W.LastRefreshTime=W.Now()
     local state,route,queue,detail
     local ok,errorText=pcall(function()
+        W.SampleExperience()
         state=W.ReadCharacter()
         route,queue,detail=W.PlanRoute(state,force,{previous=W.Decision and W.Decision.route})
         assert(type(route)=="table" and type(queue)=="table","Invalid planner result")
@@ -26,6 +27,7 @@ function W.Refresh(force,trigger)
     -- Publish one completed decision; every visible output consumes this version.
     W.Decision=decision;W.State=decision.state;W.CurrentRoute=decision.route;W.Queue=decision.queue
     W.Unmapped=detail and detail.input and detail.input.meta.deferred or {}
+    if detail and detail.endGrind then W.EndGrindBreak() end
     if detail and detail.clearPin then W.GetProfile().pinned=nil;state.profile.pinned=nil end
     if state.questLogReady then W.LastGoodState=W.Copy(state) end
     render("navigation",W.UpdateNavigation)
@@ -58,6 +60,11 @@ function W.Diagnostics()
         "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /wf trace (last 20 decisions)","Deferred / unmapped:"}
     for _,issue in ipairs(s.readIssues or {}) do lines[#lines+1]="Read issue: "..issue end
     for _,q in ipairs(W.Unmapped or {}) do lines[#lines+1]=q.id.." / "..q.title.." / "..q.reason end
+    local e=W.ExperienceStats()
+    lines[#lines+1]="XP: "..W.FormatXP(e.totalXP).." / rolling "..W.FormatXP(e.rate).." per hour / next level "..W.FormatETA(e.eta)
+    lines[#lines+1]="XP sources: "..e.kills.." rewarded kills / "..e.turnins.." turn-ins / "..e.questXP.." event quest XP"
+    lines[#lines+1]="XP pace: "..string.format("%.1f",e.moveSpeed).." yards/sec / "..string.format("%.1f",e.killSeconds).." seconds/kill"
+    lines[#lines+1]="XP quest model: "..(r.economy and W.FormatXP(r.economy.xpPerHour) or "unknown").." / "..(r.economy and r.economy.confidence or "unknown")
     lines[#lines+1]="Active quest objectives:"
     for _,q in ipairs(s.activeQuests) do
         lines[#lines+1]=q.id.." / "..q.title.." / complete="..tostring(q.isComplete).." / objectives ready="..tostring(q.objectivesReady)
@@ -68,17 +75,18 @@ function W.Diagnostics()
     for key,value in pairs(W.DataIssues or {}) do lines[#lines+1]=key..": "..value end
     return table.concat(lines,"\n")
 end
-for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE"}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
     W.LastEvent=event
     if event=="PLAYER_LOGIN" then
-        W.CreateUI();W.CreateNavigator();W.Refresh(true)
+        W.ResetExperience();W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Wayfinder "..W.Version.."|r / Your character's route is ready. |cffffc366/wf|r opens the guide; |cffffc366/wf help|r lists controls.")
         return
     end
     local args={...}
     local ok,message=pcall(function()
+        W.ExperienceEvent(event,unpack(args))
         if event=="QUEST_TURNED_IN" then W.RememberTurnIn(args[1]);W.ObserveQuest(args[1],nil,"turnin")
         elseif event=="GOSSIP_SHOW" or event=="QUEST_GREETING" then W.ObserveGossip()
         elseif event=="QUEST_DETAIL" then W.ObserveQuest(W.Safe(GetQuestID),W.Safe(GetTitleText),"pickup")
@@ -87,9 +95,10 @@ frame:SetScript("OnEvent",function(_,event,...)
     if not ok then W.EventError=tostring(message) end
     schedule(false,event)
 end)
-local navElapsed,planElapsed=0,0
+local navElapsed,planElapsed,xpElapsed=0,0,0
 frame:SetScript("OnUpdate",function(_,dt)
-    navElapsed=navElapsed+dt;planElapsed=planElapsed+dt
+    navElapsed=navElapsed+dt;planElapsed=planElapsed+dt;xpElapsed=xpElapsed+dt
+    if xpElapsed>=1 then xpElapsed=0;render("experience",W.SampleExperience) end
     if navElapsed>=.1 then navElapsed=0;if W.State then render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator);render("live panel",W.UpdateLiveUI) end end
     if planElapsed>=2 then
         planElapsed=0
@@ -122,7 +131,9 @@ SlashCmdList.WAYFINDER=function(message)
     elseif cmd=="auto" then p.mapSync=not p.mapSync;W.Refresh(true)
     elseif cmd=="reset" then p.panelPoint=nil;p.navigatorPoint=nil;W.ApplyPositions()
     elseif cmd=="debug" then W.ShowDiagnostics()
+    elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
+    elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
     elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Wayfinder|r /wf, arrow, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, scale 60-130, arrowscale 60-150.") end
+    else print("|cff5dd4d6Wayfinder|r /wf, arrow, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
 end
 

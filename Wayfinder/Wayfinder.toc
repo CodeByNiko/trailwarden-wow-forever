@@ -2,7 +2,7 @@
 ## Title: Wayfinder
 ## Notes: Character-aware quest routing for World of Warcraft: Forever.
 ## Author: CodeByNiko
-## Version: 1.3.0
+## Version: 1.4.0
 ## SavedVariables: WayfinderDB
 ## Dependencies: QuestieDB
 ## OptionalDeps: Questie
@@ -11,6 +11,7 @@ Common.lua
 Data.lua
 Tracking.lua
 Database.lua
+Experience.lua
 Planner.lua
 UI.lua
 Navigator.lua

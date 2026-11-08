@@ -48,7 +48,7 @@ end
 local function layout()
     local p=W.GetProfile();local compact=p.collapsed and not settingsOpen
     local count=p.queueRows
-    frame:SetHeight(settingsOpen and 626 or compact and 310 or 386+count*38)
+    frame:SetHeight(settingsOpen and 626 or compact and 340 or 416+count*38)
     fields.status:ClearAllPoints();fields.status:SetPoint("TOPLEFT",16,-(308+count*38))
     if settingsOpen then body:Hide();settings:Show() else body:Show();settings:Hide() end
     fields.thenLabel:SetShown(not compact and count>0);fields.status:SetShown(not compact)
@@ -61,7 +61,7 @@ function W.CreateUI()
     if frame then return end
     local p=W.GetProfile()
     frame=CreateFrame("Frame","WayfinderMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
-    frame:SetSize(360,462);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
+    frame:SetSize(360,492);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(358,50);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
@@ -103,9 +103,24 @@ function W.CreateUI()
         rows[i]=row
     end
     fields.status=atText(body,"",9,C.muted,16,384,328,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP")
+    fields.xp=atText(body,"",10,C.gold,16,0,328,14);fields.xp:ClearAllPoints();fields.xp:SetPoint("BOTTOMLEFT",16,66)
+    fields.xpRoute=atText(body,"",9,C.muted,16,0,328,13);fields.xpRoute:ClearAllPoints();fields.xpRoute:SetPoint("BOTTOMLEFT",16,51)
+    local xpHover=CreateFrame("Frame",nil,body);xpHover:SetPoint("BOTTOMLEFT",16,49);xpHover:SetSize(328,33);xpHover:EnableMouse(true)
+    xpHover:SetScript("OnEnter",function(self)
+        local e=W.ExperienceStats();local r=W.CurrentRoute or {};local m=r.economy
+        W.Tooltip(self,"Experience and route estimates",{
+            "Measured XP/h includes kills, quests and exploration. Travel and ordinary downtime count; pause/AFK do not.",
+            "Session: "..W.FormatXP(e.totalXP).." XP / "..W.FormatXP(e.sessionRate).." XP/h. Rolling window: "..math.floor(e.windowSeconds/60).." min.",
+            "Rewarded kills: "..e.kills.." / turn-ins: "..e.turnins..". Next level uses your measured rolling rate.",
+            m and ("Route: ~"..W.FormatXP(m.xpPerHour).." XP/h / "..m.confidence.." confidence. "..(m.source or "Observed kills")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
+            "Quest projections include remaining work, travel and reward collection. New unaccepted quest quantities may be uncertain.",
+            "Grind comparison needs at least 8 rewarded kills and 2 minutes in one area. /wf xpreset resets session statistics."})
+    end)
+    xpHover:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     fields.skip=W.Button(body,"Skip 15 min",96,function() local r=W.CurrentRoute;local state=W.State;if W.DeferLevel(r,state) then W.DeferCurrent() else W.SkipCurrent() end end);fields.skip:SetPoint("BOTTOMLEFT",16,12)
     fields.skip:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan));local r=W.CurrentRoute;local state=W.State
         local high=W.DeferLevel(r,state)
+        if r and r.kind=="grind" then W.Tooltip(self,"Return to questing",{"End this grind break and resume the quest route. Automatic grind suggestions pause for two minutes."});return end
         W.Tooltip(self,high and "Skip for now" or "Defer this quest",{high and ("Keep this quest for later. It returns automatically at level "..(r.level-state.profile.maxLevelAbove).." with your current level range.") or "Skip the whole current quest for 15 minutes on this character.","Use Undo skip or click a Later step to resume immediately."}) end)
     fields.refresh=W.Button(body,"Auto route",96,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true) end);fields.refresh:SetPoint("BOTTOMLEFT",118,12)
     fields.arrow=W.Button(body,"Arrow: on",116,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,12)
@@ -113,6 +128,7 @@ function W.CreateUI()
     atText(settings,"YOUR JOURNEY",10,C.cyan,0,0,328,16)
     atText(settings,"Preferences are saved for this character.",10,C.muted,0,25,328,28)
     local definitions={
+        {"XP-aware routing",function(p) return p.xpRouting and "On" or "Off" end,function(p) p.xpRouting=not p.xpRouting end},
         {"Quest difficulty",function(p) return p.includeGroup and "Include group quests" or "Solo quests" end,function(p) p.includeGroup=not p.includeGroup end},
         {"New quest level",function(p) return "Up to +"..p.maxLevelAbove end,function(p) p.maxLevelAbove=p.maxLevelAbove==2 and 4 or 2 end},
         {"Map waypoint",function(p) return p.mapSync and "Automatic" or "Off" end,function(p) p.mapSync=not p.mapSync end},
@@ -126,7 +142,7 @@ function W.CreateUI()
     settingRows={}
     for i,d in ipairs(definitions) do
         local b=W.Button(settings,"",328,function() local profile=W.GetProfile();d[3](profile);W.ApplyPositions();W.Refresh(true) end)
-        b:SetPoint("TOPLEFT",0,-(58+(i-1)*32));b:SetHeight(28);settingRows[i]={button=b,definition=d}
+        b:SetPoint("TOPLEFT",0,-(58+(i-1)*29));b:SetHeight(26);settingRows[i]={button=b,definition=d}
     end
     local undo=W.Button(settings,"Restore skipped quests",328,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.GetProfile().deferredLevels={};W.GetProfile().lastDeferred=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-362)
     local reset=W.Button(settings,"Reset window positions",328,function() local profile=W.GetProfile();profile.panelPoint=nil;profile.navigatorPoint=nil;W.ApplyPositions() end);reset:SetPoint("TOPLEFT",0,-398)
@@ -174,8 +190,8 @@ function W.UpdateUI()
     fields.empty:SetText(empty)
     fields.refresh.label:SetText(p.paused and "Resume route" or "Auto route")
     fields.arrow.label:SetText(p.navigatorHidden and "Arrow: off" or "Arrow: on")
-    fields.skip.label:SetText(W.DeferLevel(r,state) and "Skip for now" or "Skip 15 min")
-    fields.skip:SetEnabled(r.questID~=nil)
+    fields.skip.label:SetText(r.kind=="grind" and "Questing now" or W.DeferLevel(r,state) and "Skip for now" or "Skip 15 min")
+    fields.skip:SetEnabled(r.questID~=nil or r.kind=="grind")
     local laterCount=W.Count(p.deferredLevels)
     if laterCount>0 then fields.status:SetText(status.." / "..laterCount.." saved for later") end
     for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":  "..v.definition[2](p)) end
@@ -183,6 +199,10 @@ function W.UpdateUI()
 end
 function W.UpdateLiveUI()
     if not fields.distance or not W.CurrentRoute then return end
+    local e=W.ExperienceStats();local model=W.CurrentRoute.economy
+    local measured=e.available and (e.maximum==0 and "Level cap" or e.paused and "XP session paused" or e.rate and (W.FormatXP(e.rate).." XP/h  /  Next level ~"..W.FormatETA(e.eta)) or "XP/h: collecting data (60 seconds)") or "XP data unavailable"
+    fields.xp:SetText(measured)
+    fields.xpRoute:SetText("Quest ~"..W.FormatXP(W.CurrentRoute.kind=="grind" and W.Decision and W.Decision.detail.questAlternative and W.Decision.detail.questAlternative.economy and W.Decision.detail.questAlternative.economy.xpPerHour or model and model.xpPerHour).."/h  /  Grind "..W.FormatXP(e.grind and e.grind.rate).."/h measured")
     local n=W.Navigation or {}
     if W.Decision and n.decisionID~=W.Decision.id then fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route");return end
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="item" and "In your bags" or ""))

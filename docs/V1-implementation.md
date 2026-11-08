@@ -47,3 +47,4 @@ The next valuable work is live-client feedback from the two characters, followed
 - [QuestieDB Forever scope](https://github.com/Questie/QuestieDB/blob/master/docs/forever.md): provider-selected data and documented coverage limits.
 - [Questie availability implementation](https://github.com/Questie/Questie/blob/master/Database/QuestieDB.lua): availability versus active work and known quest tags.
 - [Questie ZoneDB](https://github.com/Questie/Questie/blob/master/Database/Zones/zoneDB.lua): AreaID-to-UiMapID support selection.
+
