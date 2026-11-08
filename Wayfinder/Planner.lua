@@ -196,7 +196,7 @@ function W.CollectCandidates(state)
     for _,c in ipairs(out) do c.ownerKey=state.key end
     return {candidates=out,deferred=deferred,gates=gates,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
-W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=150,leaveWorkAreaPenalty=450}
+W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75}
 local function score(c,state,all,origin,w)
     local d=c.kind=="item" and 0 or W.TravelCost(origin,c.point)
     local cluster=0;local seen={}
@@ -210,13 +210,19 @@ local function score(c,state,all,origin,w)
     elseif c.kind=="item" then action=w.item else action=w.objectiveBase end
     local parts={distance=d,action=action,cluster=math.min(cluster,w.clusterLimit)*w.clusterBonus,zone=c.point and c.mapID~=state.mapID and w.zonePenalty or 0,class=c.classQuest and w.classBonus or 0,capacity=state.freeSlots<3 and c.kind=="turnin" and w.fullLogBonus or 0}
     parts.batching=0
-    if c.kind=="turnin" and d>w.workAreaRadius and state.freeSlots>=3 then
+    -- Accepted, mapped unfinished work forms the local batch. Hand-ins and new
+    -- pickups may interrupt only if they are at least as local as that work.
+    local blocked=false
+    if c.kind=="turnin" or c.kind=="pickup" or c.kind=="deliver" then
         for _,other in ipairs(all) do
-            if other.kind=="objective" and other.point and W.TravelCost(origin,other.point)<=w.workAreaRadius then parts.batching=w.leaveWorkAreaPenalty;break end
+            local near=other.point and W.TravelCost(origin,other.point)
+            if other.kind=="objective" and near and near<=w.workAreaRadius and d>math.max(120,near+(w.leaveAreaMargin or 75)) then
+                parts.batching=w.leaveWorkAreaPenalty;blocked=true;break
+            end
         end
     end
     local value=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
-    return value,parts,cluster
+    return value,parts,cluster,blocked
 end
 local function fallback(input)
     local s,m=input.state,input.meta
@@ -235,41 +241,72 @@ function W.SelectRoute(input)
     if state.profile.paused then return {kind="wait",key="paused",title="Route paused",instruction="Resume when you want Wayfinder to plan your next quest step.",reason="Quest progress is still recorded.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
     if state.dead then return {kind="wait",key="dead",title="Return to your character",instruction="Quest navigation resumes after you are alive again.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
     if not state.questLogReady then return fallback(input),{},{clearPin=false,candidates={}} end
-    local candidates={};local previous=input.previous
+    local candidates,levelDeferred={},{};local previous=input.previous
     for _,raw in ipairs(input.meta.candidates) do
         local c=W.Copy(raw)
         local skipped=state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID]
         if not skipped or skipped<=state.now then
             if previous and previous.ownerKey==state.key and previous.key==c.key and c.kind=="objective" and previous.fingerprint==c.fingerprint and previous.targetRevision==c.targetRevision and previous.mapID==c.mapID then c.point=W.Copy(previous.point);c.mapID=previous.mapID;c.x=previous.x;c.y=previous.y end
-            c.score,c.scoreParts,c.cluster=score(c,state,input.meta.candidates,state.player,w)
-            c.distance=W.Distance(state.player,c.point)
-            c.reason=c.kind=="turnin" and "Ready to hand in; this may open the next chain step." or c.kind=="pickup" and "Gather a nearby quest before leaving this hub." or c.kind=="item" and "A quest-starting item is already in your bags." or "Continue a quest already in your log."
-            if c.cluster>0 then c.reason=c.reason.." "..c.cluster.." other quest step(s) are nearby." end
-            candidates[#candidates+1]=c
+            local level=(state.profile.deferredLevels or {})[c.questID]
+            if level and level>state.level+state.profile.maxLevelAbove and c.kind~="turnin" then
+                c.levelDeferred=true;c.resumeLevel=math.max(1,level-state.profile.maxLevelAbove)
+                c.reason="Deferred until level "..c.resumeLevel.." with your current quest range. Click to resume now."
+                levelDeferred[#levelDeferred+1]=c
+            else candidates[#candidates+1]=c end
         end
     end
-    table.sort(candidates,function(a,b) if a.score~=b.score then return a.score<b.score end return a.key<b.key end)
+    -- Score only actionable candidates: skipped quests must not hold a batch open.
+    for _,c in ipairs(candidates) do
+        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w)
+        c.distance=W.Distance(state.player,c.point)
+        c.reason=c.batchBlocked and "Finish nearby accepted quest objectives before returning to town."
+            or c.kind=="turnin" and "Ready to hand in; this may open the next chain step."
+            or c.kind=="pickup" and "Gather a nearby quest before leaving this hub."
+            or c.kind=="item" and "A quest-starting item is already in your bags."
+            or "Continue a quest already in your log."
+        if c.cluster>0 then c.reason=c.reason.." "..c.cluster.." other quest step(s) are nearby." end
+    end
+    local function before(a,b)
+        if a.batchBlocked~=b.batchBlocked then return not a.batchBlocked end
+        if a.score~=b.score then return a.score<b.score end
+        return a.key<b.key
+    end
+    table.sort(candidates,before)
     local best=candidates[1];local pinned=state.profile.pinned;local foundPin=false
     for _,c in ipairs(candidates) do if c.key==pinned then best=c;foundPin=true end end
     if not foundPin and not input.force and previous and previous.ownerKey==state.key and best then
-        for _,c in ipairs(candidates) do if c.key==previous.key and c.score<=best.score+math.max(w.switchMargin,math.abs(best.score)*w.switchRatio) then best=c;break end end
+        for _,c in ipairs(candidates) do if c.key==previous.key and (not c.batchBlocked or best.batchBlocked) and c.score<=best.score+math.max(w.switchMargin,math.abs(best.score)*w.switchRatio) then best=c;break end end
     end
-    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates}
-    if not best then return fallback(input),{},detail end
-    local queue={};local used={[best.questID]=true};local from=best.point or state.player
+    table.sort(levelDeferred,function(a,b) if a.resumeLevel~=b.resumeLevel then return a.resumeLevel<b.resumeLevel end return a.key<b.key end)
+    local uniqueDeferred={};local seenDeferred={}
+    for _,c in ipairs(levelDeferred) do if not seenDeferred[c.questID] then uniqueDeferred[#uniqueDeferred+1]=c;seenDeferred[c.questID]=true end end
+    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates,levelDeferred=uniqueDeferred}
+    local function withDeferred(queue)
+        if #uniqueDeferred>0 and #queue>=4 then table.remove(queue) end
+        for _,c in ipairs(uniqueDeferred) do if #queue>=4 then break end;queue[#queue+1]=c end
+        return queue
+    end
+    if not best then
+        local waiting=fallback(input)
+        if #uniqueDeferred>0 then waiting.title="Quests saved for later";waiting.instruction="Your deferred quests return automatically within your level range. Click a Later step to resume it now." end
+        return waiting,withDeferred({}),detail
+    end
+    local queue={};local used={[best.key]=true};local from=best.point or state.player
     for _=1,4 do
-        local nextStep,nextScore
+        local nextStep,nextScore,nextBlocked
         for _,c in ipairs(candidates) do
-            if not used[c.questID] then
+            if not used[c.key] then
                 -- Each queued leg is evaluated from the preceding step, not the player's original position.
-                local value=score(c,state,candidates,from,w)
-                if not nextStep or value<nextScore or value==nextScore and c.key<nextStep.key then nextStep,nextScore=c,value end
+                local remaining={}
+                for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
+                local value,_,_,blocked=score(c,state,remaining,from,w)
+                if not nextStep or nextBlocked and not blocked or blocked==nextBlocked and (value<nextScore or value==nextScore and c.key<nextStep.key) then nextStep,nextScore,nextBlocked=c,value,blocked end
             end
         end
         if not nextStep then break end
-        queue[#queue+1]=nextStep;used[nextStep.questID]=true;from=nextStep.point or from
+        queue[#queue+1]=nextStep;used[nextStep.key]=true;from=nextStep.point or from
     end
-    return best,queue,detail
+    return best,withDeferred(queue),detail
 end
 function W.PlanRoute(state,force,context)
     context=context or {previous=W.CurrentRoute}
@@ -283,4 +320,5 @@ function W.PlanRoute(state,force,context)
     detail.input=input
     return route,queue,detail
 end
-function W.PinStep(step) if step then W.GetProfile().pinned=step.key;W.Refresh(true) end end
+function W.PinStep(step) if step then local p=W.GetProfile();if step.levelDeferred then p.deferredLevels[step.questID]=nil end;p.pinned=step.key;W.Refresh(true) end end
+

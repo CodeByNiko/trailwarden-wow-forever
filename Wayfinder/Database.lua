@@ -205,7 +205,8 @@ function W.QuestPolicy(id,state,active)
     if not state.profile.includeGroup and (yes("IsDungeonQuest") or yes("IsGroupQuest")) then return false,"Group quest" end
     local level=W.Q(id,"questLevel") or 0
     if level<=0 and active and state.activeByID[id] then level=state.activeByID[id].level or 0 end
-    if level>state.level+state.profile.maxLevelAbove then return false,"Above comfort level" end
+    -- Comfort limits new pickups, not work the player has already accepted.
+    if not active and level>state.level+state.profile.maxLevelAbove then return false,"Above comfort level" end
     if active then return true end
     if yes("IsRepeatable") or yes("IsDailyQuest") or yes("IsWeeklyQuest") or (W.Q(id,"specialFlags") or 0)%2==1 then return false,"Repeatable" end
     return true
@@ -280,3 +281,4 @@ function W.QuestFieldsHealthy(id)
     return true
 end
 function W.IsQuestAvailable(id,state) local v=W.QuestEligibility(id,state);return v.status=="eligible",v.reason,v.status end
+

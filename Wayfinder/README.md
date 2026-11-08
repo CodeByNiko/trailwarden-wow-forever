@@ -6,7 +6,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.2.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.3.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
@@ -18,26 +18,28 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 - Resumes existing characters and new characters from their own live progress. Profiles, skips, preferences and learned completion history are separate per character.
 - Plans **accept → quest objective → return → turn in → unlocked follow-up** actions. It never marks a quest complete simply because you arrived somewhere.
 - Uses live client waypoints, QuestieDB NPC/object positions, creature and object item sources, deliveries and quest-starting items in your bags.
-- Checks level, class, race, prerequisites, alternatives and mutually exclusive chains. Solo mode avoids known group/dungeon quests and defaults to quests up to two levels above you.
+- Checks level, class, race, prerequisites, alternatives and mutually exclusive chains. Solo mode avoids known group/dungeon quests. New pickup recommendations default to quests up to two levels above you; already accepted quests are retained with an above-range indicator.
 - Collects useful nearby pickups, combines objectives in the same area and favors nearby completed turn-ins. A full log switches attention to existing work.
-- Shows one current instruction and up to four planned steps. Plans adapt as quests change. Click a future step to focus it; **Auto route** resumes automatic selection.
-- Learns live offers from NPC conversations. If Forever data suggests a quest that is absent, **Skip 15 min** moves the whole quest out of the route temporarily.
+- Shows one current instruction and a configurable preview of up to four planned steps. Plans adapt as quests change. Click a future step to focus it; **Auto route** resumes automatic selection.
+- Learns live offers from NPC conversations. If Forever data suggests a quest that is absent, **Skip 15 min** moves the whole quest out of the route temporarily. Above-range accepted work instead offers **Skip for now**, returning automatically when it fits your level range.
 - Provides an independent direction arrow and distance. Blizzard's native navigation display can remain disabled.
 - Handles Teldrassil and Duskwood with the same planner, with Alliance zone context and onward suggestions across level 1–60.
 
 This is balanced quest routing, with a preference for coherent nearby work. It is a heuristic planner, not a claim of a globally fastest leveling route.
 
-## New in 1.2
+## New in 1.3
 
-The foundation release separates confirmed, blocked and unknown quest states; repairs saved profiles; rebuilds quest data transactionally with bounded retries; and validates position units, freshness and NPC identity. One committed decision now drives the guide, navigator and map marker. Routing preserves nearby unfinished work and evaluates each planned leg from the preceding stop.
+Finish a local batch before returning to town. Accepted quests stay visible even above your pickup level range; **Skip for now** saves an above-range quest until it fits your level settings. It remains a **Later** entry in the plan and can be resumed manually. The planner retains multiple objectives from the same quest and uses the client's actual quest-log capacity.
 
-A local `/wf trace` export makes decisions reproducible without uploading anything. See [foundation review](docs/V1.2-foundation.md) and [validation](docs/validation.md). Performance profiling and new budgets (audit point 7) remain deferred.
+The panel is narrower, shorter and defaults to two planned steps at 90% scale. The navigator has no background or header. Resize the panel with the mouse wheel over its header; resize the arrow with the wheel over the navigator. Scales and planned-step count are also available under **…**. Window locking prevents wheel resizing.
+
+See [the live-feedback review](docs/V1.3-live-feedback.md). Audit point 7 remains deferred.
 
 ## Using it
 
 The main window explains the next action. The arrow shows direction to that action. At the quest giver it says **Accept at quest giver** or **Turn in here**; in an objective area it says **Work in this area**. Accept, quest and turn in normally, and Wayfinder selects the next step from the updated quest log.
 
-Drag the window's header or the navigator to move them. **−/+** collapses the planned list. **…** opens character preferences: solo/group quests, comfort level (+2/+4), automatic map waypoint, navigator visibility, scale, window locking and pause/resume. Closing the main window leaves the navigator available.
+Drag the window's header or the navigator to move them. **−/+** collapses the planned list. The settings offer 0/2/4 preview rows. **…** opens character preferences: solo/group quests, comfort level (+2/+4), automatic map waypoint, navigator visibility, independent panel/arrow scales, window locking and pause/resume. Closing the main window leaves the navigator available.
 
 | Command | Action |
 | --- | --- |
@@ -46,7 +48,10 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | `/wf settings` | Open/close character preferences |
 | `/wf lock` | Lock/unlock window positions |
 | `/wf refresh` | Rescan progress and return to automatic routing |
-| `/wf skip`, `/wf undo` | Defer the current quest for 15 minutes / undo the last skip |
+| `/wf skip`, `/wf undo` | Defer for 15 minutes / undo the last timed or level skip |
+| `/wf later` | Defer the current above-range accepted quest until it fits your level settings |
+| `/wf scale 80` | Set panel scale to 80% (60–130%) |
+| `/wf arrowscale 90` | Set navigator scale to 90% (60–150%) |
 | `/wf pause`, `/wf resume` | Pause/resume route navigation |
 | `/wf group` | Toggle known group/dungeon quest inclusion |
 | `/wf auto` | Toggle the native map waypoint; the custom arrow is independent |
@@ -74,3 +79,4 @@ The automated scenarios use synthetic client data modeled on the two character c
 Lua files live in `Wayfinder/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts and replay verification. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs all checks under Lua 5.1 and publishes a release for a new TOC version.
 
 MIT license for Wayfinder's code and original arrow asset. Questie and QuestieDB are separate dependencies; no database or paid guide content is bundled.
+

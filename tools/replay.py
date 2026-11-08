@@ -26,7 +26,7 @@ def literal(value,field=''):
     if isinstance(value,dict):
         entries=[]
         for k,v in value.items():
-            key=int(k) if field in {'completed','activeByID','gates'} and str(k).isdigit() else str(k)
+            key=int(k) if field in {'completed','activeByID','gates','deferredLevels'} and str(k).isdigit() else str(k)
             entries.append('['+literal(key)+']='+literal(v,str(k)))
         return '{'+','.join(entries)+'}'
     raise ValueError('Unsupported replay value')
@@ -51,3 +51,4 @@ print(#frames.." replay frames matched")
 with tempfile.TemporaryDirectory(prefix='wayfinder-replay-') as directory:
     script=Path(directory)/'replay.lua';script.write_text(program,encoding='utf-8')
     raise SystemExit(subprocess.call([sys.executable,str(root/'tools/run_lua.py'),str(script)],cwd=root))
+

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0
+
+- Keep accepted above-range quests available instead of applying pickup comfort filters.
+- Add Skip for now / Later entries with automatic level/range reactivation, manual resume and undo.
+- Read standard quest capacity from the Forever API instead of assuming 25.
+- Prioritize local accepted objectives before outbound hand-ins/pickups; retain each objective in the queue.
+- Ignore skipped/deferred work when evaluating local batches; allow explicit manual focus.
+- Reduce panel dimensions, default to two preview rows, and add independent scale controls.
+- Remove navigator background/header; retain draggable arrow, distance and quest caption.
+- Expand verification to 208 checks and 15 replay frames.
+
 ## 1.2.0
 
 - Distinguish eligible, blocked and unknown quests; expire live offers after progress changes.
@@ -58,3 +69,4 @@
 ## 0.1.0
 
 - Initial installable foundation.
+

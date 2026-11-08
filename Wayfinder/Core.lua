@@ -105,6 +105,8 @@ end)
 SLASH_WAYFINDER1="/wayfinder";SLASH_WAYFINDER2="/wf"
 SlashCmdList.WAYFINDER=function(message)
     local cmd=string.lower((message or ""):match("^%s*(.-)%s*$"));local p=W.GetProfile()
+    local scale=cmd:match("^scale%s+(%d+)$");local arrowScale=cmd:match("^arrowscale%s+(%d+)$")
+    if scale or arrowScale then W.SetDisplayScale(scale and "uiScale" or "navigatorScale",tonumber(scale or arrowScale)/100);return end
     if cmd=="" then W.ToggleUI()
     elseif cmd=="arrow" then W.ToggleNavigator()
     elseif cmd=="settings" then W.ToggleSettings()
@@ -112,6 +114,7 @@ SlashCmdList.WAYFINDER=function(message)
     elseif cmd=="refresh" then p.pinned=nil;W.Refresh(true)
     elseif cmd=="rebuild" then W.BuildQuestCatalog(true)
     elseif cmd=="skip" then W.SkipCurrent()
+    elseif cmd=="later" then W.DeferCurrent()
     elseif cmd=="undo" then W.UndoSkip()
     elseif cmd=="pause" then p.paused=true;W.Refresh(true)
     elseif cmd=="resume" then p.paused=false;p.pinned=nil;W.Refresh(true)
@@ -120,5 +123,6 @@ SlashCmdList.WAYFINDER=function(message)
     elseif cmd=="reset" then p.panelPoint=nil;p.navigatorPoint=nil;W.ApplyPositions()
     elseif cmd=="debug" then W.ShowDiagnostics()
     elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Wayfinder|r /wf, arrow, settings, lock, refresh, rebuild, skip, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace.") end
+    else print("|cff5dd4d6Wayfinder|r /wf, arrow, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, scale 60-130, arrowscale 60-150.") end
 end
+

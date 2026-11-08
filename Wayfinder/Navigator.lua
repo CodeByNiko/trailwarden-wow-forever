@@ -6,7 +6,7 @@ function W.PositionNavigator()
     local p=W.GetProfile();local pos=p.navigatorPoint
     frame:ClearAllPoints()
     if pos then frame:SetPoint(pos.point,UIParent,pos.relativePoint,pos.x or 0,pos.y or 0) else frame:SetPoint("TOP",UIParent,"TOP",0,-155) end
-    frame:SetScale(p.uiScale)
+    frame:SetScale(p.navigatorScale)
 end
 function W.Bearing(target,player)
     if not target or not player or not target.wx or not player.wx or target.continent~=player.continent then return nil end
@@ -50,17 +50,21 @@ function W.CreateNavigator()
     if frame then return end
     local C=W.Colors
     frame=CreateFrame("Frame","WayfinderNavigatorFrame",UIParent,"BackdropTemplate");W.NavigatorFrame=frame
-    frame:SetSize(172,156);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton");W.Backdrop(frame,C.bg)
+    frame:SetSize(130,88);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart",function(self) if not W.GetProfile().locked then self:StartMoving() end end)
     frame:SetScript("OnDragStop",function(self) self:StopMovingOrSizing();local a,_,b,x,y=self:GetPoint(1);W.GetProfile().navigatorPoint={point=a,relativePoint=b,x=x,y=y} end)
-    local label=W.Font(frame,8,C.cyan);label:SetPoint("TOPLEFT",9,-8);label:SetText("WAYFINDER / NAVIGATOR")
-    arrow=frame:CreateTexture(nil,"ARTWORK");arrow:SetTexture("Interface\\AddOns\\Wayfinder\\Media\\Arrow.tga");arrow:SetSize(48,48);arrow:SetPoint("TOP",0,-25)
-    here=W.Font(frame,15,C.green);here:SetPoint("TOP",0,-40);here:SetText("HERE")
-    title=W.Font(frame,10,C.text);title:SetPoint("TOPLEFT",8,-81);title:SetSize(156,30);title:SetJustifyH("CENTER");title:SetWordWrap(true)
-    distance=W.Font(frame,12,C.gold);distance:SetPoint("TOP",0,-116)
-    status=W.Font(frame,8,C.muted);status:SetPoint("BOTTOMLEFT",6,8);status:SetSize(160,12);status:SetJustifyH("CENTER");status:SetWordWrap(false)
-    frame:SetScript("OnEnter",function(self) local r=W.CurrentRoute or {};W.Tooltip(self,r.title or "Navigator",{r.instruction,W.GetProfile().locked and "Windows are locked. /wf lock unlocks them." or "Drag to move. /wf arrow toggles visibility.","Direction only: use roads, bridges and cave entrances."}) end)
+    arrow=frame:CreateTexture(nil,"ARTWORK");arrow:SetTexture("Interface\\AddOns\\Wayfinder\\Media\\Arrow.tga");arrow:SetSize(38,38);arrow:SetPoint("TOP",0,-2)
+    here=W.Font(frame,15,C.green);here:SetPoint("TOP",0,-12);here:SetText("HERE")
+    title=W.Font(frame,10,C.text);title:SetPoint("TOPLEFT",2,-60);title:SetSize(126,26);title:SetJustifyH("CENTER");title:SetWordWrap(true)
+    distance=W.Font(frame,12,C.gold);distance:SetPoint("TOP",0,-43)
+    status=W.Font(frame,8,C.muted);status:SetPoint("TOPLEFT",2,-60);status:SetSize(126,26);status:SetJustifyH("CENTER");status:SetWordWrap(false)
+    frame:SetScript("OnEnter",function(self) local r=W.CurrentRoute or {};W.Tooltip(self,r.title or "Navigator",{r.instruction,W.GetProfile().locked and "Windows are locked. /wf lock unlocks them." or "Drag to move. Mouse wheel adjusts arrow size. /wf arrow toggles visibility.","Direction only: use roads, bridges and cave entrances."}) end)
     frame:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
+    for _,text in ipairs({title,distance,status,here}) do
+        if text.SetShadowColor then text:SetShadowColor(0,0,0,1);text:SetShadowOffset(1,-1) end
+    end
+    frame:EnableMouseWheel(true)
+    frame:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("navigatorScale",W.GetProfile().navigatorScale+delta*.05) end end)
     W.PositionNavigator();W.UpdateNavigator()
 end
 function W.UpdateNavigator()
@@ -76,6 +80,10 @@ function W.UpdateNavigator()
         arrow:SetRotation(-(n.bearing+n.facing));arrow:Show()
     end
     distance:SetText(n.distance and W.FormatDistance(n.distance) or "")
+    -- Normal guidance needs only arrow, distance and quest. Exceptional states
+    -- replace the quest caption so missing direction remains explicit.
+    local exceptional=not n.arrived and not n.bearing
+    title:SetShown(not exceptional);status:SetShown(exceptional)
     status:SetText(n.label or "")
 end
 function W.ToggleNavigator()
@@ -115,3 +123,4 @@ function W.SyncWaypoint(route,force)
         if C_SuperTrack then W.Safe(C_SuperTrack.SetSuperTrackedUserWaypoint,true) end
     else W.ReleaseWaypoint();W.WaypointStatus="Map waypoint rejected" end
 end
+

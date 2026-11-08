@@ -1,5 +1,5 @@
 local W=Wayfinder
-local defaults={includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=1,paused=false,locked=false}
+local defaults={includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
 local function validID(id) return W.IsFinite(id) and id>0 and id%1==0 end
 local function cleanPosition(pos)
     if type(pos)~="table" or type(pos.point)~="string" or type(pos.relativePoint)~="string" or not W.IsFinite(pos.x) or not W.IsFinite(pos.y) then return nil end
@@ -9,6 +9,7 @@ local function cleanPosition(pos)
 end
 local validated=setmetatable({},{__mode="k"})
 local function validateContents(p)
+    for id,level in pairs(p.deferredLevels) do if not validID(id) or not W.IsFinite(level) or level<=0 then p.deferredLevels[id]=nil end end
     for id,done in pairs(p.completed) do if not validID(id) or done~=true then p.completed[id]=nil end end
     for id,untilTime in pairs(p.skipped) do if type(id)~="string" or not W.IsFinite(untilTime) or untilTime<=W.Now() then p.skipped[id]=nil end end
     for id,o in pairs(p.offers) do if not validID(id) or type(o)~="table" or not W.IsFinite(o.seen) or not W.IsFinite(o.revision) then p.offers[id]=nil end end
@@ -32,10 +33,17 @@ function W.GetProfile()
         WayfinderDB.profiles[key]=p
     end
     for k,v in pairs(defaults) do if type(p[k])~=type(v) then p[k]=v end end
-    if not W.IsFinite(p.uiScale) then p.uiScale=1 end
-    p.uiScale=math.max(.75,math.min(1.3,p.uiScale))
+    if p.displayVersion~=2 then
+        if p.uiScale==1 then p.uiScale=.9 end
+        p.displayVersion=2
+    end
+    if not W.IsFinite(p.uiScale) then p.uiScale=.9 end
+    p.uiScale=math.max(.6,math.min(1.3,p.uiScale))
+    if not W.IsFinite(p.navigatorScale) then p.navigatorScale=1 end
+    p.navigatorScale=math.max(.6,math.min(1.5,p.navigatorScale))
+    if p.queueRows~=0 and p.queueRows~=2 and p.queueRows~=4 then p.queueRows=2 end
     if p.maxLevelAbove~=2 and p.maxLevelAbove~=4 then p.maxLevelAbove=2 end
-    for _,field in ipairs({"completed","skipped","offers","locations","gossip"}) do if type(p[field])~="table" then p[field]={} end end
+    for _,field in ipairs({"completed","skipped","offers","locations","gossip","deferredLevels"}) do if type(p[field])~="table" then p[field]={} end end
     if not validated[p] then validateContents(p) end
     for key,untilTime in pairs(p.skipped) do if not W.IsFinite(untilTime) or untilTime<=W.Now() then p.skipped[key]=nil end end
     p.panelPoint=cleanPosition(p.panelPoint);p.navigatorPoint=cleanPosition(p.navigatorPoint)
@@ -114,8 +122,13 @@ function W.ReadCharacter()
     local progressSignature=table.concat(progress,"|")
     if p.progressSignature~=progressSignature then p.progressSignature=progressSignature;p.progressRevision=p.progressRevision+1 end
     state.revision=p.progressRevision;state.signature=table.concat(signature,"|")..":"..progressSignature
+    for id,level in pairs(p.deferredLevels) do
+        if state.completed[id] or state.activeByID[id] and state.activeByID[id].isComplete or level<=state.level+p.maxLevelAbove or state.questLogReady and not state.activeByID[id] then p.deferredLevels[id]=nil end
+    end
+    if p.lastDeferred and not p.deferredLevels[p.lastDeferred] then p.lastDeferred=nil end
     state.profile=W.Copy(p)
-    state.logLimit=type(MAX_QUESTLOG_QUESTS)=="number" and MAX_QUESTLOG_QUESTS or 25
+    local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
+    state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
     return state
 end
@@ -146,8 +159,18 @@ function W.ObserveGossip()
 end
 function W.SkipCurrent()
     local r=W.CurrentRoute
-    if r and r.key then local p=W.GetProfile();local key=r.questID and ("quest:"..r.questID) or r.key;p.skipped[key]=W.Now()+900;p.lastSkipped=key;p.pinned=nil;W.CurrentRoute=nil;W.Refresh(true) end
+    if r and r.key then local p=W.GetProfile();local key=r.questID and ("quest:"..r.questID) or r.key;p.skipped[key]=W.Now()+900;p.lastSkipped=key;p.lastDeferred=nil;p.pinned=nil;W.CurrentRoute=nil;W.Refresh(true) end
+end
+function W.DeferLevel(r,s)
+    if r and s and r.questID and s.activeByID[r.questID] and r.kind~="turnin" and r.level and r.level>s.level+s.profile.maxLevelAbove then return r.level-s.profile.maxLevelAbove end
+end
+function W.DeferCurrent()
+    local r=W.CurrentRoute;local s=W.State
+    if not W.DeferLevel(r,s) then return end
+    local p=W.GetProfile();p.deferredLevels[r.questID]=r.level;p.lastDeferred=r.questID;p.lastSkipped=nil;p.pinned=nil
+    W.Refresh(true,"defer-until-level")
 end
 function W.UndoSkip()
-    local p=W.GetProfile();if p.lastSkipped then p.skipped[p.lastSkipped]=nil;p.lastSkipped=nil end;W.Refresh(true)
+    local p=W.GetProfile();if p.lastDeferred then p.deferredLevels[p.lastDeferred]=nil;p.lastDeferred=nil end;if p.lastSkipped then p.skipped[p.lastSkipped]=nil;p.lastSkipped=nil end;W.Refresh(true)
 end
+

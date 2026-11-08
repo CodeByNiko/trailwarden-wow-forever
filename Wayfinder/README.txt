@@ -1,4 +1,4 @@
-WAYFINDER 1.2.0 — WORLD OF WARCRAFT: FOREVER
+WAYFINDER 1.3.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -13,7 +13,13 @@ not a terrain-safe walking path: use roads, bridges and cave entrances.
 
 ... opens character settings. Solo mode and +2 comfort level are defaults.
 Click a planned step to focus it; Auto route restores automatic selection.
-Skip 15 min defers a missing or unwanted quest; /wf undo restores it.
+Accepted above-range quests remain visible. Skip for now saves one until it
+fits your level range; Later queue entries can be clicked to resume now.
+Skip 15 min remains available through /wf skip; /wf undo restores either skip.
+
+Mouse wheel over the header resizes the panel, over the arrow resizes the
+navigator. Both scales are independent. Settings offer 0/2/4 planned steps.
+The arrow has a transparent background. Locking prevents wheel resizing.
 
 /wf           show/hide panel
 /wf arrow     show/hide navigator
@@ -22,7 +28,10 @@ Skip 15 min defers a missing or unwanted quest; /wf undo restores it.
 /wf refresh   rescan and choose an automatic route
 /wf rebuild   rebuild the data index
 /wf skip      defer current quest for 15 minutes
+/wf later     save above-range accepted quest until within level range
 /wf undo      undo last skip
+/wf scale 80  panel size in percent (60-130)
+/wf arrowscale 90  arrow size in percent (60-150)
 /wf pause     pause navigation
 /wf resume    resume navigation
 /wf group     include/exclude known group quests
@@ -37,3 +46,4 @@ to this character; no shaman-specific manual stages are reused on alts.
 
 Source, documentation and releases:
 https://github.com/CodeByNiko/wayfinder-wow-forever
+

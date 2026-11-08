@@ -37,7 +37,7 @@ function methods:RegisterEvent(e) self.events=self.events or {};self.events[e]=t
 function methods:CreateFontString(name) return region("font",self,name) end
 function methods:CreateTexture(name) return region("texture",self,name) end
 function methods:SetScrollChild(v) self.scrollChild=v end
-for _,m in ipairs({"SetFrameStrata","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
+for _,m in ipairs({"EnableMouseWheel","SetFrameStrata","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
 UIParent=region("frame",nil,"UIParent");UIParent:SetSize(1920,1080)
 ChatFontNormal={};SlashCmdList={}
 function CreateFrame(kind,name,parent) return region(kind,parent,name) end
@@ -224,7 +224,7 @@ check("live gossip removes phantom offers at the inspected NPC",not W.IsQuestAva
 log={{id=10,title="The Night Watch",rows={{type="monster",text="Skeleton",objectiveID=300}}}};gs=scan()
 check("quest changes invalidate negative gossip",W.IsQuestAvailable(1,gs))
 check("group option starts excluded",not W.IsQuestAvailable(13,gs));gs.profile.includeGroup=true;check("group option can include eligible elites",W.IsQuestAvailable(13,gs));gs.profile.includeGroup=false
-log={{id=777,title="New high-level quest",level=45,wp={1431,.5,.5},rows={{type="event",text="New content"}}}};gs=scan();plan();check("unknown active quests respect live quest level",W.Unmapped[1] and W.Unmapped[1].reason=="Above comfort level")
+log={{id=777,title="New high-level quest",level=45,wp={1431,.5,.5},rows={{type="event",text="New content"}}}};gs=scan();plan();check("accepted quests retain client waypoint beyond pickup comfort",W.ActiveSteps(gs.activeQuests[1],gs)[1]~=nil)
 -- A working area remains stable until its objective changes.
 ne();log={{id=32,title="Two creatures",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false},{type="monster",objectiveID=302,text="Webwood spider",finished=false}}}}
 gs=scan();local working=W.ActiveSteps(gs.activeQuests[1],gs)[1];W.GetProfile().pinned=working.key;W.Refresh(true);local oldX=W.CurrentRoute.x
@@ -241,7 +241,7 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 -- All UI and login code executes against a strict frame API double.
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
-check("main panel compact enough",W.MainFrame.w==400 and W.MainFrame.h==626)
+check("main panel compact enough",W.MainFrame.w==360 and W.MainFrame.h==462)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 -- 1.1 quality regressions.
@@ -275,7 +275,7 @@ W.SyncWaypoint({kind="pickup",key="rejected",point=pnt,mapID=1431,x=.8,y=.5},tru
 check("rejected replacement clears stale owned marker",clearCount==old+1 and W.WaypointStatus=="Map waypoint rejected")
 C_Map.SetUserWaypoint=setAPI
 local p=W.GetProfile();p.uiScale=0/0;p.maxLevelAbove=999;p.locked="bad";p=W.GetProfile()
-check("invalid saved preference values repaired",p.uiScale==1 and p.maxLevelAbove==2 and p.locked==false)
+check("invalid saved preference values repaired",p.uiScale==.9 and p.maxLevelAbove==2 and p.locked==false)
 p.skipped.expired=epoch-1;p.lastSkipped="expired";W.GetProfile();check("expired skip clears undo state",p.lastSkipped==nil)
 local moduleAPI=QuestieLoader.ImportModule;local moduleCalls=0;local late=nil
 QuestieLoader.ImportModule=function(self,name) if name=="LateModule" then moduleCalls=moduleCalls+1;return late end return moduleAPI(self,name) end
@@ -309,13 +309,13 @@ W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately v
 W.Queue={};W.UpdateUI();local empty
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
 check("empty planned list explains what happens next",empty and empty.shown)
-W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==382 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==310 and not empty.shown and not undo.shown)
 W.GetProfile().collapsed=false;W.Refresh(true)
 local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
 W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
 local titleNode
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text==longTitle then titleNode=n end end
-check("long current titles shrink within their allocated text area",titleNode and titleNode.fontSize<16 and titleNode:GetStringHeight()<=43)
+check("long current titles shrink within their allocated text area",titleNode and titleNode.fontSize<16 and titleNode:GetStringHeight()<=35)
 W.CurrentRoute=originalRoute;W.UpdateUI()
 
 -- 1.2 foundation regressions; these were demonstrated during the audit.
@@ -387,6 +387,73 @@ check("local replay contains objectives provider and expected decisions",export:
 check("replay removes player identifiers",not export:find('Player-NE',1,true) and not export:find('Raelorn',1,true))
 local traceFile=io.open('tests/replay-export.json','w');traceFile:write(export);traceFile:close()
 
+-- 1.3 live-report regressions: level-22 cemetery batch and level-aware deferral.
+dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685
+npcs[2100]={name="Insane Ghoul",spawns={[10]={{79.8,68.6}}}}
+npcs[2101]={name="Spider",spawns={[10]={{60,30}}}}
+items[2100]={name="Skeleton Finger",npcDrops={2100}}
+items[2101]={name="Ghoul Fang",npcDrops={2100}}
+items[2102]={name="Vial of Spider Venom",npcDrops={2101}}
+quests[2100]={name="The Totem of Infliction",questLevel=25,finishedBy={{100}},objectives={[3]={{2101},{2102},{2100}}}}
+log={{id=10,title="The Night Watch",level=24,complete=true},{id=2100,title="The Totem of Infliction",level=25,rows={
+ {type="item",text="Ghoul Fang: 0/10",numFulfilled=0,numRequired=10},
+ {type="item",text="Vial of Spider Venom: 0/5",numFulfilled=0,numRequired=5},
+ {type="item",text="Skeleton Finger: 7/10",numFulfilled=7,numRequired=10}}}}
+C_QuestLog.GetMaxNumQuestsCanAccept=function() return 40 end
+W.Refresh(true)
+check("live cemetery report keeps level-25 accepted collection quest",W.CurrentRoute.questID==2100 and W.CurrentRoute.kind=="objective")
+check("all unfinished item objectives map without client objective IDs",#W.ActiveSteps(W.State.activeByID[2100],W.State)==3)
+check("queue retains other local objectives from the same quest",W.Queue[1] and W.Queue[1].questID==2100 and W.Queue[1].kind=="objective")
+check("known return to town waits for remaining local collection",W.Decision.detail.candidates[1].questID~=10 and W.CurrentRoute.mapID==1431)
+check("quest capacity uses Forever client API",W.State.logLimit==40 and W.State.freeSlots==38)
+log[2].rows[3].finished=true;log[2].rows[3].numFulfilled=10;W.Refresh(false)
+check("finishing fingers still retains remaining local ghoul objective",W.CurrentRoute.questID==2100 and W.CurrentRoute.target=="Ghoul Fang")
+log[2].rows[1].finished=true;log[2].rows[1].numFulfilled=10;W.Refresh(false)
+check("return to town becomes available after local batch is complete",W.CurrentRoute.kind=="turnin" and W.CurrentRoute.questID==10)
+log[2].rows[1].finished=false;log[2].rows[1].numFulfilled=0;log[2].rows[3].finished=false;log[2].rows[3].numFulfilled=7;W.Refresh(true)
+local actualLog=log;log={};for i=1,29 do log[i]={id=3000+i,title="Capacity quest"} end
+local forty=W.ReadCharacter();check("29 of 40 quests leaves eleven free slots",forty.questLogReady and forty.freeSlots==11)
+log=actualLog;W.Refresh(true)
+check("above-range quest offers explicit skip for now",button("Skip for now").enabled)
+button("Skip for now").scripts.OnClick()
+local deferredStep;for _,step in ipairs(W.Queue) do if step.questID==2100 then deferredStep=step end end
+check("skip for now preserves quest as a later queue entry",W.GetProfile().deferredLevels[2100]==25 and deferredStep and deferredStep.levelDeferred and deferredStep.resumeLevel==23 and W.CurrentRoute.questID~=2100)
+check("level deferral is independent of the 15-minute skip",not W.GetProfile().skipped["quest:2100"])
+epoch=epoch+1000;W.Refresh(true);check("level deferral does not expire on the clock",W.GetProfile().deferredLevels[2100]==25)
+W.PinStep(deferredStep);check("later queue step can explicitly resume now",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+W.DeferCurrent();player.level=23;W.Refresh(false,"PLAYER_LEVEL_UP")
+check("deferred quest returns automatically within level range",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+player.level=22;W.GetProfile().pinned=nil;W.Refresh(true);W.DeferCurrent();W.GetProfile().maxLevelAbove=4;W.Refresh(true)
+check("changing level range reactivates deferred quests",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+W.GetProfile().maxLevelAbove=2;W.Refresh(true);W.DeferCurrent();W.UndoSkip()
+check("undo restores a level-deferred quest",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+W.DeferCurrent();W.GetProfile().panelPoint={point="CENTER",relativePoint="CENTER",x=0,y=0}
+local batchProfile=W.GetProfile();ne();W.Refresh(true)
+check("level deferrals remain character-specific",W.GetProfile().deferredLevels[2100]==nil and batchProfile.deferredLevels[2100]==25)
+dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685;log=actualLog;log[2].complete=true;W.Refresh(true)
+check("completed deferred quest always becomes a turn-in",W.GetProfile().deferredLevels[2100]==nil and W.ActiveSteps(W.State.activeByID[2100],W.State)[1].kind=="turnin")
+C_QuestLog.GetMaxNumQuestsCanAccept=function() error("temporarily unavailable") end
+MAX_QUESTLOG_QUESTS=40;check("capacity falls back safely when client call fails",W.ReadCharacter().logLimit==40)
+MAX_QUESTLOG_QUESTS=nil;C_QuestLog.GetMaxNumQuestsCanAccept=nil
+-- Display adjustments are independent, persistent and bounded.
+SlashCmdList.WAYFINDER("scale 75");SlashCmdList.WAYFINDER("arrowscale 85")
+check("panel and arrow accept independent exact scales",W.MainFrame.scale==.75 and W.NavigatorFrame.scale==.85)
+SlashCmdList.WAYFINDER("scale 1");SlashCmdList.WAYFINDER("arrowscale 999")
+check("display scales clamp to usable limits",W.MainFrame.scale==.6 and W.NavigatorFrame.scale==1.5)
+W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
+local scaleHeader;for _,n in ipairs(nodes) do if n.parent==W.MainFrame and n.scripts.OnDragStart then scaleHeader=n end end
+scaleHeader.scripts.OnMouseWheel(scaleHeader,-1)
+check("header mouse wheel resizes panel only",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==1)
+W.NavigatorFrame.scripts.OnMouseWheel(W.NavigatorFrame,-1)
+check("arrow mouse wheel resizes navigator only",W.NavigatorFrame.scale==.95 and W.MainFrame.scale==.85)
+W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.NavigatorFrame.scripts.OnMouseWheel(W.NavigatorFrame,-1)
+check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
+W.GetProfile().locked=false
+check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==130 and W.NavigatorFrame.h==88)
+W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==538)
+W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==386)
+W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
+
 print(string.format("%d scenario checks passed",passed))
 -- Export actual frame calls, not an independently designed mockup.
 local function quote(v) return string.format('%q',v):gsub('\\\n','\\n') end
@@ -402,7 +469,8 @@ local function snapshot(path)
  local f=io.open(path,'w');f:write('['..table.concat(dump,',')..']');f:close()
 end
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);local cs=W.ActiveSteps(W.State.activeQuests[1],W.State)[1];W.PinStep(cs);snapshot('tests/ui-nightelf.json')
-dwarf();log={{id=10,title="The Night Watch",level=23,rows={{type="monster",objectiveID=300,text="Skeleton: 0/8",numFulfilled=0,numRequired=8}}}};W.Refresh(true);snapshot('tests/ui-dwarf.json')
+dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685;log=actualLog;log[2].complete=false;W.GetProfile().deferredLevels={};W.GetProfile().pinned=nil;W.Refresh(true);snapshot('tests/ui-dwarf.json')
 
 W.ToggleSettings();snapshot('tests/ui-settings.json');button("Back to your route").scripts.OnClick()
 W.Queue={};W.UpdateUI();snapshot('tests/ui-empty.json')
+
