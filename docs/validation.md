@@ -1,18 +1,20 @@
-# Validation for 1.5.0
+# Validation for 1.6.0
 
-Run `python3 tools/check.py`. The fail-fast suite currently passes **291 checks** and **36 replay frames**:
+Run `python3 tools/check.py`. The fail-fast suite currently passes **332 checks** and **37 replay frames**:
 
 | Suite | Count | Coverage |
 | --- | ---: | --- |
-| Client/scenario integration | 165 | Existing 1.0/1.1 regressions, quest truth, profiles, catalog recovery, coordinates, decision ownership, UI callbacks and trace export |
+| Client/scenario integration | 170 | Existing 1.0/1.1 regressions, quest truth, profiles, catalog recovery, coordinates, decision ownership, UI callbacks and trace export |
 | Pure route engine | 49 | No-client execution, immutable inputs, deterministic ordering, score sums, queue legs, nearby work, Duskwood and Teldrassil journeys, four-quest batching and level-aware deferral |
 | Provider/client contracts | 21 | Dot-call signatures, numeric zero/nil semantics, percent spawns, support strings, transient failures, race masks, observations, nullable client rows and shown/total log counts |
 | Experience | 56 | XP accounting, level-up ordering/correction, new rewards, full cycles, learning, ranking and grind decisions |
+| Combat safety | 36 | Source level/rank checks, live corrections, held goals and navigation interlocks |
+| Safety replay | 1 frame | Live level-29 danger overrides a committed goal |
 | XP replay | 1 frame | XP-aware unaccepted quest choice through the pure engine |
 | Journey replay | 31 frames | Expected decisions reproduced from synthetic serialized inputs |
 | Export replay | 4 frames | Exported synthetic integration decisions reproduced |
 
-Local execution uses system Lua 5.4 with test-only Lua 5.1 compatibility globals. GitHub Actions installs Lua 5.1 and repeats all suites before release publication. A failing suite prevents packaging/release. See [stability review](V1.5-stability.md), [XP validation and limits](V1.4-experience.md) and [1.3 regressions](V1.3-live-feedback.md).
+Local execution uses system Lua 5.4 with test-only Lua 5.1 compatibility globals. GitHub Actions installs Lua 5.1 and repeats all suites before release publication. A failing suite prevents packaging/release. See [combat-level review](V1.6-combat-safety.md), [stability review](V1.5-stability.md), [XP validation and limits](V1.4-experience.md) and [1.3 regressions](V1.3-live-feedback.md).
 
 Contract fixtures follow primary sources pinned for review:
 

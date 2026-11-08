@@ -9,7 +9,7 @@ local function makeStep(kind,q,point,target,suffix,source,objectiveText)
     elseif kind=="item" then instruction="Use "..target.." in your bags to begin this quest."
     else instruction=objectiveText or ("Work around "..target.." until the quest objective updates.") end
     return {kind=kind,key=W.StepKey(kind,q.id,suffix),questID=q.id,questName=name,title=(labels[kind] or "")..name,point=point,
-        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)}
+        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,combatRisk=point and point.combatRisk,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)..":"..tostring(point and point.combatRisk and point.combatRisk.signature or "noncombat")}
 end
 local function relationPoint(q,field,kind,state)
     local seen=W.ObservedPoint(q.id,kind,state)
@@ -46,23 +46,21 @@ local function objectiveFinished(q,group,index,entry,entries)
     local row=assigned[index]
     return row and row.finished or false,row and row.text,row
 end
-local function entityObjectivePoints(kind,id,state)
-    if kind=="Npc" and not state.profile.includeGroup then
-        local rank=W.DBGet("Npc",id,"rank") or 0
-        if rank==1 or rank==2 or rank==3 then return {} end
-    end
+local function entityObjectivePoints(kind,id,state,blocked,combat)
+    if kind=="Npc" and combat~=false then return W.CombatPoints(id,state,blocked) end
     return W.EntityPoints(kind,id)
 end
-local function itemPoints(id,state)
-    local out={}
+local function itemPoints(id,state,blocked)
+    local out={};local hasSource=false
     for field,kind in pairs({npcDrops="Npc",objectDrops="Object",vendors="Npc"}) do
         for _,entityID in ipairs(W.DBGet("Item",id,field) or {}) do
-            for _,point in ipairs(entityObjectivePoints(kind,entityID,state)) do
-                local source={};for k,v in pairs(point) do source[k]=v end
-                source.acquisition=field;out[#out+1]=source
+            hasSource=true
+            for _,point in ipairs(entityObjectivePoints(kind,entityID,state,blocked,field=="npcDrops")) do
+                local source=W.Copy(point);source.acquisition=field;out[#out+1]=source
             end
         end
     end
+    if not hasSource then blocked[#blocked+1]={status="unknown",reason="Item source level data unavailable"} end
     return out
 end
 local function spawnPoints(spawns)
@@ -74,7 +72,8 @@ local function spawnPoints(spawns)
     return out
 end
 function W.ActiveSteps(q,state)
-    local out={}
+    local blocked={}
+    local out={safetyBlocked=blocked}
     if q.isComplete then
         local p,source=relationPoint(q,"finishedBy","turnin",state)
         p=p or q.waypoint
@@ -88,10 +87,12 @@ function W.ActiveSteps(q,state)
         for i,entry in ipairs(entries) do
             local finished,text,live=objectiveFinished(q,group,i,entry,entries)
             if not finished then
+                local riskStart=#blocked
                 local kind=group==1 and "Npc" or "Object"
-                local points=group==3 and itemPoints(entry[1],state) or entityObjectivePoints(kind,entry[1],state)
+                local points=group==3 and itemPoints(entry[1],state,blocked) or entityObjectivePoints(kind,entry[1],state,blocked)
                 local p=W.NearestPoint(points,state.player,state.mapID)
                 if p then
+                    while #blocked>riskStart do table.remove(blocked) end
                     local target=W.DBGet(group==3 and "Item" or kind,entry[1],"name") or p.name or "the objective area"
                     local detail=text or (group==1 and "Defeat " or group==2 and "Interact with " or "Collect ")..target.."."
                     if group==3 then
@@ -111,32 +112,44 @@ function W.ActiveSteps(q,state)
     for i,entry in ipairs(objectives[5] or {}) do
         local live=entry[4] and entry[4]>0 and q.objectives[entry[4]]
         if not live or not live.finished then
+            local riskStart=#blocked
             local points={}
-            for _,id in ipairs(entry[1] or {}) do for _,p in ipairs(entityObjectivePoints("Npc",id,state)) do points[#points+1]=p end end
+            for _,id in ipairs(entry[1] or {}) do for _,p in ipairs(entityObjectivePoints("Npc",id,state,blocked)) do points[#points+1]=p end end
             local p=W.NearestPoint(points,state.player,state.mapID)
-            if p then out[#out+1]=makeStep("objective",q,p,p.name or "the target","credit:"..i,"QuestieDB",live and live.text) end
+            if p then while #blocked>riskStart do table.remove(blocked) end;out[#out+1]=makeStep("objective",q,p,p.name or "the target","credit:"..i,"QuestieDB",live and live.text) end
         end
     end
     local trigger=W.Q(q.id,"triggerEnd")
-    if #out==0 and trigger and trigger[2] then
-        local p=W.NearestPoint(spawnPoints(trigger[2]),state.player,state.mapID)
+    if #out==0 and #blocked==0 and trigger and trigger[2] then
+        local uncertain=false
+        for _,row in ipairs(q.objectives) do if not row.finished and (row.type=="monster" or row.type=="item") then uncertain=true end end
+        if uncertain then blocked[#blocked+1]={status="unknown",reason="Quest event has no verified combat source"} end
+        local p=not uncertain and W.NearestPoint(spawnPoints(trigger[2]),state.player,state.mapID)
         if p then out[#out+1]=makeStep("objective",q,p,"the quest event","event","QuestieDB",trigger[1]) end
     end
     if #out==0 then
         for i,extra in ipairs(W.Q(q.id,"extraObjectives") or {}) do
             local live=extra[4] and extra[4]>0 and q.objectives[extra[4]]
             if not live or not live.finished then
-                local points=spawnPoints(extra[1])
+                local riskStart=#blocked
+                local combatRefs=false
+                for _,ref in ipairs(extra[5] or {}) do if ref[1]=="monster" then combatRefs=true end end
+                local points=combatRefs and {} or spawnPoints(extra[1])
                 for _,ref in ipairs(extra[5] or {}) do
                     local kind=ref[1]=="monster" and "Npc" or ref[1]=="object" and "Object"
-                    if kind then for _,p in ipairs(entityObjectivePoints(kind,ref[2],state)) do points[#points+1]=p end end
+                    if kind then for _,p in ipairs(entityObjectivePoints(kind,ref[2],state,blocked)) do points[#points+1]=p end end
                 end
                 local p=W.NearestPoint(points,state.player,state.mapID)
-                if p then out[#out+1]=makeStep("objective",q,p,p.name or "the quest area","extra:"..i,"QuestieDB",extra[3]) end
+                if p and live and live.type=="monster" and not p.combatRisk then blocked[#blocked+1]={status="unknown",reason="Extra objective combat levels unverified"};p=nil end
+                if p then while #blocked>riskStart do table.remove(blocked) end;out[#out+1]=makeStep("objective",q,p,p.name or "the quest area","extra:"..i,"QuestieDB",extra[3]) end
             end
         end
     end
-    if #out==0 and q.waypoint then out[1]=makeStep("objective",q,q.waypoint,"the next quest target","client","Client waypoint") end
+    if #out==0 and #blocked==0 and q.waypoint then
+        local uncertainCombat=false
+        for _,row in ipairs(q.objectives) do if not row.finished and (row.type=="monster" or row.type=="item") then uncertainCombat=true end end
+        if uncertainCombat then blocked[#blocked+1]={status="unknown",reason="Client waypoint has no verified combat source"}
+        else out[1]=makeStep("objective",q,q.waypoint,"the next quest target","client","Client waypoint") end end
     local hasDBObjectives=next(objectives)~=nil or trigger or W.Q(q.id,"extraObjectives")
     if #out==0 and #q.objectives==0 and not hasDBObjectives and W.QuestFieldsHealthy(q.id) then
         local p,source=relationPoint(q,"finishedBy","turnin",state)
@@ -176,8 +189,8 @@ local function itemPickups(out,state)
 end
 local forecastCache
 local function forecastCandidates(out,state)
-    local keys={tostring(state.revision),tostring(W.PublishedCatalogGeneration),tostring(state.profile.maxLevelAbove)}
-    for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
+    local keys={tostring(state.combatSafety and state.combatSafety.revision),tostring(state.revision),tostring(W.PublishedCatalogGeneration),tostring(state.profile.maxLevelAbove)}
+    for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(c.targetRevision)..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
     table.sort(keys);local stamp=table.concat(keys,"|")
     local cache=forecastCache
     if cache and cache.owner==state.key and cache.stamp==stamp and state.now-cache.at<45 and W.TravelCost(cache.player,state.player)<300 then
@@ -209,7 +222,11 @@ function W.CollectCandidates(state)
                     steps={};deferred[#deferred+1]={id=q.id,title=q.title,reason="Target data temporarily unavailable"}
                 elseif W.TargetErrors then W.TargetErrors[q.id]=nil end
                 for _,c in ipairs(steps) do out[#out+1]=c end
-                if #steps==0 and status=="ok" then deferred[#deferred+1]={id=q.id,title=q.title,reason=q.objectivesReady and "No mapped target" or "Objective state unavailable"} end
+                if steps.safetyBlocked and #steps.safetyBlocked>0 then
+                    local risk=steps.safetyBlocked[1]
+                    deferred[#deferred+1]={id=q.id,title=q.title,reason=risk.reason,safety=true,resumeLevel=risk.resumeLevel,risks=W.Copy(steps.safetyBlocked)}
+                end
+                if #steps==0 and status=="ok" and #(steps.safetyBlocked or {})==0 then deferred[#deferred+1]={id=q.id,title=q.title,reason=q.objectivesReady and "No mapped target" or "Objective state unavailable"} end
             else deferred[#deferred+1]={id=q.id,title=q.title,reason=why or "Failed quest"} end
         end
         if state.freeSlots>0 then appendPickups(out,state.mapID,state,gates);itemPickups(out,state) end
@@ -275,6 +292,9 @@ local function fallback(input)
     elseif s.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
     elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /wf debug for details."
     else text="No eligible mapped step is available. Inspect a quest giver, restore skipped quests or refresh your quest data." end
+    local unsafe=0
+    for _,q in ipairs(m.deferred) do if q.safety then unsafe=unsafe+1 end end
+    if unsafe>0 and s.questLogReady and m.ready then title="Combat objectives held for later";text="Known enemies exceed your combat limit, or their levels are unverified. These quests remain recorded and are reconsidered as your level or data changes. Use Questie for manual review." end
     return {kind="wait",key="wait",title=title,instruction=text,reason="Waiting for confirmed character data.",target=s.zone,ownerKey=s.key}
 end
 -- Pure selector: plain snapshot in, plain decision out. No game/provider/profile writes.
@@ -283,11 +303,18 @@ function W.SelectRoute(input)
     if state.profile.paused then return {kind="wait",key="paused",title="Route paused",instruction="Resume when you want Wayfinder to plan your next quest step.",reason="Quest progress is still recorded.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
     if state.dead then return {kind="wait",key="dead",title="Return to your character",instruction="Quest navigation resumes after you are alive again.",ownerKey=state.key},{},{clearPin=false,candidates={}} end
     if not state.questLogReady then return fallback(input),{},{clearPin=false,candidates={}} end
+    local danger=state.combatSafety and state.combatSafety.alert
+    if danger then
+        return {kind="wait",key="danger",title="High-risk enemy nearby",target=danger.name,
+            instruction="Avoid this enemy and move away from danger. Navigation resumes after the threat is no longer visible.",reason=danger.reason,source="Live hostile observation",ownerKey=state.key},{},{clearPin=false,candidates={},commitment=input.commitment}
+    end
     local candidates,levelDeferred={},{};local previous=input.previous
     for _,raw in ipairs(input.meta.candidates) do
         local c=W.Copy(raw)
         local skipped=state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID]
-        if not skipped or skipped<=state.now then
+        local risk=c.combatRisk
+        local combatAllowed=not risk or risk.status=="allowed" and W.IsFinite(risk.maxLevel) and risk.maxLevel<=state.level+(W.CombatLevelMargin or 2) and risk.rank~=3 and (state.profile.includeGroup or risk.rank~=1 and risk.rank~=2)
+        if (not skipped or skipped<=state.now) and combatAllowed then
             if previous and previous.ownerKey==state.key and previous.key==c.key and c.kind=="objective" and previous.targetRevision==c.targetRevision and previous.mapID==c.mapID and W.TravelCost(state.player,previous.point)<=600 then c.point=W.Copy(previous.point);c.mapID=previous.mapID;c.x=previous.x;c.y=previous.y end
             local level=(state.profile.deferredLevels or {})[c.questID]
             if level and level>state.level+state.profile.maxLevelAbove and c.kind~="turnin" then
@@ -343,9 +370,15 @@ function W.SelectRoute(input)
         best.selectedAt=previous and previous.key==best.key and previous.selectedAt or state.now
         best.reason=best.reason.." Finish the current regional batch before changing zones."
     end
+    local safetyHeld={}
+    for _,q in ipairs(input.meta.deferred) do
+        if q.safety then safetyHeld[#safetyHeld+1]={kind="wait",key="safety:"..q.id,questID=q.id,questName=q.title,title="Held: "..q.title,safetyHeld=true,resumeLevel=q.resumeLevel,reason=q.reason,instruction=q.reason,ownerKey=state.key} end
+    end
     local function withDeferred(queue)
         if #uniqueDeferred>0 and #queue>=4 then table.remove(queue) end
         for _,c in ipairs(uniqueDeferred) do if #queue>=4 then break end;queue[#queue+1]=c end
+        if #safetyHeld>0 and #queue>=4 then table.remove(queue) end
+        for _,c in ipairs(safetyHeld) do if #queue>=4 then break end;queue[#queue+1]=c end
         return queue
     end
     if not best then
@@ -377,6 +410,10 @@ function W.SelectRoute(input)
 end
 function W.PlanRoute(state,force,context)
     context=context or {previous=W.CurrentRoute}
+    if state.combatSafety and state.combatSafety.alert then
+        local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
+        local route,queue,detail=W.SelectRoute(input);detail.input=input;return route,queue,detail
+    end
     W.BeginDataCapture()
     local ok,meta=pcall(W.CollectCandidates,state)
     local facts=W.EndDataCapture()
@@ -387,5 +424,5 @@ function W.PlanRoute(state,force,context)
     detail.input=input
     return route,queue,detail
 end
-function W.PinStep(step) if step then local p=W.GetProfile();if step.levelDeferred then p.deferredLevels[step.questID]=nil end;p.pinned=step.key;W.Refresh(true) end end
+function W.PinStep(step) if step and not step.safetyHeld then local p=W.GetProfile();if step.levelDeferred then p.deferredLevels[step.questID]=nil end;p.pinned=step.key;W.Refresh(true) end end
 

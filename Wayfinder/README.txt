@@ -1,4 +1,4 @@
-WAYFINDER 1.5.0 — WORLD OF WARCRAFT: FOREVER
+WAYFINDER 1.6.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Wayfinder folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -41,6 +41,15 @@ The arrow has a transparent background. Locking prevents wheel resizing.
 /wf xpreset   reset current XP session; retain learned pace
 /wf debug     copy local diagnostics
 /wf trace     copy recent local decisions for replay (before reload/logout)
+
+Automatic combat targets require known enemy levels no more than +2 above you.
+Quest level does not override enemy level. Unknown/dangerous sources are held;
+an appropriate alternative is preferred if one exists. Group settings and
+manual focus do not override the enemy-level cap. Friendly vendors and
+noncombat hand-ins are not combat targets.
+
+Visible over-level hostiles can stop navigation until no longer visible.
+This is not a danger-free terrain pathfinder; remain aware of surroundings.
 
 Regional batches remain committed while useful mapped work exists. XP events
 update measurement without rebuilding the whole plan after each kill. Accepted

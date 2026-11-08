@@ -311,6 +311,7 @@ end
 function W.ChooseGrindBreak(best,state,previous,detail)
     local e=state.experience;local g=e and e.grind
     if previous and previous.kind=="grind" and (previous.grindUntil or 0)<=state.now then detail.endGrind=true;return best end
+    if not state.combatSafety or not state.combatSafety.grindAllowed then return best end
     if not best or state.profile.pinned or not e or not e.enabled or e.paused or not g or not g.valid then return best end
     if previous and previous.kind=="grind" and e.inCombat and (g.cooldownUntil or 0)<=state.now then
         detail.questAlternative=W.Copy(best);return W.Copy(previous)

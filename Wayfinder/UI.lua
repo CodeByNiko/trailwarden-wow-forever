@@ -82,7 +82,7 @@ function W.CreateUI()
     fields.source=atText(card,"",9,C.muted,12,125,304,13);fields.source:SetWordWrap(false)
     card:SetScript("OnEnter",function(self)
         local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
-        W.Tooltip(self,r.title or "Why this step?",{r.instruction,r.reason,z and z.hint,"Source: "..(r.source or "Live character state"),"The arrow shows direction, not a terrain-safe path. Use roads and entrances.","Click a planned step to focus it. The plan updates as your quests change."})
+        W.Tooltip(self,r.title or "Why this step?",{r.instruction,r.reason,z and z.hint,"Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow shows direction, not a terrain-safe path. Use roads and entrances.","Click a planned step to focus it. The plan updates as your quests change."})
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");strip:SetPoint("TOPLEFT",16,-234);strip:SetSize(328,28);W.Backdrop(strip,C.raised)
@@ -98,7 +98,7 @@ function W.CreateUI()
         row.title=atText(row,"",11,C.text,35,4,281,15);row.title:SetWordWrap(false)
         row.detail=atText(row,"",9,C.muted,35,21,281,12);row.detail:SetWordWrap(false)
         row:SetScript("OnClick",function(self) W.PinStep(self.step) end)
-        row:SetScript("OnEnter",function(self) if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.levelDeferred and "Click to resume this deferred quest now." or "Click to focus this quest step."}) end end)
+        row:SetScript("OnEnter",function(self) if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.safetyHeld and "Automatic combat limits cannot be bypassed with manual focus." or self.step.levelDeferred and "Click to resume this deferred quest now." or "Click to focus this quest step."}) end end)
         row:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
         rows[i]=row
     end
@@ -176,19 +176,22 @@ function W.UpdateUI()
             fields.title:SetFont("Fonts\\FRIZQT__.TTF",size,"")
         end
     end
-    fields.target:SetText(r.target or state.zone)
+    fields.target:SetText((r.target or state.zone)..(r.combatRisk and r.combatRisk.maxLevel and ("  /  Enemy level "..r.combatRisk.maxLevel) or ""))
     fields.instruction:SetText(r.instruction or "Reading your quest progress...")
     local location=r.point and string.format("%s  /  %.1f, %.1f",W.MapName(r.mapID),r.x*100,r.y*100) or state.zone
     fields.source:SetText(location.."  /  "..(r.source or "Live state"))
     for i,row in ipairs(rows) do
         local step=(W.Queue or {})[i];row.step=step
-        if step then row.title:SetText(step.levelDeferred and ("Later: "..(step.questName or step.title)) or step.title);row.detail:SetText(step.levelDeferred and ("Returns at level "..step.resumeLevel.." / click to resume now") or (step.target or W.MapName(step.mapID)).."  /  "..(step.mapID and W.MapName(step.mapID) or "Your bags")) end
+        if step then row.title:SetText(step.safetyHeld and step.title or step.levelDeferred and ("Later: "..(step.questName or step.title)) or step.title);row.detail:SetText(step.safetyHeld and (step.resumeLevel and ("Enemy levels / reconsider at level "..step.resumeLevel) or "Combat level data unverified") or step.levelDeferred and ("Returns at level "..step.resumeLevel.." / click to resume now") or (step.target or W.MapName(step.mapID)).."  /  "..(step.mapID and W.MapName(step.mapID) or "Your bags")) end
     end
     local status=string.format("%s  /  %d active  /  %d completed  /  %d free slots",state.zone,#state.activeQuests,state.completedCount,state.freeSlots)
     if W.CatalogError then status=status.."\nQuest catalog needs attention / /wf debug"
     elseif not W.CatalogReady then status=status.."\n"..(W.DatabaseStatus or "Waiting for data")
     elseif #(W.Unmapped or {})>0 then status=status.."\n"..#W.Unmapped.." deferred or unmapped quest(s)  /  /wf debug" end
     if not state.historyReady and not W.CatalogError and W.CatalogReady and #(W.Unmapped or {})==0 then status=status.."\nAwaiting completed quest history" end
+    local safetyCount=0;local safetyReason
+    for _,q in ipairs(W.Unmapped or {}) do if q.safety then safetyCount=safetyCount+1;safetyReason=safetyReason or q.reason end end
+    if safetyCount>0 then status=state.zone.." / "..safetyCount.." combat objective(s) held / cap +2\n"..(safetyReason or "") end
     fields.status:SetText(status)
     local empty=not W.CatalogReady and "Reading quest data. Your next steps will appear here shortly."
         or #(W.Unmapped or {})>0 and "No further mapped steps yet. Some active quests need Questie, a different comfort setting or more complete quest data."

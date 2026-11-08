@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.0
+
+- Require known enemy levels within +2 of the player for automatic combat destinations.
+- Filter drop sources and kill-credit alternatives before distance/XP ranking.
+- Prevent client/extra-objective coordinates and manual focus from bypassing combat checks.
+- Hold blocked/unknown combat objectives visibly and reconsider after level/data changes.
+- Let fresh hostile observations raise provider levels; stop navigation for visible over-level threats.
+- Invalidate committed sources/cached forecasts after risk changes; clear owned waypoints on danger.
+- Keep high-level friendly vendors and completed noncombat hand-ins available.
+- Require suitable observed enemy evidence before automatic grind suggestions.
+- 332 checks and 37 replay frames, including the level-22 / quest-25 / enemy-29 regression.
+
 ## 1.5.0
 
 - Separate XP event measurement, live step progression and regional planning.

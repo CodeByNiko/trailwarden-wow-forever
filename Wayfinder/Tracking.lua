@@ -130,6 +130,7 @@ function W.ReadCharacter()
     local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
     state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
+    if W.CombatSafetySnapshot then state.combatSafety=W.CombatSafetySnapshot(state) end
     if W.ObserveExperienceProgress then
         local status,message=W.Call(W.ObserveExperienceProgress,state)
         W.LearningError=status~="ok" and tostring(message) or nil

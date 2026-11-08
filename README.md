@@ -6,7 +6,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Install or update
 
-1. Download `Wayfinder-1.5.0-Forever.zip` under the release's **Assets**.
+1. Download `Wayfinder-1.6.0-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Wayfinder` with the `Wayfinder` folder inside the ZIP.
 3. Keep **QuestieDB for Forever** enabled. Questie is strongly recommended for its availability checks, map markers and tracking.
 4. Start the game. Your character's route and navigator appear automatically. Existing saved progress is retained.
@@ -18,7 +18,7 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 - Resumes existing characters and new characters from their own live progress. Profiles, skips, preferences and learned completion history are separate per character.
 - Plans **accept → quest objective → return → turn in → unlocked follow-up** actions. It never marks a quest complete simply because you arrived somewhere.
 - Uses live client waypoints, QuestieDB NPC/object positions, creature and object item sources, deliveries and quest-starting items in your bags.
-- Checks level, class, race, prerequisites, alternatives and mutually exclusive chains. Solo mode avoids known group/dungeon quests. New pickup recommendations default to quests up to two levels above you; already accepted quests are retained with an above-range indicator.
+- Checks level, class, race, prerequisites, alternatives and mutually exclusive chains. Solo mode avoids known group/dungeon quests. New pickup recommendations default to quests up to two levels above you; already accepted quests are retained with an above-range indicator. Their combat sources must independently satisfy the +2 enemy-level cap.
 - Collects useful nearby pickups, combines objectives in the same area and favors nearby completed turn-ins. A full log switches attention to existing work.
 - Shows one current instruction and a configurable preview of up to four planned steps. Plans adapt as quests change. Click a future step to focus it; **Auto route** resumes automatic selection.
 - Learns live offers from NPC conversations. If Forever data suggests a quest that is absent, **Skip 15 min** moves the whole quest out of the route temporarily. Above-range accepted work instead offers **Skip for now**, returning automatically when it fits your level range.
@@ -27,15 +27,13 @@ The resulting path must be `Interface/AddOns/Wayfinder/Wayfinder.toc`. When usin
 
 XP-aware mode ranks modeled cycles within a committed region by estimated XP return, with a conservative discount for uncertain data. Regional continuity, unfinished work, eligibility and explicit focus remain constraints. Unknown cycles retain the normal questing fallback. This is a continuously updated heuristic, not a proof of a globally optimal route.
 
-## New in 1.5
+## New in 1.6
 
-**Stable regional questing and a cleaner XP display.** XP changes no longer cause full planning after every kill. The planner commits to the current region while useful mapped steps remain, keeps an unfinished objective selected, and advances when progress makes that step invalid or complete. Level-ups reveal options without automatically sending you to another zone.
+**Combat targets are checked by enemy level, not quest level.** Automatic combat sources must have known levels within **+2 of your character**, using the provider's maximum enemy level. A level-25 quest does not authorize a level-29 enemy for a level-22 character. Item drops and kill-credit alternatives are filtered before choosing the nearest source. Unknown combat levels are held for review.
 
-XP forecasts are reused for 45 seconds unless the goal set, eligibility, catalog or meaningful travel changes. Duplicate quest-log events do not rebuild unchanged plans. Forecast/learning failures fall back to normal quest guidance, and a planner error can retain only an independently revalidated live objective/hand-in.
+If no appropriate source exists, the objective stays recorded and appears as **Held** in the bounded preview when space permits. Live target/mouseover/nameplate observations can raise an underestimated provider level. A visible over-level hostile temporarily stops navigation; group settings and manual focus cannot bypass the level cap. High-level friendly vendors and noncombat turn-ins remain available.
 
-The compact guide now gives measured XP/hour and next-level ETA their own readable two-column section. Uncertain quest/grind projections live in its tooltip. **Auto route** respects the regional batch; **Replan region now** in settings or `/wf refresh` explicitly reconsiders the wider route.
-
-See [stability and polish review](docs/V1.5-stability.md).
+This filters known combat destinations. The arrow still does not calculate a terrain- or danger-free walking path, and the client may not reveal every nearby enemy. See [combat-level review and limits](docs/V1.6-combat-safety.md).
 
 ## Using it
 
@@ -66,7 +64,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 
 Measured XP/h appears after 60 seconds. Its dedicated section shows measured XP/hour and next-level ETA; projected quest/grind rates are in the hover details. It includes actual XP from kills, quests and exploration, with travel and ordinary downtime in the denominator. Pause and AFK are excluded. Hover the XP lines for session statistics, estimate confidence and calculation details. Unknown rates show `--`; a zero measured rate has no finite level ETA.
 
-A grind suggestion requires at least eight locally observed, verified rewarded kills over two minutes, a modeled quest alternative of medium confidence and at least a 25% rate advantage. It lasts at most three minutes, is rechecked as progress changes and can be dismissed with **Questing now**. A two-minute cooldown prevents immediate repetition. No fixed Classic grinding guide is bundled.
+A grind suggestion also requires recent suitable enemy-level observations in the area. It requires at least eight locally observed, verified rewarded kills over two minutes, a modeled quest alternative of medium confidence and at least a 25% rate advantage. It lasts at most three minutes, is rechecked as progress changes and can be dismissed with **Questing now**. A two-minute cooldown prevents immediate repetition. No fixed Classic grinding guide is bundled.
 
 ## First evening with your characters
 

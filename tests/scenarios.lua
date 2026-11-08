@@ -121,7 +121,8 @@ npcs[303]={name="Wolf",spawns={[20]={{58,60}}}}
 npcs[304]={name="Dire Wolf",spawns={[20]={{68,60}}}}
 npcs[202]={name="Quartermaster",spawns={[20]={{57,61}}}}
 items[403]={name="Supply pack",vendors={202}}
-local numeric={sourceItemId=true,zoneOrSort=true,nextQuestInChain=true,parentQuest=true,breadcrumbForQuestId=true,availableUntilCompleted=true,availableStartingWith=true,disabledByQuest=true,requiredLevel=true,questLevel=true,requiredRaces=true,requiredClasses=true,requiredMaxLevel=true,requiredSpell=true,requiredSpecialization=true,specialFlags=true,questFlags=true,rank=true}
+for id,row in pairs(npcs) do row.minLevel=id==300 and 22 or 7;row.maxLevel=row.minLevel end
+local numeric={minLevel=true,maxLevel=true,sourceItemId=true,zoneOrSort=true,nextQuestInChain=true,parentQuest=true,breadcrumbForQuestId=true,availableUntilCompleted=true,availableStartingWith=true,disabledByQuest=true,requiredLevel=true,questLevel=true,requiredRaces=true,requiredClasses=true,requiredMaxLevel=true,requiredSpell=true,requiredSpecialization=true,specialFlags=true,questFlags=true,rank=true}
 local function db(data)
  return {Get=function(id,key) local r=data[id];if not r then return nil end if r[key]~=nil then return r[key] end if numeric[key] then return 0 end if key=="startedBy" or key=="finishedBy" or key=="objectives" then return {} end end,
  GetAllIds=function() local ids={} for id in pairs(data) do ids[#ids+1]=id end table.sort(ids);return ids end}
@@ -131,7 +132,7 @@ LibQuestieDB={Quest=db(quests),Npc=db(npcs),Item=db(items),Object=db(objects),co
 local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=function(id) return id==17 end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Data","Tracking","Database","Experience","Planner","UI","Navigator","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
+for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Navigator","Replay","Core"}) do dofile("Wayfinder/"..file..".lua") end
 local W=Wayfinder
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
@@ -390,8 +391,8 @@ local traceFile=io.open('tests/replay-export.json','w');traceFile:write(export);
 
 -- 1.3 live-report regressions: level-22 cemetery batch and level-aware deferral.
 dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685
-npcs[2100]={name="Insane Ghoul",spawns={[10]={{79.8,68.6}}}}
-npcs[2101]={name="Spider",spawns={[10]={{60,30}}}}
+npcs[2100]={name="Insane Ghoul",minLevel=23,maxLevel=24,spawns={[10]={{79.8,68.6}}}}
+npcs[2101]={name="Spider",minLevel=23,maxLevel=24,spawns={[10]={{60,30}}}}
 items[2100]={name="Skeleton Finger",npcDrops={2100}}
 items[2101]={name="Ghoul Fang",npcDrops={2100}}
 items[2102]={name="Vial of Spider Venom",npcDrops={2101}}
@@ -500,6 +501,30 @@ W.PlanRoute=failPlan;W.Refresh(false,"fault-test")
 check("completed quest progresses after recovery",W.CurrentRoute.kind=="turnin")
 local countPlans=W.PlanExecutions;epoch=epoch+1;W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player");drain()
 check("post-turn-in XP measurement does not churn the planner",W.PlanExecutions==countPlans)
+
+-- Immediate live danger must clear a committed map marker and navigator.
+dwarf();player.guid="Player-Combat-Regression";player.x=.797;player.y=.685;log=actualLog;log[2].complete=false
+W.Refresh(true);W.PinStep(W.ActiveSteps(W.State.activeByID[2100],W.State)[1]);local oldCombatRoute=W.Copy(W.CurrentRoute)
+local guidAPI,levelAPI,nameAPI=UnitGUID,UnitLevel,UnitName
+local hostileVisible=true
+UnitGUID=function(unit) if unit=="target" and hostileVisible then return "Creature-0-0-0-0-2100-1" end return guidAPI(unit) end
+UnitLevel=function(unit) if unit=="target" then return 29 end return levelAPI(unit) end
+UnitName=function(unit) if unit=="target" then return "Fetid Corpse live correction" end return nameAPI(unit) end
+UnitCanAttack=function(_,unit) return unit=="target" and hostileVisible end
+UnitClassification=function() return "normal" end
+W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_TARGET_CHANGED")
+check("live level-29 hostile immediately interrupts committed quest route",W.CurrentRoute.key=="danger")
+check("danger stop releases owned map waypoint and arrow direction",W.WaypointStatus=="No mapped step" and not W.Navigation.bearing)
+hostileVisible=false;W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_TARGET_CHANGED")
+check("source correction survives after hostile leaves target",W.CurrentRoute.point==nil or W.CurrentRoute.point.entityID~=2100)
+local currentSteps=W.ActiveSteps(W.State.activeByID[2100],W.State);local noUnsafe=true
+for _,step in ipairs(currentSteps) do if step.point.entityID==2100 then noUnsafe=false end end
+check("old pinned collection source cannot bypass observed level cap",noUnsafe)
+player.level=27;W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LEVEL_UP",27);drain()
+local again=W.ActiveSteps(W.State.activeByID[2100],W.State);local permitted=false
+for _,step in ipairs(again) do if step.point.entityID==2100 then permitted=true end end
+check("level-up reconsiders held combat sources automatically",permitted)
+UnitGUID=guidAPI;UnitLevel=levelAPI;UnitName=nameAPI;UnitCanAttack=nil;UnitClassification=nil;W.PollCombatSafety()
 
 -- Export actual frame calls, not an independently designed mockup.
 local function quote(v) return string.format('%q',v):gsub('\\\n','\\n') end

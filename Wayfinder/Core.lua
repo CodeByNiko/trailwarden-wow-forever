@@ -30,7 +30,7 @@ function W.Refresh(force,trigger)
         -- Preserve only a step revalidated against the fresh live quest log.
         local prior=W.Decision and W.Decision.route
         local q=captured and state.questLogReady and prior and state.activeByID and state.activeByID[prior.questID]
-        if q and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
+        if q and not (state.combatSafety and state.combatSafety.alert) and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
             local status,steps=W.Call(W.ActiveSteps,q,state)
             if status=="ok" then for _,step in ipairs(steps) do if step.key==prior.key then route=step;route.ownerKey=state.key;break end end end
         end
@@ -81,6 +81,7 @@ function W.Diagnostics()
     lines[#lines+1]="XP quest model: "..(r.economy and W.FormatXP(r.economy.xpPerHour) or "unknown").." / "..(r.economy and r.economy.confidence or "unknown")
     lines[#lines+1]="Region plan: "..tostring(W.Decision and W.Decision.commitment and W.Decision.commitment.mapID)
     lines[#lines+1]="Forecast error: "..tostring(W.ForecastError or "none").." / learning error: "..tostring(W.LearningError or "none")
+    lines[#lines+1]="Combat target cap: +"..W.CombatLevelMargin.." / risk revision "..tostring(s.combatSafety and s.combatSafety.revision)
     lines[#lines+1]="Planning: "..tostring(W.PlanExecutions).." selections / "..tostring(W.ForecastBuilds or 0).." forecasts / "..tostring(W.ForecastCacheHits or 0).." cached forecasts"
     for id,message in pairs(W.TargetErrors or {}) do lines[#lines+1]="Target "..id..": "..message end
     lines[#lines+1]="Active quest objectives:"
@@ -93,17 +94,22 @@ function W.Diagnostics()
     for key,value in pairs(W.DataIssues or {}) do lines[#lines+1]=key..": "..value end
     return table.concat(lines,"\n")
 end
-for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED"}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({"PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
     W.LastEvent=event
     if event=="PLAYER_LOGIN" then
-        W.ResetExperience();W.CreateUI();W.CreateNavigator();W.Refresh(true)
+        W.ResetExperience();W.Safe(W.PollCombatSafety);W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Wayfinder "..W.Version.."|r / Your character's route is ready. |cffffc366/wf|r opens the guide; |cffffc366/wf help|r lists controls.")
         return
     end
     local args={...}
     render("XP event",W.ExperienceEvent,event,unpack(args))
+    if event=="PLAYER_TARGET_CHANGED" or event=="UPDATE_MOUSEOVER_UNIT" or event=="NAME_PLATE_UNIT_ADDED" or event=="NAME_PLATE_UNIT_REMOVED" then
+        W.TrackCombatUnit(event,args[1]);local changed=W.Safe(W.PollCombatSafety)
+        if changed then W.Refresh(false,"combat-safety") end
+        return
+    end
     local ok,message=pcall(function()
         if event=="QUEST_TURNED_IN" then W.RememberTurnIn(args[1]);W.ObserveQuest(args[1],nil,"turnin")
         elseif event=="GOSSIP_SHOW" or event=="QUEST_GREETING" then W.ObserveGossip()
@@ -119,7 +125,10 @@ end)
 local navElapsed,planElapsed,xpElapsed=0,0,0
 frame:SetScript("OnUpdate",function(_,dt)
     navElapsed=navElapsed+dt;planElapsed=planElapsed+dt;xpElapsed=xpElapsed+dt
-    if xpElapsed>=1 then xpElapsed=0;render("experience",W.SampleExperience) end
+    if xpElapsed>=1 then
+        xpElapsed=0;render("experience",W.SampleExperience)
+        if W.Safe(W.PollCombatSafety) then W.Refresh(false,"combat-safety") end
+    end
     if navElapsed>=.1 then navElapsed=0;if W.State then render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator);render("live panel",W.UpdateLiveUI) end end
     if planElapsed>=2 then
         planElapsed=0
