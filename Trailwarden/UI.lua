@@ -105,7 +105,7 @@ function W.CreateUI()
         row:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
         rows[i]=row
     end
-    fields.status=atText(body,"",8,C.muted,16,241,292,14);fields.status:SetWordWrap(false);fields.statusText=""
+    fields.status=atText(body,"",8,C.muted,16,241,220,14);fields.status:SetWordWrap(false);fields.statusText=""
     local xpHover=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.xpHover=xpHover;xpHover:SetPoint("BOTTOMLEFT",16,49);xpHover:SetSize(292,44);xpHover:EnableMouse(true);W.Backdrop(xpHover,C.card)
     atText(xpHover,"YOUR XP / HOUR",7,C.muted,10,6,130,10)
     atText(xpHover,"NEXT LEVEL",7,C.muted,158,6,124,10)
