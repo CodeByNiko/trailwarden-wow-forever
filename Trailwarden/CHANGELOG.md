@@ -2,6 +2,9 @@
 
 ## 1.7.3
 
+- Fix non-terminating multi-goal forecasts, bound route optimization and reject malformed/non-finite projection data.
+- Invalidate forecast models immediately when objective progress changes; never show an old navigator bearing for a new decision.
+- Size the panel to the actual preview, hide the entire body when collapsed, retain warnings alongside nearby offers, and keep long titles readable.
 - Rework the route panel into a narrower, shorter hierarchy with clearer objective progress and less diagnostic clutter.
 - Replace the navigator pointer with a compact compass needle and improve its spacing and labels.
 - Wait for five active minutes before showing the live XP rate and next-level ETA, avoiding misleading short-session projections.

@@ -1,3 +1,15 @@
+# Validation for 1.7.3 (feature branch)
+
+**440 checks and 40 replay frames** pass locally under both Lua 5.1.5 and the Lua 5.4 development fallback: 202 scenario/client, 70 pure engine, 21 provider/client, 74 XP, 36 combat safety and 37 access/map checks.
+
+The previous branch's experience suite timed out on its first nonempty objective cycle. The corrected projection consumes a shrinking pending list and orders goals separately. Tests cover a route where the greedy ordering is 160 yards and the improved ordering is 140 yards, origin/pickup/return legs, once-only work/kill accounting, unchanged inputs, empty/coincident goals, malformed/sparse data, overflow, and bounded execution at the 64-goal limit. Forecasts above that limit remain unknown and retain normal quest-routing behavior. Two-opt has at most eight improving passes; these are direct-distance estimates, not terrain paths or a global optimum.
+
+Additional client scenarios verify progress invalidates stale forecast quantities while unchanged data still uses the cache; collapse hides all body content; preview height follows actual rows; warnings, preview and XP do not overlap; nearby offers preserve data/combat warnings; long titles stay at least 11px and fit two lines; tooltip gaps do not discard later instructions; measured rate/ETA appear at five active minutes; and an out-of-date navigation decision cannot show an old bearing or arrival state.
+
+Feature pushes and PRs now run the Lua 5.1 suite plus package validation through a read-only verification workflow. Each suite times out after 90 seconds and the CI job after five minutes. The release workflow remains separate. Local package validation checks the installable archive; repeat builds must be byte-identical. Updated `docs/previews/` renders use the actual frame calls with synthetic data and a substitute font. They support layout inspection and do not establish live WoW behavior.
+
+Live Forever testing is still required for real fonts, readability at the chosen UI scale, actual cave/escort behavior and provider coverage. The feature branch is not a published release.
+
 # Validation for 1.7.1
 
 **409 checks and 40 replay frames** pass: 189 scenario/client, 70 pure engine, 21 provider/client, 56 XP, 36 combat safety and 37 access/map checks. Three new replay frames cover cave collection, last-item persistence and release after local completion.

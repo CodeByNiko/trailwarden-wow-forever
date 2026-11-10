@@ -17,6 +17,7 @@ function methods:SetSize(w,h) self.w=w;self.h=h end
 function methods:SetWidth(w) self.w=w end
 function methods:SetHeight(h) self.h=h end
 function methods:SetText(t) self.text=t or "" end
+function methods:GetText() return self.text end
 function methods:SetFont(path,size) self.fontSize=size end
 function methods:GetStringHeight()
  return math.max(1,math.ceil(#self.text*(self.fontSize or 10)*.52/math.max(1,self.w)))*(self.fontSize or 10)*1.2
@@ -242,7 +243,7 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 -- All UI and login code executes against a strict frame API double.
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
-check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h==456)
+check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h<500)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 -- 1.1 quality regressions.
@@ -311,14 +312,69 @@ W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately v
 W.Queue={};W.UpdateUI();local empty
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
 check("empty planned list explains what happens next",empty and empty.shown)
-W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides body content",W.MainFrame.h==54 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides body content",W.MainFrame.h==44 and not empty.shown and not undo.shown)
+local function visible(n) return n.shown and (not n.parent or visible(n.parent)) end
+local bodyHidden=true
+for _,n in ipairs(nodes) do if n.parent==empty.parent and visible(n) then bodyHidden=false end end
+check("collapse hides navigation labels and all other body children",bodyHidden)
 W.GetProfile().collapsed=false;W.Refresh(true)
 local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
 W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
 local titleNode
-for _,n in ipairs(nodes) do if n.kind=="font" and n.text==longTitle then titleNode=n end end
-check("long current titles shrink within their allocated text area",titleNode and titleNode.fontSize<16 and titleNode:GetStringHeight()<=35)
+for _,n in ipairs(nodes) do if n.kind=="font" and n.text:sub(1,20)==longTitle:sub(1,20) then titleNode=n end end
+check("long current titles keep two readable lines",titleNode and titleNode.fontSize>=11 and titleNode:GetStringHeight()<=34 and titleNode.text:sub(-3)=="...")
 W.CurrentRoute=originalRoute;W.UpdateUI()
+do
+ local oldError,oldUnmapped,oldDetail=W.CatalogError,W.Unmapped,W.Decision.detail
+ local oldQueue,oldCount=W.Queue,W.GetProfile().queueRows
+ W.CatalogError="synthetic catalog fault";W.Unmapped={{safety=true,reason="Enemy above cap"}}
+ W.Decision.detail={opportunities={{name="A nearby escort",activity="escort"}}}
+ W.Queue={};for i=1,4 do W.Queue[i]=W.Copy(W.CurrentRoute) end
+ W.GetProfile().queueRows=4;W.UpdateUI()
+ local warning,xpBox
+ for _,n in ipairs(nodes) do
+  if n.kind=="font" and n.text:find("Quest data needs attention",1,true) then warning=n end
+  if n.kind=="font" and n.text=="YOUR XP / HOUR" then xpBox=n.parent end
+ end
+ check("nearby offers preserve catalog and combat warnings",warning and warning.text:find("combat objective",1,true) and warning.text:find("nearby",1,true))
+ local xpTop=-xpBox.points[1][3];local clear=true
+ for _,n in ipairs(nodes) do
+  if n.step and visible(n) then
+   local top=-n.points[1][3]
+   if top< -warning.points[1][3]+warning.h+20 or top+n.h>xpTop-8 then clear=false end
+  end
+ end
+ check("warnings preview and XP occupy separate vertical space",clear)
+ W.GetProfile().queueRows=0;W.UpdateUI()
+ check("warnings remain visible when the preview is disabled",visible(warning) and -xpBox.points[1][3]>=-warning.points[1][3]+warning.h)
+ W.CatalogError=oldError;W.Unmapped=oldUnmapped;W.Decision.detail=oldDetail;W.Queue=oldQueue;W.GetProfile().queueRows=oldCount;W.UpdateUI()
+ local statsAPI=W.SafeExperienceStats
+ local sample={available=true,maximum=1000,windowSeconds=299,rate=12000,eta=210}
+ W.SafeExperienceStats=function() return sample end
+ local rate,eta
+ for _,n in ipairs(nodes) do if n.parent==xpBox and n.kind=="font" then local pnt=n.points[1];if pnt[3]==-21 then if pnt[2]==10 then rate=n else eta=n end end end end
+ W.UpdateLiveUI();check("both rate and ETA wait until five active minutes",rate.text=="Learning..." and eta.text=="Building sample")
+ sample.windowSeconds=300;W.UpdateLiveUI();check("stable sample displays measured rate and finite ETA",rate.text=="12,000" and eta.text=="~4m")
+ sample.rate=0;sample.eta=nil;W.UpdateLiveUI();check("stable zero rate has no fabricated ETA",rate.text=="0" and eta.text=="--")
+ sample.paused=true;W.UpdateLiveUI();check("paused sample hides rate and ETA",rate.text=="Paused" and eta.text=="--")
+ sample.paused=false;sample.maximum=0;W.UpdateLiveUI();check("level cap has no next-level ETA",rate.text=="Level cap" and eta.text=="--")
+ W.SafeExperienceStats=statsAPI;W.UpdateLiveUI()
+ local tooltipAPI=GameTooltip;local tooltipLines={}
+ GameTooltip={SetOwner=function() end,SetText=function() end,AddLine=function(_,text) tooltipLines[#tooltipLines+1]=text end,Show=function() end}
+ W.Tooltip(W.MainFrame,"Test",{[1]="First",[3]="Details after an unavailable line"})
+ check("optional tooltip gaps do not discard later guidance",#tooltipLines==2 and tooltipLines[2]=="Details after an unavailable line")
+ GameTooltip=tooltipAPI
+ local nav=W.Navigation;local profile=W.GetProfile();local hidden=profile.navigatorHidden
+ profile.navigatorHidden=false
+ W.Navigation={decisionID=W.Decision.id-1,bearing=1,facing=0,arrived=true,distance=20};W.UpdateNavigator()
+ local staleHidden,syncShown=true,false
+ for _,n in ipairs(nodes) do if n.parent==W.NavigatorFrame then
+  if (n.texture or ""):find("Arrow.tga",1,true) or n.text=="HERE" then if visible(n) then staleHidden=false end end
+  if n.text=="Synchronizing route" and visible(n) then syncShown=true end
+ end end
+ check("navigator clears stale bearing and arrival after a new decision",staleHidden and syncShown)
+ W.Navigation=nav;profile.navigatorHidden=hidden;W.UpdateNavigator()
+end
 
 -- 1.2 foundation regressions; these were demonstrated during the audit.
 ne();player.guid="Player-Foundation";player.name="Foundation";log={};complete={};W.CurrentRoute=nil
@@ -452,8 +508,14 @@ W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.Na
 check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
 W.GetProfile().locked=false
 check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==142 and W.NavigatorFrame.h==104)
-W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==520)
-W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==392)
+local savedQueue=W.Queue;W.Queue={}
+for i=1,4 do W.Queue[i]=W.Copy(W.CurrentRoute) end
+W.GetProfile().queueRows=4;W.UpdateUI();local fourHeight=W.MainFrame.h
+W.GetProfile().queueRows=2;W.UpdateUI();check("four actual preview steps add only their two row heights",fourHeight-W.MainFrame.h==64)
+W.GetProfile().queueRows=0;W.UpdateUI();check("preview can be hidden while keeping a compact next-step card",W.MainFrame.h<410)
+local hiddenHeight=W.MainFrame.h;W.Queue={W.Copy(W.CurrentRoute)};W.GetProfile().queueRows=4;W.UpdateUI();local oneHeight=W.MainFrame.h
+W.GetProfile().queueRows=2;W.UpdateUI();check("unused preview slots do not leave blank space",W.MainFrame.h==oneHeight and oneHeight<fourHeight)
+W.Queue=savedQueue
 W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
 
 -- XP event wiring and real panel values, in addition to the isolated XP suite.
@@ -490,9 +552,15 @@ epoch=epoch+46;W.Refresh(false,"fault-test")
 check("failed forecast falls back to quest routing rather than waiting card",W.CurrentRoute.questID==2 and W.ForecastError~=nil)
 W.PrepareQuestEconomies=forecastXP;W.Refresh(false,"fault-test")
 check("forecast recovers independently without resetting route",W.CurrentRoute.questID==2 and W.ForecastError==nil)
-local builds=W.ForecastBuilds or 0
+local rewardAPI=W.QuestRewardEstimate
+W.QuestRewardEstimate=function(id,state) if id==2 then return 500,"Questie adjusted reward" end return rewardAPI(id,state) end
+epoch=epoch+46;W.Refresh(false,"forecast-regression")
+local builds=W.ForecastBuilds or 0;local oldWork=W.CurrentRoute.economy.workSeconds
 for i=1,3 do log[1].rows[1].numFulfilled=i;W.Refresh(false,"QUEST_LOG_UPDATE") end
-check("partial kills reuse forecast work while preserving live progress",(W.ForecastBuilds or 0)==builds and W.CurrentRoute.questID==2)
+check("partial progress rebuilds stale forecast quantities immediately",(W.ForecastBuilds or 0)==builds+2 and W.CurrentRoute.questID==2 and W.CurrentRoute.economy.workSeconds<oldWork and W.CurrentRoute.remaining==1)
+builds=W.ForecastBuilds;local hits=W.ForecastCacheHits or 0;W.Refresh(false,"forecast-regression")
+check("unchanged progress still reuses forecast models",W.ForecastBuilds==builds and (W.ForecastCacheHits or 0)==hits+1)
+W.QuestRewardEstimate=rewardAPI
 local routeBefore=W.CurrentRoute
 local failPlan=W.PlanRoute;W.PlanRoute=function() error("synthetic planner fault") end
 log[1].complete=true;W.Refresh(false,"fault-test")

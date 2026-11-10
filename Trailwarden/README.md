@@ -110,6 +110,6 @@ The automated scenarios use synthetic client data modeled on the two character c
 
 ## Development and releases
 
-Lua files live in `Trailwarden/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts, XP accounting/projection checks and replay verification. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs all checks under Lua 5.1 and publishes a release for a new TOC version.
+Lua files live in `Trailwarden/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts, XP accounting/projection checks and replay verification, with a 90-second timeout per suite. `python3 tools/package.py` builds a reproducible installable ZIP. GitHub Actions verifies feature-branch pushes and pull requests under Lua 5.1 with read-only repository permissions. On `main`, the separate release workflow runs the checks and publishes a release for a new TOC version.
 
 MIT license for Trailwarden's code and original arrow asset. Questie and QuestieDB are separate dependencies; no database or paid guide content is bundled.

@@ -92,16 +92,20 @@ function W.UpdateNavigator()
     local r=W.CurrentRoute
     title:SetText(r and (r.questName or r.title) or "Preparing your route")
     local n=W.Navigation or {label="Preparing navigation"}
+    -- A failed/pending navigation refresh must not display the previous
+    -- decision's bearing or arrival state under the new quest caption.
+    if W.Decision and n.decisionID~=W.Decision.id then n={label="Synchronizing route"} end
     if n.travel and n.travel.mode=="cave-approach" then title:SetText(n.travel.caveName.." entrance") end
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     here:SetShown(n.arrived==true);arrow:Hide()
-    if not n.arrived and n.bearing then
+    local direction=W.IsFinite(n.bearing) and W.IsFinite(n.facing)
+    if not n.arrived and direction then
         arrow:SetRotation(-(n.bearing+n.facing));arrow:Show()
     end
     distance:SetText(n.distance and W.FormatDistance(n.distance) or "")
     -- Normal guidance needs only arrow, distance and quest. Exceptional states
     -- replace the quest caption so missing direction remains explicit.
-    local exceptional=not n.arrived and not n.bearing
+    local exceptional=not n.arrived and not direction
     title:SetShown(not exceptional);status:SetShown(exceptional)
     status:SetText(n.label or "")
 end

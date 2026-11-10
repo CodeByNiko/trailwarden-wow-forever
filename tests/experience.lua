@@ -72,6 +72,37 @@ model.goals[1].seconds=200;check("slower combat reduces route rate",W.ProjectQue
 check("unknown reward cannot masquerade as zero-XP route",W.ProjectQuestXP({receiver=point(0)},point(0),{})==nil)
 local other=point(0);other.continent=1
 check("unknown transport connection produces no confident rate",W.ProjectQuestXP(model,other,{moveSpeed=7})==nil)
+-- A deterministic instruction budget makes non-termination a test failure.
+local function boundedProjection(m,origin)
+ debug.sethook(function() error("Projection exceeded instruction budget") end,"",2000000)
+ local ok,result=pcall(W.ProjectQuestXP,m,origin,{moveSpeed=10})
+ debug.sethook();assert(ok,result);return result
+end
+local multi={rewardXP=2000,receiver=point(200),goals={
+ {point=point(180),seconds=17,killXP=3},{point=point(80),seconds=23,killXP=5},{point=point(110),seconds=31,killXP=7}}}
+local originalModel=W.Json(multi);local originalOrigin=W.Json(point(100))
+local ordered=boundedProjection(multi,point(100))
+check("multi-goal ordering terminates and improves the greedy return route",ordered and near(ordered.travelDistance,140))
+check("all work and kill XP are counted once after reordering",ordered.remainingGoals==3 and ordered.workSeconds==71 and ordered.killXP==15 and near(ordered.seconds,107.8))
+check("projection leaves model and origin unchanged",W.Json(multi)==originalModel and W.Json(point(100))==originalOrigin)
+multi.goals[1],multi.goals[3]=multi.goals[3],multi.goals[1]
+check("shuffled distinct goals retain the same cycle estimate",near(boundedProjection(multi,point(100)).travelDistance,140))
+multi.pickup=point(100)
+check("reordering retains the origin to pickup leg",near(boundedProjection(multi,point(0)).travelDistance,240))
+local direct=boundedProjection({rewardXP=100,receiver=point(200),goals={}},point(100))
+check("a ready hand-in needs no objective goals",direct.remainingGoals==0 and near(direct.travelDistance,100))
+local colocated=boundedProjection({rewardXP=100,receiver=point(0),goals={{point=point(0),seconds=10},{point=point(0),seconds=20}}},point(0))
+check("colocated goals retain work without fabricated travel",colocated.workSeconds==30 and colocated.travelDistance==0)
+local maximumModel={rewardXP=100,receiver=point(0),goals={}}
+for i=1,64 do maximumModel.goals[i]={point=point(i%7*20),seconds=1} end
+check("maximum shared batch finishes within a fixed instruction budget",boundedProjection(maximumModel,point(0)).remainingGoals==64)
+maximumModel.goals[65]={point=point(0),seconds=1}
+check("excessive forecasts fall back instead of monopolizing the planner",boundedProjection(maximumModel,point(0))==nil)
+local malformed={false,"invalid",{point=point(0),seconds=0/0},{point=point(0),seconds=math.huge},{point=point(0),seconds=1,killXP=-1},{point={wx=0/0,wy=0,continent=0},seconds=1}}
+for i,g in ipairs(malformed) do check("malformed goal is rejected "..i,boundedProjection({rewardXP=100,receiver=point(0),goals={g}},point(0))==nil) end
+check("sparse goals cannot silently drop remaining work",boundedProjection({rewardXP=100,receiver=point(0),goals={[2]={point=point(0),seconds=1}}},point(0))==nil)
+check("overflowing total work stays unknown",boundedProjection({rewardXP=100,receiver=point(0),goals={{point=point(0),seconds=1e308},{point=point(0),seconds=1e308}}},point(0))==nil)
+check("negative interaction time is rejected",boundedProjection({rewardXP=100,receiver=point(0),interactionSeconds=-1},point(0))==nil)
 -- Candidate models for accepted and unaccepted quests use the same provider path.
 local function step(id,x,kind)
  return {key=(kind or "objective")..":"..id,questID=id,kind=kind or "objective",point=point(x),mapID=1431,x=x/6000,y=.5,ownerKey=guid,objectiveKind="monster",objectiveIndex=1,remaining=3,questName="Forever quest "..id,level=25}

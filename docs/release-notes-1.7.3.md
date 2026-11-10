@@ -7,6 +7,9 @@ This update polishes the route display and makes modeled quest cycles less prone
 - Live XP/hour and next-level time appear after five active minutes, so a brief sample does not dominate the display.
 - Quest-cycle estimates improve the initial nearest-target order with a two-opt pass, and reject invalid negative work values instead of letting them distort the estimate.
 - Existing local-work, current-region, cave/interior and escort priorities remain in place.
+- Correct the multi-goal forecast loop, cap optimization work and refresh modeled quantities as quest objectives progress.
+- Fit the panel to the actual preview length; collapse hides all body content. Data/combat warnings remain visible alongside nearby quest offers.
+- Prevent the navigator from showing an earlier decision's arrow or arrival state while a new route is synchronizing.
 
 The arrow is still directional guidance. It does not calculate a verified path around terrain.
 

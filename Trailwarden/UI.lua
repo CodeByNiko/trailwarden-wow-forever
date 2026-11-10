@@ -22,7 +22,8 @@ end
 function W.Tooltip(owner,title,lines)
     if not GameTooltip then return end
     GameTooltip:SetOwner(owner,"ANCHOR_LEFT");GameTooltip:SetText(title,unpack(C.gold))
-    for _,line in ipairs(lines) do if line and line~="" then GameTooltip:AddLine(line,0.85,0.9,0.92,true) end end
+    local last=0;for i in pairs(lines) do if type(i)=="number" and i>last then last=i end end
+    for i=1,last do local line=lines[i];if line and line~="" then GameTooltip:AddLine(line,0.85,0.9,0.92,true) end end
     GameTooltip:Show()
 end
 local frame,body,settings,settingsOpen,rows,settingRows
@@ -47,15 +48,23 @@ function W.ApplyPositions()
 end
 local function layout()
     local p=W.GetProfile();local compact=p.collapsed and not settingsOpen
-    local count=p.queueRows
-    frame:SetHeight(settingsOpen and 626 or compact and 54 or 392+count*32)
-    fields.status:ClearAllPoints();fields.status:SetPoint("TOPLEFT",16,-(328+count*32))
-    if settingsOpen then body:Hide();settings:Show() else body:Show();settings:Hide() end
-    for _,key in ipairs({"eyebrow","mode","card","strip","xpHover","skip","refresh","arrow"}) do if fields[key] then fields[key]:SetShown(not compact) end end
-    fields.thenLabel:SetShown(not compact and count>0 and fields.statusText=="");fields.status:SetShown(not compact and fields.statusText~="")
-    fields.status:ClearAllPoints();fields.status:SetPoint("TOPLEFT",16,-241)
-    fields.empty:SetShown(not compact and count>0 and #(W.Queue or {})==0)
-    fields.undo:SetShown(not compact and (p.lastSkipped~=nil or p.lastDeferred~=nil))
+    local count=math.min(p.queueRows,#(W.Queue or {}))
+    local hasStatus=fields.statusText~=""
+    local undo=p.lastSkipped~=nil or p.lastDeferred~=nil
+    local y=258+(hasStatus and 32 or 0)
+    body:SetShown(not settingsOpen and not compact);settings:SetShown(settingsOpen==true)
+    fields.status:SetShown(not compact and hasStatus)
+    fields.thenLabel:SetShown(not compact and p.queueRows>0)
+    fields.thenLabel:ClearAllPoints();fields.thenLabel:SetPoint("TOPLEFT",16,-y)
+    fields.undo:ClearAllPoints();fields.undo:SetPoint("TOPRIGHT",-16,-(y-3))
+    fields.undo:SetShown(not compact and undo)
+    local empty=not compact and p.queueRows>0 and count==0
+    fields.empty:SetShown(empty)
+    fields.empty:ClearAllPoints();fields.empty:SetPoint("TOPLEFT",25,-(y+22))
+    for i,r in ipairs(rows) do r:ClearAllPoints();r:SetPoint("TOPLEFT",16,-(y+22+(i-1)*32)) end
+    local xpY=y+(p.queueRows>0 and (22+(count>0 and count*32 or 42)+10) or undo and 26 or 0)
+    frame:SetHeight(settingsOpen and 626 or compact and 44 or xpY+89)
+    fields.xpHover:ClearAllPoints();fields.xpHover:SetPoint("TOPLEFT",16,-xpY)
     for i,r in ipairs(rows) do r:SetShown(not compact and i<=count and r.step~=nil) end
     fields.fold.label:SetText(p.collapsed and "+" or "-")
 end
@@ -64,48 +73,49 @@ function W.CreateUI()
     local p=W.GetProfile()
     frame=CreateFrame("Frame","TrailwardenMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
     frame:SetSize(324,456);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
-    local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(322,44);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
+    body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
+    local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(322,42);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
     atText(head,"TRAILWARDEN",13,C.text,15,7,190,18)
-    fields.subtitle=atText(head,"",8,C.muted,15,25,230,13)
+    fields.subtitle=atText(head,"",8,C.muted,15,25,290,13);fields.subtitle:SetWordWrap(false)
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(322,1)
     local close=W.Button(head,"×",20,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(20)
     fields.fold=W.Button(head,"−",20,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-32,-8);fields.fold:SetHeight(20)
     local config=W.Button(head,"⋯",22,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-56,-8);config:SetHeight(20)
-    body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
     fields.eyebrow=atText(body,"UP NEXT",9,C.cyan,16,54,120,13)
     fields.mode=atText(body,"SOLO",8,C.muted,170,54,138,13);fields.mode:SetJustifyH("RIGHT")
-    local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-72);card:SetSize(292,122);W.Backdrop(card,C.card);card:EnableMouse(true)
+    local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-72);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
     fields.action=atText(card,"",8,C.gold,11,8,270,12)
     fields.title=atText(card,"",15,C.text,11,25,270,34);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
     fields.target=atText(card,"",10,C.cyan,11,61,270,15);fields.target:SetWordWrap(false)
-    fields.progress=atText(card,"",8,C.muted,11,79,270,12);fields.progress:SetWordWrap(false)
-    fields.instruction=atText(card,"",9,C.text,11,96,270,20);fields.instruction:SetJustifyV("TOP");fields.instruction:SetWordWrap(true)
+    fields.progress=atText(card,"",9,C.muted,11,79,270,12);fields.progress:SetWordWrap(false)
+    fields.instruction=atText(card,"",10,C.text,11,96,270,38);fields.instruction:SetJustifyV("TOP");fields.instruction:SetWordWrap(true)
     card:SetScript("OnEnter",function(self)
         local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
-        local location=r.point and string.format("%s · %.1f, %.1f",W.MapName(r.mapID),r.x*100,r.y*100) or nil
-        W.Tooltip(self,r.title or "Why this step?",{r.instruction,W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction,r.reason,location,z and z.hint,"Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow is direction only. Cyan pins mark known cave entrances; gold pins mark objectives. A marker is not a walking path.","Click a planned step to focus it. The plan updates as your quests change."})
+        local point=r.point
+        local location=point and W.IsFinite(point.x) and W.IsFinite(point.y) and string.format("%s · %.1f, %.1f",W.MapName(point.mapID),point.x*100,point.y*100) or ""
+        W.Tooltip(self,r.title or "Why this step?",{r.instruction or "",W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction or "",r.reason or "",location,z and z.hint or "",fields.statusText or "","Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow is direction only. Cyan pins mark known cave entrances; gold pins mark objectives. A marker is not a walking path.","Click a planned step to focus it. The plan updates as your quests change."})
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
-    local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.strip=strip;strip:SetPoint("TOPLEFT",16,-202);strip:SetSize(292,28);W.Backdrop(strip,C.raised)
+    local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.strip=strip;strip:SetPoint("TOPLEFT",16,-222);strip:SetSize(292,28);W.Backdrop(strip,C.raised)
     fields.distance=atText(strip,"",11,C.gold,10,6,92,16)
     fields.navStatus=atText(strip,"",8,C.muted,101,7,181,14);fields.navStatus:SetJustifyH("RIGHT")
     fields.thenLabel=atText(body,"PLANNED NEXT",8,C.cyan,16,242,160,13)
-    fields.undo=W.Button(body,"Undo",48,W.UndoSkip);fields.undo:SetPoint("TOPRIGHT",-16,-238);fields.undo:SetHeight(19)
+    fields.undo=W.Button(body,"Undo skip",68,W.UndoSkip);fields.undo:SetPoint("TOPRIGHT",-16,-238);fields.undo:SetHeight(19)
     fields.empty=atText(body,"",9,C.muted,25,267,270,42);fields.empty:SetJustifyV("TOP");fields.empty:SetWordWrap(true)
     rows={}
     for i=1,4 do
         local row=CreateFrame("Button",nil,body,"BackdropTemplate");row:SetPoint("TOPLEFT",16,-(260+(i-1)*32));row:SetSize(292,30);W.Backdrop(row,C.card)
         local number=atText(row,string.format("%02d",i+1),8,C.muted,8,8,20,12)
-        row.title=atText(row,"",9,C.text,32,4,251,13);row.title:SetWordWrap(false)
-        row.detail=atText(row,"",8,C.muted,32,18,251,10);row.detail:SetWordWrap(false)
+        row.title=atText(row,"",10,C.text,32,3,251,13);row.title:SetWordWrap(false)
+        row.detail=atText(row,"",9,C.muted,32,17,251,12);row.detail:SetWordWrap(false)
         row:SetScript("OnClick",function(self) W.PinStep(self.step) end)
         row:SetScript("OnEnter",function(self) if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.safetyHeld and "Automatic combat limits cannot be bypassed with manual focus." or self.step.levelDeferred and "Click to resume this deferred quest now." or "Click to focus this quest step."}) end end)
         row:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
         rows[i]=row
     end
-    fields.status=atText(body,"",8,C.muted,16,241,220,14);fields.status:SetWordWrap(false);fields.statusText=""
+    fields.status=atText(body,"",9,C.muted,16,258,292,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP");fields.statusText=""
     local xpHover=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.xpHover=xpHover;xpHover:SetPoint("BOTTOMLEFT",16,49);xpHover:SetSize(292,44);xpHover:EnableMouse(true);W.Backdrop(xpHover,C.card)
     atText(xpHover,"YOUR XP / HOUR",7,C.muted,10,6,130,10)
     atText(xpHover,"NEXT LEVEL",7,C.muted,158,6,124,10)
@@ -118,7 +128,7 @@ function W.CreateUI()
             "Measured XP/h includes kills, quests and exploration. Travel and ordinary downtime count; pause/AFK do not.",
             "Session: "..W.FormatXP(e.totalXP).." XP / "..W.FormatXP(e.sessionRate).." XP/h. Rolling window: "..math.floor(e.windowSeconds/60).." min.",
             "Rewarded kills: "..e.kills.." / turn-ins: "..e.turnins..". Next-level time appears after five active minutes and uses the measured rolling rate.",
-            m and ("Quest cycle: ~"..W.FormatXP(m.xpPerHour).." XP/h · "..W.FormatDistance(m.travelDistance).." travel · "..W.FormatETA(m.seconds).." estimated. "..m.confidence.." confidence; "..(m.source or "Observed kills")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
+            m and ("Quest cycle: ~"..W.FormatXP(m.xpPerHour).." XP/h · "..W.FormatDistance(m.travelDistance).." direct travel · "..W.FormatETA(m.seconds).." estimated. "..(m.confidence or "unknown").." confidence; "..(m.source or "Observed kills")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
             "Quest projections include remaining work, travel and reward collection. New unaccepted quest quantities may be uncertain.",
             "Grind comparison: "..W.FormatXP(e.grind and e.grind.rate).." XP/h from verified local kills.",
             "The current region and unfinished objective stay committed; XP changes do not send you back and forth between zones.",
@@ -169,21 +179,28 @@ function W.UpdateUI()
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     local p=state.profile;local r=W.CurrentRoute or {}
     fields.subtitle:SetText(string.format("%s · %s %s · LEVEL %d",state.name,state.raceName,state.className,state.level))
-    fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED" or string.upper(state.zone or "QUESTING"))
+    fields.mode:SetWordWrap(false);fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED" or string.upper(state.zone or "QUESTING"))
     fields.action:SetText((W.ActionLabels[r.kind] or "ROUTE")..(r.level and r.level>0 and (" · LEVEL "..r.level) or "")..(W.DeferLevel(r,state) and " · ABOVE RANGE" or ""))
     fields.title:SetFont("Fonts\\FRIZQT__.TTF",15,"")
-    fields.title:SetText(r.questName or r.title or "Preparing your route")
+    fields.title:SetText(r.kind=="wait" and r.title or r.questName or r.title or "Preparing your route")
     if fields.title.GetStringHeight then
         for size=14,11,-1 do
             if fields.title:GetStringHeight()<=34 then break end
             fields.title:SetFont("Fonts\\FRIZQT__.TTF",size,"")
         end
+        -- Keep two readable lines; full quest text remains in the card tooltip.
+        local text=fields.title:GetText()
+        while fields.title:GetStringHeight()>34 and #text>0 do
+            local shortened,n=text:gsub("[%z\1-\127\194-\244][\128-\191]*$","")
+            text=n>0 and shortened or text:sub(1,-2)
+            fields.title:SetText(text.."...")
+        end
     end
-    local target=r.target or state.zone
+    local target=r.target or state.zone or "Your current area"
     if r.kind=="objective" and r.point and r.point.name and r.point.name~=target then target=target.." · "..r.point.name end
     fields.target:SetText(target..(r.combatRisk and r.combatRisk.maxLevel and (" · Lv "..r.combatRisk.maxLevel) or ""))
-    if W.IsFinite(r.required) and W.IsFinite(r.remaining) then
-        fields.progress:SetText(string.format("%d / %d complete",math.max(0,r.required-r.remaining),r.required))
+    if W.IsFinite(r.required) and r.required>0 and W.IsFinite(r.remaining) then
+        fields.progress:SetText(string.format("%d / %d complete",math.max(0,math.min(r.required,r.required-r.remaining)),r.required))
     else fields.progress:SetText(r.kind=="turnin" and "Ready to turn in" or r.kind=="pickup" and "Quest available" or r.kind=="escort" and "Stay with the escort" or "") end
     fields.instruction:SetText(r.instruction or "Reading your quest progress...")
     for i,row in ipairs(rows) do
@@ -197,7 +214,7 @@ function W.UpdateUI()
     elseif not state.historyReady then status="Waiting for completed quest history" end
     local safetyCount=0
     for _,q in ipairs(W.Unmapped or {}) do if q.safety then safetyCount=safetyCount+1 end end
-    if safetyCount>0 then status=safetyCount.." combat objective(s) held · cap +2" end
+    if safetyCount>0 then status=(status~="" and status.."\n" or "")..safetyCount.." combat objective(s) held · cap +2" end
     fields.statusText=status;fields.status:SetText(status)
     local empty=not W.CatalogReady and "Reading quest data. Your next steps will appear here shortly."
         or #(W.Unmapped or {})>0 and "No further mapped steps yet. Some active quests need Questie, a different comfort setting or more complete quest data."
@@ -213,7 +230,8 @@ function W.UpdateUI()
     if #opportunities>0 then
         local first=opportunities[1]
         for _,o in ipairs(opportunities) do if o.activity=="escort" then first=o;break end end
-        fields.statusText=#opportunities.." nearby · "..(first.activity=="escort" and "Escort: " or "Quest: ")..first.name
+        local nearby=#opportunities.." nearby · "..(first.activity=="escort" and "Escort: " or "Quest: ")..first.name
+        fields.statusText=fields.statusText~="" and (fields.statusText.." · "..#opportunities.." nearby") or nearby
         fields.status:SetText(fields.statusText)
     end
     for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":  "..v.definition[2](p)) end
@@ -232,8 +250,6 @@ function W.UpdateLiveUI()
     local travel=n.travel
     local r=W.CurrentRoute
     fields.instruction:SetText(travel and travel.instruction or r.instruction or "Reading your quest progress...")
-    local entrance=travel and travel.mode=="cave-approach"
-    local point=entrance and travel.entry or r.point
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="escort" and "Escort active" or W.CurrentRoute.kind=="item" and "In your bags" or ""))
     fields.navStatus:SetText(n.label or "")
 end
