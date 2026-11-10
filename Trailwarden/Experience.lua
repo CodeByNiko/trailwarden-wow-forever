@@ -191,26 +191,56 @@ function W.QuestRewardEstimate(id,state)
 end
 -- Pure projection, also used by replay. No provider/client reads.
 function W.ProjectQuestXP(model,origin,pace)
-    if not model or not finite(model.rewardXP) or not model.receiver or not origin then return nil end
+    if not model or not finite(model.rewardXP) or model.rewardXP<0 or not model.receiver or not origin then return nil end
     pace=pace or {}
     local speed=pace.moveSpeed or 7;if not finite(speed) or speed<1 or speed>40 then return nil end
-    local seconds=model.interactionSeconds or 20;if not finite(seconds) then return nil end;local from=origin;local travel=0;local work=0;local killXP=0
+    local seconds=model.interactionSeconds or 20;if not finite(seconds) or seconds<0 then return nil end;local from=origin;local travel=0;local travelDistance=0;local work=0;local killXP=0
     local function leg(point)
         local d=W.Distance(from,point);if not finite(d) then return false end
-        travel=travel+d/speed*1.2;from=point;return true
+        travelDistance=travelDistance+d;travel=travel+d/speed*1.2;from=point;return true
     end
     if model.pickup and not leg(model.pickup) then return nil end
+    if model.goals~=nil and type(model.goals)~="table" then return nil end
     local todo=W.Copy(model.goals or {})
+    for _,g in ipairs(todo) do
+        if not g.point or not finite(g.seconds) or g.seconds<0 or g.killXP~=nil and (not finite(g.killXP) or g.killXP<0) then return nil end
+    end
+    -- Greedy nearest-neighbour is a useful starting order, but can double back
+    -- through a cluster. Two-opt removes crossing detours before XP/h is scored.
     while #todo>0 do
         local nearest,index
         for i,g in ipairs(todo) do local d=W.Distance(from,g.point);if d and (not nearest or d<nearest) then nearest,index=d,i end end
         if not index then return nil end
-        local g=table.remove(todo,index);if not finite(g.seconds) or g.killXP~=nil and not finite(g.killXP) or not leg(g.point) then return nil end
+        local g=table.remove(todo,index);todo[#todo+1]=g;from=g.point
+    end
+    from=model.pickup or origin
+    local improved=true
+    while improved and #todo>1 do
+        improved=false
+        for i=1,#todo-1 do
+            local a=i==1 and from or todo[i-1].point
+            local b=todo[i].point
+            for k=i+1,#todo do
+                local c=todo[k].point
+                local d=k==#todo and model.receiver or todo[k+1].point
+                local ab,cd=W.Distance(a,b),W.Distance(c,d)
+                local ac,bd=W.Distance(a,c),W.Distance(b,d)
+                if ab and cd and ac and bd and ac+bd+0.01<ab+cd then
+                    local left,right=i,k
+                    while left<right do todo[left],todo[right]=todo[right],todo[left];left=left+1;right=right-1 end
+                    improved=true;break
+                end
+            end
+            if improved then break end
+        end
+    end
+    for _,g in ipairs(todo) do
+        if not leg(g.point) then return nil end
         work=work+g.seconds;killXP=killXP+(g.killXP or 0)
     end
     if not leg(model.receiver) then return nil end
     seconds=math.max(20,seconds+travel+work)
-    return {xpPerHour=(model.rewardXP+killXP)*3600/seconds,rewardXP=model.rewardXP,killXP=killXP,seconds=seconds,travelSeconds=travel,workSeconds=work,confidence=model.confidence,source=model.source,remainingGoals=#(model.goals or {})}
+    return {xpPerHour=(model.rewardXP+killXP)*3600/seconds,rewardXP=model.rewardXP,killXP=killXP,seconds=seconds,travelSeconds=travel,travelDistance=travelDistance,workSeconds=work,confidence=model.confidence,source=model.source,remainingGoals=#(model.goals or {})}
 end
 function W.PrepareQuestEconomies(candidates,state)
     local models={}
@@ -342,3 +372,4 @@ function W.SafeExperienceStats()
     if status=="ok" and type(e)=="table" then return e end
     return {available=false,elapsed=0,totalXP=0,windowSeconds=0,kills=0,turnins=0,questXP=0,moveSpeed=7,killSeconds=35}
 end
+

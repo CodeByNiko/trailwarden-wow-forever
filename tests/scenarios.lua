@@ -242,7 +242,7 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 -- All UI and login code executes against a strict frame API double.
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
-check("main panel compact enough",W.MainFrame.w==360 and W.MainFrame.h==526)
+check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h==456)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 -- 1.1 quality regressions.
@@ -311,7 +311,7 @@ W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately v
 W.Queue={};W.UpdateUI();local empty
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
 check("empty planned list explains what happens next",empty and empty.shown)
-W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides empty-list copy and undo",W.MainFrame.h==374 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides body content",W.MainFrame.h==54 and not empty.shown and not undo.shown)
 W.GetProfile().collapsed=false;W.Refresh(true)
 local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
 W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
@@ -451,9 +451,9 @@ check("arrow mouse wheel resizes navigator only",W.NavigatorFrame.scale==.95 and
 W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.NavigatorFrame.scripts.OnMouseWheel(W.NavigatorFrame,-1)
 check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
 W.GetProfile().locked=false
-check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==130 and W.NavigatorFrame.h==88)
-W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==602)
-W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==450)
+check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==142 and W.NavigatorFrame.h==104)
+W.GetProfile().queueRows=4;W.UpdateUI();check("four planned steps expand panel without footer overlap",W.MainFrame.h==520)
+W.GetProfile().queueRows=0;W.UpdateUI();check("planned steps can be hidden without hiding next instruction",W.MainFrame.h==392)
 W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
 
 -- XP event wiring and real panel values, in addition to the isolated XP suite.
@@ -462,8 +462,8 @@ UnitXP=function() return testXP end;UnitXPMax=function() return 1000 end
 W.ResetExperience();epoch=epoch+60;testXP=300
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player");drain()
 check("client XP event refreshes the live session",W.ExperienceStats().totalXP==200 and W.ExperienceStats().rate==12000)
-local xpText=false;for _,node in ipairs(nodes) do if node.kind=="font" and node.text=="12,000" then xpText=true end end
-check("panel shows measured XP rate and next-level estimate",xpText and W.ExperienceStats().eta==210)
+local xpText,etaText=false,false;for _,node in ipairs(nodes) do if node.kind=="font" and node.text=="Learning..." then xpText=true elseif node.kind=="font" and node.text=="Building sample" then etaText=true end end
+check("panel waits for a stable XP sample before showing rate and ETA",xpText and etaText and W.ExperienceStats().eta==210)
 check("XP gain and rewarded-kill events are registered",W.EventFrame.events.PLAYER_XP_UPDATE and W.EventFrame.events.CHAT_MSG_COMBAT_XP_GAIN)
 SlashCmdList.TRAILWARDEN("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
 SlashCmdList.TRAILWARDEN("xp");SlashCmdList.TRAILWARDEN("xpreset");check("session reset retains learned character preferences",W.ExperienceStats().totalXP==0 and W.GetProfile().xpRouting and W.GetProfile().queueRows==2)
@@ -618,3 +618,4 @@ W.GetProfile().collapsed=false;W.UpdateUI()
 
 
 print(string.format("%d scenario checks passed",passed))
+

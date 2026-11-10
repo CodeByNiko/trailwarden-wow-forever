@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.3
+
+- Rework the route panel into a narrower, shorter hierarchy with clearer objective progress and less diagnostic clutter.
+- Replace the navigator pointer with a compact compass needle and improve its spacing and labels.
+- Wait for five active minutes before showing the live XP rate and next-level ETA, avoiding misleading short-session projections.
+- Improve modeled quest-cycle travel ordering with a two-opt pass after the initial nearest-objective route; reject invalid negative work inputs.
+- Keep the current-region, local-work, cave/interior and escort priorities from 1.7.1 intact.
+
 ## 1.7.2
 
 - Rename to Trailwarden across the addon, commands, settings, map registration and release packaging.
@@ -135,4 +143,5 @@
 ## 0.1.0
 
 - Initial installable foundation.
+
 

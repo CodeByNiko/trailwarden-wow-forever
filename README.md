@@ -6,6 +6,10 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest installable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases/latest)**
 
+## New in 1.7.3: compact routes and clearer estimates
+
+The route panel uses a tighter layout, shows objective progress at a glance and keeps route details in the hover explanation. The navigator has a redesigned compass pointer. Quest-cycle estimates reduce unnecessary backtracking, while live XP/hour and next-level time wait for a five-minute active sample.
+
 ## New in 1.7.2: Trailwarden
 
 Renamed from Wayfinder with a separate addon namespace, settings file and `/tw` command. See [upgrade instructions](https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md) before removing the old addon.
@@ -31,7 +35,7 @@ Nearby eligible quest offers are retained as opportunities. Escort offers wait u
 
 ## Install or update
 
-1. Download `Trailwarden-1.7.2-Forever.zip` under the release's **Assets**.
+1. Download `Trailwarden-1.7.3-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Trailwarden` with the `Trailwarden` folder inside the ZIP.
 3. Keep **QuestieDB for Forever**, **Questie** and your existing **OpenMap** enabled. Questie supplies the map-pin library; the core quest planner still requires QuestieDB.
 4. Start the game. Your character's route and navigator appear automatically. For an upgrade from Wayfinder, migrate your saved settings as described below.
@@ -88,7 +92,7 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 | `/tw xpreset` | Reset this character’s current XP session, retaining learned pace |
 | `/tw debug` | Copyable local diagnostics; nothing is transmitted |
 
-Measured XP/h appears after 60 seconds. Its dedicated section shows measured XP/hour and next-level ETA; projected quest/grind rates are in the hover details. It includes actual XP from kills, quests and exploration, with travel and ordinary downtime in the denominator. Pause and AFK are excluded. Hover the XP lines for session statistics, estimate confidence and calculation details. Unknown rates show `--`; a zero measured rate has no finite level ETA.
+Measured XP/h appears after five active minutes. Its dedicated section shows measured XP/hour and next-level ETA; projected quest/grind rates are in the hover details. It includes actual XP from kills, quests and exploration, with travel and ordinary downtime in the denominator. Pause and AFK are excluded. Hover the XP lines for session statistics, estimate confidence and calculation details. Unknown rates show `--`; a zero measured rate has no finite level ETA.
 
 A grind suggestion also requires recent suitable enemy-level observations in the area. It requires at least eight locally observed, verified rewarded kills over two minutes, a modeled quest alternative of medium confidence and at least a 25% rate advantage. It lasts at most three minutes, is rechecked as progress changes and can be dismissed with **Questing now**. A two-minute cooldown prevents immediate repetition. No fixed Classic grinding guide is bundled.
 
@@ -111,4 +115,5 @@ The automated scenarios use synthetic client data modeled on the two character c
 Lua files live in `Trailwarden/`; the TOC defines load order. `python3 tools/check.py` runs scenarios, pure-engine checks, provider/client contracts, XP accounting/projection checks and replay verification. `python3 tools/package.py` builds a reproducible installable ZIP. On `main`, GitHub Actions runs all checks under Lua 5.1 and publishes a release for a new TOC version.
 
 MIT license for Trailwarden's code and original arrow asset. Questie and QuestieDB are separate dependencies; no database or paid guide content is bundled.
+
 
