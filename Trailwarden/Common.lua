@@ -1,6 +1,6 @@
 Trailwarden = Trailwarden or {}
 local W = Trailwarden
-W.Version = "1.7.2"
+W.Version = "1.7.3"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)
@@ -99,4 +99,3 @@ function W.FormatDistance(d)
     return string.format("%d yd",math.floor(d+0.5))
 end
 function W.StepKey(kind,id,suffix) return tostring(kind)..":"..tostring(id or 0)..":"..tostring(suffix or "") end
-

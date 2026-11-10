@@ -191,26 +191,76 @@ function W.QuestRewardEstimate(id,state)
 end
 -- Pure projection, also used by replay. No provider/client reads.
 function W.ProjectQuestXP(model,origin,pace)
-    if not model or not finite(model.rewardXP) or not model.receiver or not origin then return nil end
+    local function mapped(p) return type(p)=="table" and W.IsFinite(p.wx) and W.IsFinite(p.wy) and W.IsFinite(p.continent) end
+    if type(model)~="table" or not finite(model.rewardXP) or not mapped(model.receiver) or not mapped(origin) then return nil end
     pace=pace or {}
+    if type(pace)~="table" then return nil end
     local speed=pace.moveSpeed or 7;if not finite(speed) or speed<1 or speed>40 then return nil end
-    local seconds=model.interactionSeconds or 20;if not finite(seconds) then return nil end;local from=origin;local travel=0;local work=0;local killXP=0
-    local function leg(point)
-        local d=W.Distance(from,point);if not finite(d) then return false end
-        travel=travel+d/speed*1.2;from=point;return true
+    local seconds=model.interactionSeconds or 20;if not finite(seconds) then return nil end
+    if model.goals~=nil and type(model.goals)~="table" then return nil end
+    local goals=model.goals or {};local count=#goals
+    -- Forecasts are optional. Reject sparse/malformed or excessive input rather
+    -- than blocking the synchronous planner or silently omitting quest work.
+    if count>64 then return nil end
+    for i,g in pairs(goals) do
+        if not finite(i) or i%1~=0 or i<1 or i>count or type(g)~="table" or not mapped(g.point) or not finite(g.seconds) or g.killXP~=nil and not finite(g.killXP) then return nil end
     end
-    if model.pickup and not leg(model.pickup) then return nil end
-    local todo=W.Copy(model.goals or {})
+    local start=model.pickup or origin
+    if not mapped(start) then return nil end
+    local travelDistance=W.Distance(origin,start)
+    if not finite(travelDistance) then return nil end
+    -- Precompute finite, same-continent legs once per projection. Input goals
+    -- remain untouched; todo shrinks and ordered holds each visited index once.
+    local points={[0]=start,[count+1]=model.receiver};local todo,ordered,distances={},{},{}
+    for i=1,count do if not goals[i] then return nil end;points[i]=goals[i].point;todo[i]=i end
+    for i=0,count+1 do
+        distances[i]={}
+        for j=0,i do
+            local d=W.Distance(points[i],points[j]);if not finite(d) then return nil end
+            distances[i][j]=d;distances[j][i]=d
+        end
+    end
+    local from=0
+    -- Greedy nearest-neighbour is a useful starting order, but can double back
+    -- through a cluster. Two-opt removes crossing detours before XP/h is scored.
     while #todo>0 do
         local nearest,index
-        for i,g in ipairs(todo) do local d=W.Distance(from,g.point);if d and (not nearest or d<nearest) then nearest,index=d,i end end
-        if not index then return nil end
-        local g=table.remove(todo,index);if not finite(g.seconds) or g.killXP~=nil and not finite(g.killXP) or not leg(g.point) then return nil end
+        for i,goal in ipairs(todo) do
+            local d=distances[from][goal]
+            local previous=index and points[todo[index]];local p=points[goal]
+            if not nearest or d<nearest or d==nearest and (p.wx<previous.wx or p.wx==previous.wx and p.wy<previous.wy) then nearest,index=d,i end
+        end
+        from=table.remove(todo,index);ordered[#ordered+1]=from
+    end
+    -- Bound optimization work even for large shared quest batches. Every
+    -- accepted reversal strictly shortens the route, including the return leg.
+    for pass=1,8 do
+        local improved=false
+        for i=1,count-1 do
+            local a=i==1 and 0 or ordered[i-1];local b=ordered[i]
+            for k=i+1,count do
+                local c=ordered[k];local d=k==count and count+1 or ordered[k+1]
+                if distances[a][c]+distances[b][d]+0.01<distances[a][b]+distances[c][d] then
+                    local left,right=i,k
+                    while left<right do ordered[left],ordered[right]=ordered[right],ordered[left];left=left+1;right=right-1 end
+                    improved=true;break
+                end
+            end
+            if improved then break end
+        end
+        if not improved then break end
+    end
+    local work,killXP=0,0;from=0
+    for _,index in ipairs(ordered) do
+        local g=goals[index];travelDistance=travelDistance+distances[from][index];from=index
         work=work+g.seconds;killXP=killXP+(g.killXP or 0)
     end
-    if not leg(model.receiver) then return nil end
+    travelDistance=travelDistance+distances[from][count+1]
+    local travel=travelDistance/speed*1.2
     seconds=math.max(20,seconds+travel+work)
-    return {xpPerHour=(model.rewardXP+killXP)*3600/seconds,rewardXP=model.rewardXP,killXP=killXP,seconds=seconds,travelSeconds=travel,workSeconds=work,confidence=model.confidence,source=model.source,remainingGoals=#(model.goals or {})}
+    local rate=(model.rewardXP+killXP)/seconds*3600
+    if not finite(seconds) or not finite(rate) or not finite(travelDistance) then return nil end
+    return {xpPerHour=rate,rewardXP=model.rewardXP,killXP=killXP,seconds=seconds,travelSeconds=travel,travelDistance=travelDistance,workSeconds=work,confidence=model.confidence,source=model.source,remainingGoals=count}
 end
 function W.PrepareQuestEconomies(candidates,state)
     local models={}

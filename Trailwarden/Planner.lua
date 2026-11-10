@@ -216,7 +216,7 @@ end
 local forecastCache
 local function forecastCandidates(out,state)
     local keys={tostring(state.workArea and state.workArea.id),tostring(state.combatSafety and state.combatSafety.revision),tostring(state.revision),tostring(W.PublishedCatalogGeneration),tostring(state.profile.maxLevelAbove)}
-    for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(c.mapID)..":"..tostring(c.x)..":"..tostring(c.y)..":"..tostring(c.targetRevision)..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
+    for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(c.mapID)..":"..tostring(c.x)..":"..tostring(c.y)..":"..tostring(c.targetRevision)..":"..tostring(c.fingerprint)..":"..tostring(c.remaining)..":"..tostring(c.required)..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
     table.sort(keys);local stamp=table.concat(keys,"|")
     local cache=forecastCache
     if cache and cache.owner==state.key and cache.stamp==stamp and state.now-cache.at<45 and W.TravelCost(cache.player,state.player)<300 then

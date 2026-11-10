@@ -68,14 +68,14 @@ function W.CreateNavigator()
     if frame then return end
     local C=W.Colors
     frame=CreateFrame("Frame","TrailwardenNavigatorFrame",UIParent,"BackdropTemplate");W.NavigatorFrame=frame
-    frame:SetSize(130,88);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
+    frame:SetSize(142,104);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart",function(self) if not W.GetProfile().locked then self:StartMoving() end end)
     frame:SetScript("OnDragStop",function(self) self:StopMovingOrSizing();local a,_,b,x,y=self:GetPoint(1);W.GetProfile().navigatorPoint={point=a,relativePoint=b,x=x,y=y} end)
-    arrow=frame:CreateTexture(nil,"ARTWORK");arrow:SetTexture("Interface\\AddOns\\Trailwarden\\Media\\Arrow.tga");arrow:SetSize(38,38);arrow:SetPoint("TOP",0,-2)
+    arrow=frame:CreateTexture(nil,"ARTWORK");arrow:SetTexture("Interface\\AddOns\\Trailwarden\\Media\\Arrow.tga");arrow:SetSize(48,48);arrow:SetPoint("TOP",0,-1)
     here=W.Font(frame,15,C.green);here:SetPoint("TOP",0,-12);here:SetText("HERE")
-    title=W.Font(frame,10,C.text);title:SetPoint("TOPLEFT",2,-60);title:SetSize(126,26);title:SetJustifyH("CENTER");title:SetWordWrap(true)
-    distance=W.Font(frame,12,C.gold);distance:SetPoint("TOP",0,-43)
-    status=W.Font(frame,8,C.muted);status:SetPoint("TOPLEFT",2,-60);status:SetSize(126,26);status:SetJustifyH("CENTER");status:SetWordWrap(false)
+    title=W.Font(frame,9,C.text);title:SetPoint("TOPLEFT",2,-74);title:SetSize(138,24);title:SetJustifyH("CENTER");title:SetWordWrap(true)
+    distance=W.Font(frame,12,C.gold);distance:SetPoint("TOP",0,-50)
+    status=W.Font(frame,8,C.muted);status:SetPoint("TOPLEFT",2,-74);status:SetSize(138,24);status:SetJustifyH("CENTER");status:SetWordWrap(false)
     frame:SetScript("OnEnter",function(self) local r=W.CurrentRoute or {};W.Tooltip(self,r.title or "Navigator",{r.instruction,W.GetProfile().locked and "Windows are locked. /tw lock unlocks them." or "Drag to move. Mouse wheel adjusts arrow size. /tw arrow toggles visibility.","Direction only: use roads, bridges and cave entrances."}) end)
     frame:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     for _,text in ipairs({title,distance,status,here}) do
@@ -92,16 +92,20 @@ function W.UpdateNavigator()
     local r=W.CurrentRoute
     title:SetText(r and (r.questName or r.title) or "Preparing your route")
     local n=W.Navigation or {label="Preparing navigation"}
+    -- A failed/pending navigation refresh must not display the previous
+    -- decision's bearing or arrival state under the new quest caption.
+    if W.Decision and n.decisionID~=W.Decision.id then n={label="Synchronizing route"} end
     if n.travel and n.travel.mode=="cave-approach" then title:SetText(n.travel.caveName.." entrance") end
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     here:SetShown(n.arrived==true);arrow:Hide()
-    if not n.arrived and n.bearing then
+    local direction=W.IsFinite(n.bearing) and W.IsFinite(n.facing)
+    if not n.arrived and direction then
         arrow:SetRotation(-(n.bearing+n.facing));arrow:Show()
     end
     distance:SetText(n.distance and W.FormatDistance(n.distance) or "")
     -- Normal guidance needs only arrow, distance and quest. Exceptional states
     -- replace the quest caption so missing direction remains explicit.
-    local exceptional=not n.arrived and not n.bearing
+    local exceptional=not n.arrived and not direction
     title:SetShown(not exceptional);status:SetShown(exceptional)
     status:SetText(n.label or "")
 end
@@ -146,4 +150,3 @@ function W.SyncWaypoint(route,force)
         if C_SuperTrack then W.Safe(C_SuperTrack.SetSuperTrackedUserWaypoint,true) end
     else W.ReleaseWaypoint();W.WaypointStatus="Map waypoint rejected" end
 end
-

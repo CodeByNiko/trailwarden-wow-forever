@@ -16,6 +16,6 @@ commands=[
  ['tools/replay.py','tests/safety-replay.json'],
 ]
 for command in commands:
-    subprocess.run([sys.executable,*command],cwd=root,check=True)
+    subprocess.run([sys.executable,*command],cwd=root,check=True,timeout=90)
 print('All scenario, engine, provider-contract and replay suites passed')
 
