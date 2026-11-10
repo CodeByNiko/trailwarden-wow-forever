@@ -258,5 +258,3 @@ function W.ShowDiagnostics(content)
     end
     local f=W.DiagnosticsFrame;f.edit:SetText(type(content)=="string" and content or W.Diagnostics());f:Show();f.edit:SetFocus();f.edit:HighlightText()
 end
-
-

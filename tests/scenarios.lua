@@ -618,4 +618,3 @@ W.GetProfile().collapsed=false;W.UpdateUI()
 
 
 print(string.format("%d scenario checks passed",passed))
-

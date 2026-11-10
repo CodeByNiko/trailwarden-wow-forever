@@ -99,5 +99,3 @@ function W.FormatDistance(d)
     return string.format("%d yd",math.floor(d+0.5))
 end
 function W.StepKey(kind,id,suffix) return tostring(kind)..":"..tostring(id or 0)..":"..tostring(suffix or "") end
-
-

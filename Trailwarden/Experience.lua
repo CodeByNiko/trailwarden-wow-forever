@@ -372,4 +372,3 @@ function W.SafeExperienceStats()
     if status=="ok" and type(e)=="table" then return e end
     return {available=false,elapsed=0,totalXP=0,windowSeconds=0,kills=0,turnins=0,questXP=0,moveSpeed=7,killSeconds=35}
 end
-

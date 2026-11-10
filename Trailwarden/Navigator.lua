@@ -146,5 +146,3 @@ function W.SyncWaypoint(route,force)
         if C_SuperTrack then W.Safe(C_SuperTrack.SetSuperTrackedUserWaypoint,true) end
     else W.ReleaseWaypoint();W.WaypointStatus="Map waypoint rejected" end
 end
-
-

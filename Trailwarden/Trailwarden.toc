@@ -20,5 +20,3 @@ Navigator.lua
 RouteOverlay.lua
 Replay.lua
 Core.lua
-
-
