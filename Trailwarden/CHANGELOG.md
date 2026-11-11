@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.17
+- Resolve the strongest objective-name match before considering whether that provider entity is already claimed by an ID match.
+- Keep a conflicting or already claimed long-name identity unknown instead of assigning its progress to a shorter substring target.
+
 ## 1.8.16
 - Build reference XP normalization only from medium-confidence quest-cycle projections.
 - Keep uncertain reward forecasts out of the baseline used to compare otherwise reliable routes.
