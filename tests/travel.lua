@@ -65,6 +65,15 @@ check("a uniquely linked game POI extends cave entrance coverage",dynamicAccess.
 check("discovered cave identity is reused for route batching",W.MatchCave(dynamicRoute).id==dynamicAccess.caveID)
 local playerInDiscoveredCave=W.Point(750,.5,.5)
 check("discovered interior map becomes the current work area",W.ReadWorkArea(playerInDiscoveredCave).id==dynamicAccess.caveID)
+local parentSurfaceRoute={kind="objective",key="surface:1411",point=W.Point(1411,.4,.4),mapID=1411,x=.4,y=.4}
+local savedPlayerPoint=W.PlayerPoint;W.PlayerPoint=function() return playerInDiscoveredCave end
+local discoveredExit=W.ReadAccess(parentSurfaceRoute,playerInDiscoveredCave)
+check("discovered cave without bounds safely guides an exit to its parent surface",discoveredExit.mode=="cave-exit" and not discoveredExit.navRoute.point)
+W.PlayerPoint=savedPlayerPoint
+C_AreaPoiInfo.GetAreaPOIInfo=function(map,id)
+ if map==1411 and id==7501 then return {name="Skull Rock",position={GetXY=function() return nil,nil end},linkedUiMapID=750} end
+end
+check("invalid refreshed POI preserves a cached discovered entrance",W.ReadAccess(dynamicRoute,player).entry.x==.3)
  C_AreaPoiInfo.GetAreaPOIForMap=function(map) assert(map==1411);return {7502,7503} end
 local ambiguousRoute={kind="objective",key="objective:751",point=W.Point(751,.5,.5),mapID=751,x=.5,y=.5}
 check("ambiguous POI links stay manual instead of choosing an entrance",W.ReadAccess(ambiguousRoute,player).mode=="direction")
