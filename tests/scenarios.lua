@@ -227,8 +227,9 @@ W.Decision=savedDecision
 log={};s=scan();r=plan();local skipped=r.questID;W.SkipCurrent();check("skip removes quest temporarily",not W.CurrentRoute.questID or W.CurrentRoute.questID~=skipped)
 W.UndoSkip();check("undo restores skipped quest",W.GetProfile().lastSkipped==nil and W.Count(W.GetProfile().skipped)==0)
 W.GetProfile().skipped.test=epoch-1;W.GetProfile();check("expired skips pruned",W.GetProfile().skipped.test==nil)
-W.GetProfile().paused=true;plan();check("pause clears actionable route",W.CurrentRoute.key=="paused");W.GetProfile().paused=false
-player.dead=true;plan();check("death suspends quest navigation",W.CurrentRoute.key=="dead");player.dead=false
+local collector=W.CollectCandidates;W.CollectCandidates=function() error("pause/death must not collect candidates") end
+W.GetProfile().paused=true;plan();check("pause clears actionable route without collecting candidates",W.CurrentRoute.key=="paused");W.GetProfile().paused=false
+player.dead=true;plan();check("death suspends quest navigation without collecting candidates",W.CurrentRoute.key=="dead");player.dead=false;W.CollectCandidates=collector
 -- Live negative gossip is scoped to this exact quest snapshot, not permanent.
 dwarf();log={};local gs=scan();offers={};W.ObserveGossip();gs=W.ScanCharacter()
 check("live gossip removes phantom offers at the inspected NPC",not W.IsQuestAvailable(1,gs))

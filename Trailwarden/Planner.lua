@@ -299,10 +299,24 @@ function W.CollectCandidates(state)
 end
 W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
 local function planningMap(c) return c.regionMapID or c.mapID end
-local function score(c,state,all,origin,w,releaseArea)
+local function clusterCounts(all,w)
+    local counts={}
+    for _,candidate in ipairs(all) do
+        local count,seen=0,{}
+        if candidate.point then
+            for _,other in ipairs(all) do
+                if other.questID~=candidate.questID and other.point and not seen[other.questID] and W.TravelCost(candidate.point,other.point)<w.clusterRadius then
+                    count=count+1;seen[other.questID]=true
+                end
+            end
+        end
+        counts[candidate.key]=count
+    end
+    return counts
+end
+local function score(c,state,all,origin,w,releaseArea,clusters)
     local d=c.kind=="item" and 0 or W.TravelCost(origin,c.point)
-    local cluster=0;local seen={}
-    if c.point then for _,other in ipairs(all) do if other.questID~=c.questID and other.point and W.TravelCost(c.point,other.point)<w.clusterRadius and not seen[other.questID] then cluster=cluster+1;seen[other.questID]=true end end end
+    local cluster=clusters and clusters[c.key] or 0
     local action=0
     if c.kind=="turnin" then
         local proximity=math.max(0,math.min(1,(w.turninFadeRadius-d)/(w.turninFadeRadius-w.turninFullRadius)))
@@ -401,8 +415,10 @@ function W.SelectRoute(input)
     if preferred and not hasZone(preferred) then preferred=nil end
     if not input.releasePlan and not preferred and hasZone(region) then preferred=region end
     -- Score only actionable candidates: skipped quests must not hold a batch open.
+    local clusters=clusterCounts(candidates,w)
+    local scoreEvaluations=0
     for _,c in ipairs(candidates) do
-        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan)
+        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan,clusters);scoreEvaluations=scoreEvaluations+1
         c.activityRank=c.kind=="escort" and 0 or 1
         local focus=not input.releasePlan and state.workFocus
         c.workFocusRank=c.reviewWork and 0 or focus and c.kind=="objective" and c.questID==focus.questID and c.point and (W.TravelCost(state.player,c.point)<=w.workAreaRadius or state.workArea and c.workAreaID==state.workArea.id) and 0 or 1
@@ -435,7 +451,7 @@ function W.SelectRoute(input)
     table.sort(levelDeferred,function(a,b) if a.resumeLevel~=b.resumeLevel then return a.resumeLevel<b.resumeLevel end return a.key<b.key end)
     local uniqueDeferred={};local seenDeferred={}
     for _,c in ipairs(levelDeferred) do if not seenDeferred[c.questID] then uniqueDeferred[#uniqueDeferred+1]=c;seenDeferred[c.questID]=true end end
-    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates,levelDeferred=uniqueDeferred,opportunities={}}
+    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates,levelDeferred=uniqueDeferred,opportunities={},candidateCount=#candidates,scoreEvaluations=scoreEvaluations,queuePreviewShortened=#candidates>128}
     for _,c in ipairs(candidates) do
         if c.kind=="pickup" and c.point and (state.workArea and c.workAreaID==state.workArea.id or W.TravelCost(state.player,c.point)<=120) then
             detail.opportunities[#detail.opportunities+1]={questID=c.questID,name=c.questName,activity=c.activity,target=c.target}
@@ -464,21 +480,22 @@ function W.SelectRoute(input)
         return waiting,withDeferred({}),detail
     end
     local queue={};local used={[best.key]=true};local from=best.point or state.player
-    for _=1,4 do
+    local queueDepth=detail.queuePreviewShortened and 1 or 4
+    for _=1,queueDepth do
+        local remaining={};for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
+        local remainingClusters=clusterCounts(remaining,w)
         local nextStep,nextScore,nextBlocked,nextRank
-        for _,c in ipairs(candidates) do
-            if not used[c.key] then
-                -- Each queued leg is evaluated from the preceding step, not the player's original position.
-                local remaining={}
-                for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
-                local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan)
+        for _,c in ipairs(remaining) do
+                -- Build the remaining list and its cluster counts once per leg.
+                local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan,remainingClusters);scoreEvaluations=scoreEvaluations+1
                 local rank=c.zoneRank
                 if not nextStep or nextBlocked and not blocked or blocked==nextBlocked and (rank<nextRank or rank==nextRank and (value<nextScore or value==nextScore and c.key<nextStep.key)) then nextStep,nextScore,nextBlocked,nextRank=c,value,blocked,rank end
-            end
         end
         if not nextStep then break end
         queue[#queue+1]=nextStep;used[nextStep.key]=true;from=nextStep.point or from
     end
+    detail.scoreEvaluations=scoreEvaluations
+    if detail.queuePreviewShortened then best.reason=best.reason.." The next-step preview is shortened to keep planning responsive." end
     if W.ChooseGrindBreak and best.kind~="escort" and not (best.kind=="objective" and (state.workArea or state.workFocus and state.workFocus.questID==best.questID)) then
         local chosen=W.ChooseGrindBreak(best,state,previous,detail)
         if chosen~=best then table.insert(queue,1,best);while #queue>4 do table.remove(queue) end;best=chosen end
@@ -487,6 +504,10 @@ function W.SelectRoute(input)
 end
 function W.PlanRoute(state,force,context)
     context=context or {previous=W.CurrentRoute}
+    if state.profile.paused or state.dead then
+        local input={state=W.Copy(state),meta={candidates={},deferred={},gates={},ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data"},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
+        local route,queue,detail=W.SelectRoute(input);detail.input=input;detail.candidateCount=0;detail.scoreEvaluations=0;return route,queue,detail
+    end
     if state.combatSafety and state.combatSafety.alert then
         local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
         local route,queue,detail=W.SelectRoute(input);detail.input=input;return route,queue,detail

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.5
+- Cache candidate clustering per planner pass and build the remaining queue once per leg instead of once per candidate.
+- Shorten only the queue preview above 128 candidates; preserve full evaluation of the primary route.
+- Skip candidate collection entirely while paused or dead and expose planner budget data in diagnostics.
+
+## 1.8.4
 ## 1.8.4
 - Hold new quest pickups when optional quest-type classification is unavailable; expose a clear Questie guidance message.
 - Preserve routing for already accepted quests and the existing combat-safety gates.
