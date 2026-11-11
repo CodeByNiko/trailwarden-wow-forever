@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.11
+- Add persistent automatic, English, and Danish language selection for Trailwarden action labels and map cues.
+- Mark entrances and objectives with distinct E/Q glyphs plus concise help so cues remain identifiable without color.
+- Keep quest/provider/world names in their original source language and fall back to English for missing catalog entries.
+
 ## 1.8.10
 - Discover additional cave entrances only from unique client POIs linked to the exact interior map.
 - Explain cross-continent transport needs and require a manual in-game transit choice before refreshing the route.

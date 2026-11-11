@@ -14,7 +14,7 @@ end,
 GetUserWaypoint=function() return userWaypoint end,SetUserWaypoint=function(p) userWaypoint=p;mapSets=mapSets+1 end,
 ClearUserWaypoint=function() userWaypoint=nil;mapClears=mapClears+1 end,CanSetUserWaypointOnMap=function() return true end}
 UiMapPoint={CreateFromCoordinates=function(map,x,y) return {uiMapID=map,position=CreateVector2D(x,y)} end}
-for _,name in ipairs({"Common","Data","Travel","Navigator","RouteOverlay"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","Travel","Navigator","RouteOverlay"}) do dofile("Trailwarden/"..name..".lua") end
 local W=Trailwarden
 W.GetProfile=function() return profile end;W.GetCharacterKey=function() return "NightElf" end
 local passed=0
@@ -88,8 +88,12 @@ local icons={};local methods={}
 for _,name in ipairs({"SetSize","SetPoint","SetAllPoints","SetTexture","SetTexCoord","EnableMouse"}) do methods[name]=function() end end
 function methods:SetScript(name,fn) self.scripts[name]=fn end
 function methods:SetVertexColor(...) self.color={...} end
+function methods:SetText(value) self.text=value end
+function methods:SetTextColor(...) self.textColor={...} end
+function methods:SetFont(...) self.font={...} end
 function methods:Hide() self.hidden=true end
 function methods:CreateTexture() return setmetatable({},{__index=methods}) end
+function methods:CreateFontString() return setmetatable({},{__index=methods}) end
 function CreateFrame() local f=setmetatable({scripts={}},{__index=methods});icons[#icons+1]=f;return f end
 local hbd={};local mini,world,removedMini,removedWorld={},{},0,0;local ref
 function hbd:AddMinimapIconMap(owner,icon,map,x,y,parent,edge)
@@ -107,12 +111,13 @@ W.Navigation={decisionID=W.Decision.id,travel=a,navRoute=a.navRoute}
 local menu;OpenMapAPI={major=1,RegisterMenuToggle=function(owner,definition) menu=definition;check("OpenMap menu uses public addon registration",owner=="Trailwarden") end}
 W.UpdateRouteOverlay()
 check("entrance and objective use separate mini and world frames",#mini==2 and #world==2 and mini[1].icon~=world[1].icon)
+check("map markers distinguish entrance and objective without color",mini[1].icon.pinMarker.text=="E" and mini[2].icon.pinMarker.text=="Q")
 check("minimap receives normalized entrance and parent/edge flags",mini[1].map==1438 and mini[1].x==entry.x and mini[1].y==entry.y and mini[1].parent and mini[1].edge)
 check("entrance cyan and goal gold remain distinct",mini[1].icon.pinTexture.color[2]==.9 and mini[2].icon.pinTexture.color[2]==.78)
 before=#mini;W.UpdateRouteOverlay()
 check("unchanged access points do not rebuild icons",#mini==before)
 W.Navigation={decisionID=W.Decision.id,travel=W.ResolveAccess(outside,player,{})};W.UpdateRouteOverlay()
-check("reused marker updates its tooltip and color",mini[#mini].icon.pinLabel=="Quest objective / not walking path" and mini[#mini].icon.pinTexture.color[2]==.78)
+check("reused marker updates its text and color",mini[#mini].icon.pinLabel=="Quest objective / Not a walking path" and mini[#mini].icon.pinMarker.text=="Q" and mini[#mini].icon.pinTexture.color[2]==.78)
 local originalAdd=hbd.AddMinimapIconMap
 hbd.AddMinimapIconMap=function() error("map library refreshing") end
 W.ClearRouteOverlay();W.UpdateRouteOverlay()

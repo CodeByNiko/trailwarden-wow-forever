@@ -62,4 +62,5 @@ end
 W.ZoneCoverageIssues=W.ValidateZoneGraph()
 W.ClassMasks={WARRIOR=1,PALADIN=2,HUNTER=4,ROGUE=8,PRIEST=16,DEATHKNIGHT=32,SHAMAN=64,MAGE=128,WARLOCK=256,MONK=512,DRUID=1024}
 W.ClassicRaceMasks={[1]=1,[2]=2,[3]=4,[4]=8,[5]=16,[6]=32,[7]=64,[8]=128,[10]=512,[11]=1024}
-W.ActionLabels={escort="ESCORT",grind="GRIND",pickup="ACCEPT",objective="QUEST",turnin="TURN IN",deliver="SPEAK",item="USE ITEM",travel="TRAVEL",wait="ROUTE STATUS"}
+local L=W.L or function(key) return key end
+W.ActionLabels={escort=L("action_escort"),grind=L("action_grind"),pickup=L("action_pickup"),objective=L("action_objective"),turnin=L("action_turnin"),deliver=L("action_deliver"),item=L("action_item"),travel=L("action_travel"),wait=L("action_wait")}

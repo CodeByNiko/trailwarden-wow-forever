@@ -227,6 +227,7 @@ end
 function W.UpdateUI()
     if not frame then W.CreateUI() end
     local state=W.State;if not state then return end
+    W.ActionLabels={escort=W.L("action_escort"),grind=W.L("action_grind"),pickup=W.L("action_pickup"),objective=W.L("action_objective"),turnin=W.L("action_turnin"),deliver=W.L("action_deliver"),item=W.L("action_item"),travel=W.L("action_travel"),wait=W.L("action_wait")}
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     local p=state.profile;local r=W.CurrentRoute or {}
     fields.mode:SetWordWrap(false);fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED" or "AUTO")

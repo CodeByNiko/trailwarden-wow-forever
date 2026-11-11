@@ -140,7 +140,7 @@ local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=
  IsDailyQuest=function() return false end,IsWeeklyQuest=function() return false end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Trailwarden/"..file..".lua") end
+for _,file in ipairs({"Common","Locale","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Trailwarden/"..file..".lua") end
 local W=Trailwarden
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
@@ -613,6 +613,9 @@ local xpText,etaText=false,false;for _,node in ipairs(nodes) do if node.kind=="f
 check("panel waits for a stable XP sample before showing rate and ETA",xpText and etaText and W.ExperienceStats().eta==210)
 check("XP gain and rewarded-kill events are registered",W.EventFrame.events.PLAYER_XP_UPDATE and W.EventFrame.events.CHAT_MSG_COMBAT_XP_GAIN)
 SlashCmdList.TRAILWARDEN("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
+SlashCmdList.TRAILWARDEN("language da");check("language command persists Danish and refreshes labels",W.GetProfile().language=="da" and W.ActionLabels.escort=="ESKORTE")
+SlashCmdList.TRAILWARDEN("language en");check("language command restores English labels",W.GetProfile().language=="en" and W.ActionLabels.escort=="ESCORT")
+SlashCmdList.TRAILWARDEN("language auto")
 SlashCmdList.TRAILWARDEN("xp");SlashCmdList.TRAILWARDEN("xpreset");check("session reset retains learned character preferences",W.ExperienceStats().totalXP==0 and W.GetProfile().xpRouting and W.GetProfile().queueRows==2)
 -- Leave a measured synthetic session for development UI renders.
 epoch=epoch+120;testXP=500;W.SampleExperience()

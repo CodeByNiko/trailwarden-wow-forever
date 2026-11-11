@@ -89,6 +89,8 @@ The main window explains the next action. The arrow shows direction to that acti
 
 Drag the window's header or the navigator to move them. **−/+** collapses the planned list. The settings offer 0/2/4 preview rows. **…** opens character preferences: solo/group quests, comfort level (+2/+4), automatic map waypoint, navigator visibility, independent panel/arrow scales, window locking and pause/resume. Closing the main window leaves the navigator available.
 
+Use `/tw language auto`, `/tw language en` or `/tw language da` to choose Trailwarden's action labels and map-cue language per character. The entrance and objective map pins include **E/Q** glyphs as well as color. QuestieDB quest names and in-game world names retain their source language.
+
 | Command | Action |
 | --- | --- |
 | `/tw` | Show/hide the guide |
