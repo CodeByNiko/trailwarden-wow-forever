@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.15
+- Fully rerender the quest panel when navigation enters or recovers from an access error, including title, controls, progress, and queue.
+- Keep routine live distance updates lightweight when the navigation state is unchanged.
+
 ## 1.8.14
 - Guard cave access checks when a dynamically discovered entrance has no reference bounds or coordinates.
 - Preserve a previously validated live entrance when a refreshed POI returns invalid coordinates; keep exit guidance conservative.

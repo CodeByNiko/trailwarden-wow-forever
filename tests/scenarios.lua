@@ -472,6 +472,22 @@ check("navigation failure publishes a shared safe wait state",W.Decision.navigat
 check("navigation failure clears only Trailwarden owned waypoint",waypoint==nil and W.WaypointDecisionID==W.Decision.id)
 W.ReadAccess=accessReader;W.UpdateNavigation()
 check("navigation recovers for the same decision without a quest event",not W.Decision.navigationError and W.CurrentRoute.key==W.Decision.route.key and W.Navigation.decisionID==W.Decision.id)
+local expectedRecoveryTitle=W.CurrentRoute.questName or W.CurrentRoute.title
+W.ReadAccess=function() error("synthetic OnUpdate access failure") end
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+local unavailableTitle,skipDisabled=false,false
+for _,n in ipairs(nodes) do
+ if n.kind=="font" and n.text=="Navigation unavailable" then unavailableTitle=true end
+ if n.kind=="font" and n.text=="Skip 15 min" and n.parent.enabled==false then skipDisabled=true end
+end
+check("OnUpdate navigation failure fully renders error title and disables stale skip",unavailableTitle and skipDisabled)
+W.ReadAccess=accessReader;W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+local restoredTitle,skipEnabled=false,false
+for _,n in ipairs(nodes) do
+ if n.kind=="font" and n.text==expectedRecoveryTitle then restoredTitle=true end
+ if n.kind=="font" and n.text=="Skip 15 min" and n.parent.enabled==true then skipEnabled=true end
+end
+check("OnUpdate navigation recovery fully restores title and route controls",restoredTitle and skipEnabled and W.CurrentRoute.key==W.Decision.route.key)
 local beforeInput=W.Json(W.Decision.detail.input);local statePin=W.Decision.detail.input.state.profile.pinned
 W.SelectRoute(W.Decision.detail.input)
 check("selector does not modify input or profile state",beforeInput==W.Json(W.Decision.detail.input) and statePin==W.Decision.detail.input.state.profile.pinned)
