@@ -16,6 +16,7 @@ from lupa.lua51 import LuaRuntime
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('provider', type=Path)
+parser.add_argument('--expected-version', help='Fail if the provider TOC version differs from this pinned release.')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 provider = args.provider.resolve()
@@ -29,6 +30,9 @@ for line in (provider / 'QuestieDB_Forever.toc').read_bytes().splitlines():
         metadata[key] = value.strip()
     elif line.strip() and not line.startswith(b'#'):
         files.append(line.decode().replace('\\', '/'))
+version = metadata.get(b'Version', b'').decode()
+if args.expected_version and version != args.expected_version:
+    raise SystemExit(f'Expected QuestieDB {args.expected_version}, found {version or "unknown"}')
 
 
 def to_lua(value):
@@ -117,6 +121,6 @@ Trailwarden.PinStep(accepted)
 assert(Trailwarden.CurrentRoute.questID==456 and Trailwarden.CurrentRoute.kind=="objective")
 assert(not Trailwarden.LastError and not Trailwarden.ForecastError)
 ''')
-print('QuestieDB', metadata[b'Version'].decode(), '/ contract', namespace[b'contractVersion'])
+print('QuestieDB', version, '/ contract', namespace[b'contractVersion'])
 print('Complete catalog:', globals_.Trailwarden[b'CatalogCount'], 'quests; accepted objective and forecasts passed')
 print('Provider reads are real; client APIs, position and objective counts are synthetic.')
