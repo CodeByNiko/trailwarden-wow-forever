@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.1
+- Refresh active quest guidance when the client waypoint changes without objective progress.
+- Release a stabilized client waypoint when a newer authoritative waypoint is reported.
+
 ## 1.7.5
 
 - Immediately invalidate cached guidance when a quest fails or restarts, including active escorts.

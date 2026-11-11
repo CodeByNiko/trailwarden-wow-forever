@@ -9,7 +9,7 @@ local function makeStep(kind,q,point,target,suffix,source,objectiveText)
     elseif kind=="item" then instruction="Use "..target.." in your bags to begin this quest."
     else instruction=objectiveText or ("Work around "..target.." until the quest objective updates.") end
     return {kind=kind,key=W.StepKey(kind,q.id,suffix),questID=q.id,questName=name,title=(labels[kind] or "")..name,point=point,
-        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,combatRisk=point and point.combatRisk,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)..":"..tostring(point and point.combatRisk and point.combatRisk.signature or "noncombat")}
+        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,combatRisk=point and point.combatRisk,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)..":"..tostring(point and point.combatRisk and point.combatRisk.signature or "noncombat")..((source or point and point.source)=="Client waypoint" and (":"..tostring(q.waypoint and q.waypoint.mapID or "")..":"..tostring(q.waypoint and q.waypoint.x or "")..":"..tostring(q.waypoint and q.waypoint.y or "")) or "")}
 end
 local function nearestObjective(points,state)
     if state.workArea and W.MatchCave then
