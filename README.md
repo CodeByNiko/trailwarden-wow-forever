@@ -11,6 +11,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 - Waypoint-aware quest updates, verified objective matching, and synchronized fail-safe navigation.
 - Safe handling for unknown quest policy, bounded planner previews, and missing Horde start-zone coverage.
 - Same-level XP reward calibration, pinned real-provider CI, and a documented client smoke process.
+- Additional cave entrances are discovered from exact game POI links; cross-continent travel is explained without guessing boat or flight paths.
 
 See the [release notes](docs/) for the full change history.
 
@@ -45,7 +46,7 @@ Nearby eligible quest offers are retained as opportunities. Escort offers wait u
 **No additional navigation addon is required.** Keep your existing Questie and OpenMap enabled. Trailwarden now separates a cave's entrance from the quest target inside it. For Lord Melenas in Fel Rock, the arrow and native waypoint first target the entrance instead of the underground objective's hillside projection.
 
 - **Cyan marker:** cave entrance; approach this first. **Gold marker:** final quest objective. Markers appear on the minimap and through OpenMap's supported world-map integration.
-- Known access records cover **Fel Rock, Shadowthread Cave and Ban'ethil Barrow Den** in Teldrassil. Matching live Forever entrance POIs take priority; fallback locations are labeled **Reference entrance**.
+- Bundled fallback access records cover **Fel Rock, Shadowthread Cave and Ban'ethil Barrow Den** in Teldrassil. Other cave entrances are discovered only when the client exposes a unique POI linked to the exact interior map. Fallback locations are labeled **Reference entrance**.
 - On a recognized cave map, or matching indoor subzone, guidance switches to the cave map. It does not keep pointing through tunnel walls. Getting near the entrance or target alone never completes a quest or proves you entered the cave.
 - Ordinary quests retain the existing routing and arrow. The map library is detected automatically, including its real callable-table LibStub interface; temporary marker failures retry without a quest update.
 
@@ -124,7 +125,7 @@ A grind suggestion also requires recent suitable enemy-level observations in the
 
 Forever quest data is still developing. The provider itself documents incomplete new content, objectives, restrictions and live placement. A database position can be absent or out of date; cave floors, phases, moving NPCs, unusual scripted/spell objectives and transport connections may require Questie or the quest text. A fresh live offer can resolve incorrect static restrictions, but cannot override subsequent confirmed blocking progress. Incomplete quest history or a partial/collapsed quest log suspends database pickups; expand quest headers and run `/tw refresh` if diagnostics report an incomplete log. Unknown active quests can use a client waypoint when one exists; otherwise they are shown as unmapped in diagnostics.
 
-The arrow points toward a target, with entrance-first access guidance for the three documented Teldrassil caves. It does **not** calculate a terrain-safe walking path, tunnel graph, general bridge access or boat schedules. Follow roads and use normal travel connections. It never displays a stale bearing when position data is missing or a target is on another continent. Distances are direct map distances, not walking distance.
+The arrow points toward a target, with entrance-first access guidance for documented and uniquely linked caves. It does **not** calculate a terrain-safe walking path, tunnel graph, general bridge access, boat schedules or flight routes. Cross-continent targets name the destination and ask you to use the in-game travel map; refresh after arrival. Distances are direct map distances, not walking distance.
 
 The automated scenarios use synthetic client data modeled on the two character contexts. A successful run does not replace testing in the actual Forever client. See [the V1 implementation analysis](docs/V1-implementation.md) and [validation notes](docs/validation.md).
 

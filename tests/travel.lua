@@ -5,13 +5,16 @@ function GetServerTime() return epoch end
 function CreateVector2D(x,y) return {GetXY=function() return x,y end} end
 local userWaypoint;local mapSets,mapClears=0,0
 C_Map={GetWorldPosFromMapPos=function(id,p)
- local x,y=p:GetXY();if id~=1438 and id~=59 then return nil end
+ local x,y=p:GetXY();if id~=1438 and id~=59 and id~=1411 and id~=750 and id~=751 then return nil end
  return 1,CreateVector2D(12000-y*4000,4000-x*6000)
-end,GetMapInfo=function(id) return {name=id==59 and "Fel Rock" or "Cave"} end,
+end,GetMapInfo=function(id)
+ if id==59 then return {name="Fel Rock"} elseif id==750 then return {name="Skull Rock",parentMapID=1411} elseif id==751 then return {name="Unmapped chamber",parentMapID=1411} elseif id==1411 then return {name="Durotar"} end
+ return {name="Cave"}
+end,
 GetUserWaypoint=function() return userWaypoint end,SetUserWaypoint=function(p) userWaypoint=p;mapSets=mapSets+1 end,
 ClearUserWaypoint=function() userWaypoint=nil;mapClears=mapClears+1 end,CanSetUserWaypointOnMap=function() return true end}
 UiMapPoint={CreateFromCoordinates=function(map,x,y) return {uiMapID=map,position=CreateVector2D(x,y)} end}
-for _,name in ipairs({"Common","Travel","Navigator","RouteOverlay"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Data","Travel","Navigator","RouteOverlay"}) do dofile("Trailwarden/"..name..".lua") end
 local W=Trailwarden
 W.GetProfile=function() return profile end;W.GetCharacterKey=function() return "NightElf" end
 local passed=0
@@ -50,6 +53,24 @@ end}
 check("live Forever cave POI takes precedence over reference coordinates",W.ReadAccess(route,player).entry.x==.55 and W.ReadAccess(route,player).entry.accessSource=="Live entrance POI")
 C_AreaPoiInfo.GetAreaPOIInfo=function() return {name="Different landmark",position=CreateVector2D(.1,.1)} end
 check("reused POI id cannot position an unrelated entrance",W.ReadAccess(route,player).entry.x==entry.x)
+C_AreaPoiInfo={GetAreaPOIForMap=function(map) assert(map==1411);return {7501} end,
+ GetAreaPOIInfo=function(map,id)
+  if map==1411 and id==7501 then return {name="Skull Rock",position=CreateVector2D(.3,.6),linkedUiMapID=750} end
+  if map==1411 and id==7502 then return {name="Entrance A",position=CreateVector2D(.2,.4),linkedUiMapID=751} end
+  if map==1411 and id==7503 then return {name="Entrance B",position=CreateVector2D(.8,.7),linkedUiMapID=751} end
+ end}
+local dynamicRoute={kind="objective",key="objective:750",point=W.Point(750,.5,.5),mapID=750,x=.5,y=.5}
+local dynamicAccess=W.ReadAccess(dynamicRoute,player)
+check("a uniquely linked game POI extends cave entrance coverage",dynamicAccess.mode=="cave-approach" and dynamicAccess.caveName=="Skull Rock" and dynamicAccess.entry.mapID==1411 and dynamicAccess.entry.x==.3)
+check("discovered cave identity is reused for route batching",W.MatchCave(dynamicRoute).id==dynamicAccess.caveID)
+local playerInDiscoveredCave=W.Point(750,.5,.5)
+check("discovered interior map becomes the current work area",W.ReadWorkArea(playerInDiscoveredCave).id==dynamicAccess.caveID)
+ C_AreaPoiInfo.GetAreaPOIForMap=function(map) assert(map==1411);return {7502,7503} end
+local ambiguousRoute={kind="objective",key="objective:751",point=W.Point(751,.5,.5),mapID=751,x=.5,y=.5}
+check("ambiguous POI links stay manual instead of choosing an entrance",W.ReadAccess(ambiguousRoute,player).mode=="direction")
+local distant= W.Copy(route);distant.point=W.Copy(route.point);distant.point.continent=0;distant.point.mapID=1411
+local transportHint=W.ManualTransportHint(distant,player)
+check("cross-continent target names its destination and requires manual transit",transportHint and transportHint:find("Durotar",1,true) and transportHint:find("does not guess",1,true))
 C_AreaPoiInfo=nil
 local n=W.UpdateNavigation()
 check("entrance fallback is built into Trailwarden",n.navRoute.kind=="entrance")

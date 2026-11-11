@@ -30,6 +30,14 @@ function W.ComputeNavigation(route,player,facing,previous)
     if not W.IsFinite(facing) then return {distance=d,arrivalKey=key,label="Facing unavailable"} end
     return {distance=d,bearing=bearing,facing=facing,arrivalKey=key,label=point.mapID~=player.mapID and "Travel via roads / transit" or "Following your step"}
 end
+function W.ManualTransportHint(route,player)
+    local point=route and route.point
+    if not point or not player or not point.continent or not player.continent or point.continent==player.continent then return nil end
+    local mapID=W.QuestRegion and W.QuestRegion(point.mapID) or point.mapID
+    local zone=W.Zones and W.Zones[mapID]
+    local destination=zone and zone.name or "the destination continent"
+    return "Use the in-game transport map to reach "..destination..". Trailwarden does not guess boat or flight connections; use /tw refresh after arrival."
+end
 local function readNavigation(route,previous)
     local copy=route and W.Copy(route)
     if copy and copy.point then
@@ -44,6 +52,7 @@ local function readNavigation(route,previous)
         if status=="ok" then travel=result;W.AccessError=nil else travel={mode="error",navRoute={kind="wait"},label="Access data unavailable"};W.AccessError=tostring(result) end
     end
     local n=W.ComputeNavigation(travel.navRoute,player,W.Safe(GetPlayerFacing),previous)
+    travel.instruction=travel.instruction or W.ManualTransportHint(copy,player)
     n.travel=travel;n.navRoute=travel.navRoute
     if travel.mode=="cave-approach" then
         if n.arrived then n.label="Enter "..travel.caveName elseif n.bearing then n.label="Following cave entrance" end
