@@ -60,6 +60,9 @@ local skipped=input({a,b});skipped.state.profile.skipped["quest:100"]=1000
 check("temporary skip excludes quest",W.SelectRoute(skipped).questID==101)
 skipped.state.now=1001;check("expired skip no longer excludes quest",W.SelectRoute(skipped).questID==100)
 local waiting=input({a});waiting.state.questLogReady=false;check("unready log never produces an action",W.SelectRoute(waiting).kind=="wait")
+local unsupportedZone=input({});unsupportedZone.meta.transitionStatus="unmapped-zone"
+local unsupportedRoute=W.SelectRoute(unsupportedZone)
+check("unsupported zone transition is explained instead of silently stopping",unsupportedRoute.title=="Local quests exhausted" and unsupportedRoute.instruction:find("No supported neighboring zone",1,true)~=nil)
 waiting.state.questLogReady=true;waiting.state.profile.paused=true;check("pause is deterministic",W.SelectRoute(waiting).key=="paused")
 waiting.state.profile.paused=false;waiting.state.dead=true;check("death is deterministic",W.SelectRoute(waiting).key=="dead")
 local sc=input({ready,a});local result=W.SelectRoute(sc);local parts=result.scoreParts

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.6
+- Add explicit start-zone coverage and progression edges for Durotar, Mulgore, The Barrens, Tirisfal Glades and Silverpine Forest.
+- Validate zone metadata and graph targets; explain when no supported neighboring zone is configured.
+
+## 1.8.5
 ## 1.8.5
 - Cache candidate clustering per planner pass and build the remaining queue once per leg instead of once per candidate.
 - Shorten only the queue preview above 128 candidates; preserve full evaluation of the primary route.
