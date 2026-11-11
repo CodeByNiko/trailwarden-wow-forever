@@ -12,7 +12,8 @@ token or the complete webhook URL to this public repository.
 
 Only tag a verified commit from main. Tags containing `beta` produce beta files;
 plain version tags produce release files. Keep public testing builds in the beta
-channel, for example `v1.7.5-beta.1`. The addon TOC version remains `1.7.5`.
+channel, for example `v<major>.<minor>.<patch>-beta.1`. The addon TOC version
+remains `<major>.<minor>.<patch>`.
 Do not move or reuse an already published tag.
 
 The GitHub release workflow defaults to `v<TOC version>-beta` tags and GitHub

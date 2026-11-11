@@ -6,16 +6,13 @@ Trailwarden is an open-source quest-routing companion for **World of Warcraft: F
 
 **Public beta for Forever 1.60.1 (Interface 16001).** Feedback is very welcome. Requires **QuestieDB for Forever**; use Forever-compatible Questie and OpenMap for quest tracking, map pins and cave layouts.
 
-## What's new in 1.7.4
+## Recent improvements
 
-- Larger text, clearer contrast and a compact quest card that grows with its content.
-- Quest, objective, progress and distance together in one current-step card.
-- A slim progress bar and clearer planned steps with separate quest names and instructions.
-- A cleaner compass navigator with larger distance text and two-line captions.
-- A collapsed guide that keeps distance visible even beside long quest names.
-- Better-aligned preferences and clearer status messages while a new route is being calculated.
+- Waypoint-aware quest updates, verified objective matching and synchronized fail-safe navigation.
+- Conservative routing when Questie policy is incomplete, with bounded planner previews and Horde starter-zone coverage.
+- Same-level XP reward calibration and a pinned provider integration in CI.
 
-The 1.7.3 routing improvements are included: bounded quest-cycle optimization, refreshed XP forecasts when objectives change, and protection against stale navigation. Measured XP/hour and next-level ETA appear after **five active minutes**.
+The interface includes a compact current-step card, progress feedback, a movable compass and a collapsible planned-step list. Measured XP/hour and next-level ETA appear after **five active minutes**.
 
 ## What it does
 

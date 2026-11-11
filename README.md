@@ -6,23 +6,33 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
-## New in 1.7.5: reliable quest updates
+## Recent improvements
+
+- Waypoint-aware quest updates, verified objective matching, and synchronized fail-safe navigation.
+- Safe handling for unknown quest policy, bounded planner previews, and missing Horde start-zone coverage.
+- Same-level XP reward calibration, pinned real-provider CI, and a documented client smoke process.
+
+See the [release notes](docs/) for the full change history.
+
+## Selected improvements from 1.7
+
+### 1.7.5: reliable quest updates
 
 Failed quests, including escorts, release guidance immediately. Unknown-position markers in quest data no longer stop catalog loading when map metadata is unavailable. CurseForge packages declare QuestieDB as a required dependency.
 
-## New in 1.7.4: easier to read at a glance
+### 1.7.4: easier to read at a glance
 
 Larger text, clearer contrast and a content-sized quest card put the current objective first. Progress uses a count and a slim bar; distance is part of the same card. Planned steps separate the quest name from its action, while the collapsed guide retains your current quest and distance. Navigator captions are larger and preferences use aligned labels and values.
 
-## New in 1.7.3: compact routes and clearer estimates
+### 1.7.3: compact routes and clearer estimates
 
 The route panel uses a tighter layout, shows objective progress at a glance and keeps route details in the hover explanation. The navigator has a redesigned compass pointer. Quest-cycle estimates reduce unnecessary backtracking, while live XP/hour and next-level time wait for a five-minute active sample.
 
-## New in 1.7.2: Trailwarden
+### 1.7.2: Trailwarden
 
 Renamed from Wayfinder with a separate addon namespace, settings file and `/tw` command. See [upgrade instructions](https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md) before removing the old addon.
 
-## New in 1.7.1: finish local work and retain nearby opportunities
+### 1.7.1: finish local work and retain nearby opportunities
 
 Unfinished accepted objectives now take priority over distant objectives, not only town returns. XP forecasts cannot override that area boundary. The planner receives the same observed cave context as navigation, treats cave floors as part of their parent quest region, and prefers a known safe item source inside the current cave when one exists.
 
@@ -30,7 +40,7 @@ The same guideline applies beyond named caves: actual quest-progress changes cre
 
 Nearby eligible quest offers are retained as opportunities. Escort offers wait until local collection is finished and are considered before leaving; accepting an escort commits guidance to following its NPC until completion/failure. Escort detection uses provider event metadata, not quest-ID exceptions. The UI names nearby opportunities in its existing status area. Fresh provider/client availability is still required: an unknown or unavailable quest cannot be promised, and an escort without recognizable event metadata may need manual guidance.
 
-## New in 1.7: cave access and map guidance
+### 1.7: cave access and map guidance
 
 **No additional navigation addon is required.** Keep your existing Questie and OpenMap enabled. Trailwarden now separates a cave's entrance from the quest target inside it. For Lord Melenas in Fel Rock, the arrow and native waypoint first target the entrance instead of the underground objective's hillside projection.
 

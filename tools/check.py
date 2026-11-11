@@ -5,6 +5,7 @@ import sys
 root=Path(__file__).resolve().parents[1]
 commands=[
  ['tools/check_install_matrix.py'],
+ ['tools/check_release_consistency.py'],
  ['tools/run_lua.py','tests/scenarios.lua'],
  ['tools/run_lua.py','tests/engine.lua'],
  ['tools/run_lua.py','tests/provider_contract.lua'],
