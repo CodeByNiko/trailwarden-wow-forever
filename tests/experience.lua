@@ -63,6 +63,16 @@ state.level=32;check("provider base reward falls with grey quest level",near(W.Q
 W.Import=function() return {GetQuestLogRewardXP=function(self,id) assert(type(self)=="table" and id==90001);return 3000 end} end
 check("consumer reward uses documented colon contract",W.QuestRewardEstimate(90001,state)==3000)
 W.Import=function() return nil end
+reset();state.level=22;W.State=state;W.CurrentRoute={questID=90001,economy={rewardXP=3000,xpPerHour=8000,seconds=120}}
+W.ExperienceEvent("QUEST_TURNED_IN",90001,3300)
+local calibration=W.ExperienceStats().calibration
+check("turn-in reward records a same-level observed estimate",W.QuestRewardEstimate(90001,state)==3300 and calibration and calibration.actualXP==3300)
+check("XP estimate difference is measured and exposed",calibration.percentError==65 and calibration.absoluteError==1300)
+local lowConfidence={rewardXP=2000,pickup=point(100),receiver=point(0),goals={{point=point(500),seconds=100,killXP=500}},confidence="low",interactionSeconds=40}
+local lowProjection=W.ProjectQuestXP(lowConfidence,point(0),{moveSpeed=10})
+local pace={enabled=true,referenceRate=6000};check("low-confidence XP projection has no route-ranking effect",W.XPRouteEfficiency(lowProjection,pace,200)==0)
+lowProjection.confidence="medium";check("medium-confidence projection can rank a route",W.XPRouteEfficiency(lowProjection,pace,200)<0)
+reset()
 local model={rewardXP=2000,pickup=point(100),receiver=point(0),goals={{point=point(500),seconds=100,killXP=500}},confidence="low",interactionSeconds=40}
 local projected=W.ProjectQuestXP(model,point(0),{moveSpeed=10})
 check("unaccepted cycle includes pickup work and return",near(projected.travelSeconds,120) and near(projected.seconds,260) and projected.rewardXP==2000 and projected.killXP==500)
@@ -148,8 +158,12 @@ check("ETA formatting rounds conservatively",W.FormatETA(61)=="2m" and W.FormatE
 local unavailable=UnitXP;UnitXP=function() return nil end;W.SampleExperience();check("unavailable XP API remains explicit",not W.ExperienceStats().available);UnitXP=unavailable
 -- Rank accepted and unaccepted full cycles without client calls in selection.
 W.ActiveSteps=function(q) return {step(q.id,500)} end
+W.DBGet=function() return "Known synthetic target" end
+W.ExperienceStats();local learnedScores=W.GetProfile().xpLearning.quests
+learnedScores[90001]={seen=now,goals={{type="monster",entityID=1,required=3,secondsPerUnit=20,samples=3}}}
+learnedScores[90002]={seen=now,goals={{type="monster",entityID=1,required=3,secondsPerUnit=20,samples=3}}}
 local good=step(90001,100,"pickup");local poor=step(90002,100,"pickup")
-state.profile=W.Copy(W.GetProfile());state.activeByID={};state.activeQuests={};state.now=now;state.experience=W.ExperienceStats()
+state.profile=W.Copy(W.GetProfile());state.activeByID={};state.activeQuests={};state.now=now;state.experience=W.ExperienceStats();state.experience.killTrusted=3;state.experience.killXP=100
 W.PrepareQuestEconomies({poor,good},state)
 local routeInput={state=state,meta={candidates={poor,good},deferred={},ready=true},force=true,weights=W.Copy(W.RouteWeights)}
 local chosen,queue,d=W.SelectRoute(routeInput)

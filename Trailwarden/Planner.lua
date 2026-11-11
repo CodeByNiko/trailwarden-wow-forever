@@ -355,13 +355,10 @@ local function score(c,state,all,origin,w,releaseArea,clusters)
     parts.efficiency=0
     if state.experience and state.experience.enabled and c.economyModel then
         local projected=W.ProjectQuestXP(c.economyModel,origin,state.experience)
-        if projected then
-            local certainty=projected.confidence=="medium" and 1 or .6
-            local baseline=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
-            -- Full-cycle XP already includes travel/work. Do not charge distance
-            -- a second time: rank known cycles by conservative XP return instead.
-            parts.efficiency=-baseline-(w.xpBias or 1000)*(projected.xpPerHour/math.max(1,state.experience.referenceRate or 6000))*certainty
-        end
+        local baseline=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
+        -- Full-cycle XP already includes travel/work. Do not charge distance
+        -- a second time; the helper also fails closed for low-confidence models.
+        parts.efficiency=W.XPRouteEfficiency(projected,state.experience,baseline,w.xpBias or 1000)
     end
     local value=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching+parts.efficiency
     return value,parts,cluster,blocked

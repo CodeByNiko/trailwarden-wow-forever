@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.7
+- Calibrate quest reward estimates from observed same-level turn-in XP and expose the latest prediction error in diagnostics.
+- Keep XP rate influence out of route ranking unless reward and objective-time evidence reach medium confidence.
+- Explain low-confidence fallback in the XP hover details.
+
 ## 1.8.6
 - Add explicit start-zone coverage and progression edges for Durotar, Mulgore, The Barrens, Tirisfal Glades and Silverpine Forest.
 - Validate zone metadata and graph targets; explain when no supported neighboring zone is configured.
