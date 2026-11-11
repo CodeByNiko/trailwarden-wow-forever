@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.19
+- Load Locale, Diagnostics, and Commands in the fresh provider-integration addon namespace using the runtime TOC order.
+- Assert diagnostics, slash-command registration, and absence of runtime output errors before reporting provider smoke success.
+
 ## 1.8.18
 - Restore the matched live objective row's text when building monster and item instructions.
 - Keep client-provided target wording visible instead of falling back to generic provider instructions.
