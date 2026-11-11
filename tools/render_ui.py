@@ -1,6 +1,7 @@
 """Inspect the real frame layout recorded by tests; this is not a WoW screenshot."""
 import json
 import re
+import math
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 root=Path(__file__).resolve().parents[1]
@@ -34,10 +35,12 @@ for subject in ('nightelf','dwarf','settings','empty','compact','cave'):
         if not show: continue
         x,y,w,h=map(round,box)
         if node['bg'] and node['kind']!='font':
+            draw=ImageDraw.Draw(image)
             draw.rectangle((x,y,x+w,y+h),fill=color(node['bg'],(20,35,44,255)),outline=(41,64,78,255) if h>2 else None)
         if node['kind']=='font' and node['text']:
             font=ImageFont.truetype(font_path,int(node['font']));lines=[]
             for line in node['text'].split('\n'):
+                if not node.get('wrap',True): lines.append(line);continue
                 words=line.split();current=''
                 for word in words:
                     value=(current+' '+word).strip()
@@ -45,10 +48,19 @@ for subject in ('nightelf','dwarf','settings','empty','compact','cave'):
                     else:current=value
                 lines.append(current)
             tile=Image.new('RGBA',(max(1,w),max(1,h)),(0,0,0,0));td=ImageDraw.Draw(tile)
-            for i,line in enumerate(lines): td.text((0,i*int(node['font']*1.25)-2),line,font=font,fill=color(node['color'],(235,240,240,255)))
+            line_height=int(node['font']*1.25)
+            align_y=node.get('justifyV','MIDDLE')
+            top=0 if align_y=='TOP' else h-len(lines)*line_height if align_y=='BOTTOM' else (h-len(lines)*line_height)/2
+            for i,line in enumerate(lines):
+                align_x=node.get('justifyH','LEFT');length=font.getlength(line)
+                left=w-length if align_x=='RIGHT' else (w-length)/2 if align_x=='CENTER' else 0
+                td.text((round(left),round(top+i*line_height-2)),line,font=font,fill=color(node['color'],(235,240,240,255)))
             image.alpha_composite(tile,(x,y))
         if node['texture'].endswith('Arrow.tga'):
-            arrow=Image.open(root/'Trailwarden/Media/Arrow.tga').convert('RGBA').resize((w,h));image.alpha_composite(arrow,(x,y))
+            arrow=Image.open(root/'Trailwarden/Media/Arrow.tga').convert('RGBA').resize((w,h))
+            arrow=arrow.rotate(math.degrees(node.get('rotation',0)),resample=Image.Resampling.BICUBIC)
+            image.alpha_composite(arrow,(x,y))
+    draw=ImageDraw.Draw(image)
     draw.text((28,730),'Development render from actual frame calls · synthetic quest data',font=ImageFont.truetype(font_path,11),fill='#8398a5')
     draw.text((28,749),'Fonts and textures may appear slightly different in the game client.',font=ImageFont.truetype(font_path,11),fill='#8398a5')
     out=root/f'docs/previews/{subject}.png';out.parent.mkdir(parents=True,exist_ok=True);image.convert('RGB').save(out)

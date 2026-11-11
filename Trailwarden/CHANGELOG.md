@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.4
+
+- Increase objective, instruction, queue and navigator text sizes; improve secondary-text contrast.
+- Fit the current card to its actual title, target and instruction height, with distance integrated into the card.
+- Show a proportional objective progress bar and a numeric count; hide it for steps without counts.
+- Separate planned quest names from their action/target, with hover feedback and readable truncation.
+- Keep the current quest and fresh distance visible when collapsed.
+- Align preference labels and values, and let long instructions and warnings grow without clipping.
+- Retain the transparent compass pointer with larger distance and two-line captions; arrival reads "IN AREA".
+
 ## 1.7.3
 
 - Fix non-terminating multi-goal forecasts, bound route optimization and reject malformed/non-finite projection data.
