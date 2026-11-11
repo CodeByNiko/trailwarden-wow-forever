@@ -1,0 +1,19 @@
+package-as: Trailwarden
+enable-nolib-creation: no
+
+# The repository keeps the installable addon below its root. Flatten it so the
+# archive installs as Trailwarden/Trailwarden.toc, not Trailwarden/Trailwarden/.
+move-folders:
+  Trailwarden/Trailwarden: Trailwarden
+
+ignore:
+  - docs
+  - tests
+  - tools
+  - artifacts
+  - README.md
+  - LICENSE.txt
+
+manual-changelog:
+  filename: Trailwarden/CHANGELOG.md
+  markup-type: markdown
