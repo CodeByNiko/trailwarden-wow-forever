@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.10
+- Discover additional cave entrances only from unique client POIs linked to the exact interior map.
+- Explain cross-continent transport needs and require a manual in-game transit choice before refreshing the route.
+
 ## 1.8.9
 - Reconcile current README, CurseForge description, validation guidance, and release instructions with the 1.8 feature line.
 - Enforce TOC/Common/changelog/release-note version consistency and unique changelog headings before tests and packaging.
