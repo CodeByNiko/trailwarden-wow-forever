@@ -177,7 +177,7 @@ function W.CreateUI()
             "Measured XP/h includes kills, quests and exploration. Travel and ordinary downtime count; pause/AFK do not.",
             "Session: "..W.FormatXP(e.totalXP).." XP / "..W.FormatXP(e.sessionRate).." XP/h. Rolling window: "..math.floor(e.windowSeconds/60).." min.",
             "Rewarded kills: "..e.kills.." / turn-ins: "..e.turnins..". Next-level time appears after five active minutes and uses the measured rolling rate.",
-            m and ("Quest cycle: ~"..W.FormatXP(m.xpPerHour).." XP/h · "..W.FormatDistance(m.travelDistance).." direct travel · "..W.FormatETA(m.seconds).." estimated. "..(m.confidence or "unknown").." confidence; "..(m.source or "Observed kills")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
+            m and ("Quest cycle: ~"..W.FormatXP(m.xpPerHour).." XP/h · "..W.FormatDistance(m.travelDistance).." direct travel · "..W.FormatETA(m.seconds).." estimated. "..(m.confidence or "unknown").." confidence; "..(m.source or "Observed kills")..(m.confidence~="medium" and ". Low-confidence estimates do not influence route selection." or "")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
             "Quest projections include remaining work, travel and reward collection. New unaccepted quest quantities may be uncertain.",
             "Grind comparison: "..W.FormatXP(e.grind and e.grind.rate).." XP/h from verified local kills.",
             "The current region and unfinished objective stay committed; XP changes do not send you back and forth between zones.",

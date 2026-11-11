@@ -82,6 +82,7 @@ function W.Diagnostics()
     lines[#lines+1]="XP sources: "..e.kills.." rewarded kills / "..e.turnins.." turn-ins / "..e.questXP.." event quest XP"
     lines[#lines+1]="XP pace: "..string.format("%.1f",e.moveSpeed).." yards/sec / "..string.format("%.1f",e.killSeconds).." seconds/kill"
     lines[#lines+1]="XP quest model: "..(r.economy and W.FormatXP(r.economy.xpPerHour) or "unknown").." / "..(r.economy and r.economy.confidence or "unknown")
+    if e.calibration then lines[#lines+1]="Last quest XP calibration: "..tostring(e.calibration.questID).." / predicted "..W.FormatXP(e.calibration.expectedXP).." / actual "..W.FormatXP(e.calibration.actualXP).." / error "..string.format("%.1f%%",e.calibration.percentError)..(e.calibration.percentError>=50 and " (large estimate error)" or "") end
     lines[#lines+1]="Region plan: "..tostring(W.Decision and W.Decision.commitment and W.Decision.commitment.mapID)
     lines[#lines+1]="Forecast error: "..tostring(W.ForecastError or "none").." / learning error: "..tostring(W.LearningError or "none")
     lines[#lines+1]="Combat target cap: +"..W.CombatLevelMargin.." / risk revision "..tostring(s.combatSafety and s.combatSafety.revision)

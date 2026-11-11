@@ -10,8 +10,9 @@ local function learning()
     local p=W.GetProfile()
     if type(p.xpLearning)~="table" then p.xpLearning={} end
     local l=p.xpLearning
-    if l.provider~=providerKey() then l.quests={};l.provider=providerKey() end
+    if l.provider~=providerKey() then l.quests={};l.questRewards={};l.calibration=nil;l.provider=providerKey() end
     if type(l.quests)~="table" then l.quests={} end
+    if type(l.questRewards)~="table" then l.questRewards={} end
     if not finite(l.moveSpeed) or l.moveSpeed<1 or l.moveSpeed>30 then l.moveSpeed=nil end
     if not finite(l.killSeconds) or l.killSeconds<1 or l.killSeconds>180 then l.killSeconds=nil end
     if not finite(l.killXP) or l.killXP>100000 then l.killXP=nil end
@@ -77,7 +78,19 @@ function W.ExperienceEvent(event,...)
         s.lastKill=s.elapsed
     elseif event=="QUEST_TURNED_IN" and not s.excluded then
         s.turnins=s.turnins+1
-        if finite(b) then s.questXP=s.questXP+b;s.pendingQuest=s.pendingQuest+b;s.pendingAt=clock() end
+        if finite(b) then
+            s.questXP=s.questXP+b;s.pendingQuest=s.pendingQuest+b;s.pendingAt=clock()
+            local id=tonumber(a);local level=W.Safe(UnitLevel,"player")
+            if finite(id) and id>0 and id%1==0 and finite(level) then
+                local profile=W.GetProfile();local learned=learning();local previous=learned.questRewards[id]
+                local expected,source
+                if W.State then expected,source=W.QuestRewardEstimate(id,{level=level}) end
+                learned.questRewards[id]={xp=b,level=level,seen=W.Now(),samples=math.min(1000,(type(previous)=="table" and finite(previous.samples) and previous.samples or 0)+1)}
+                if expected and expected>0 then
+                    profile.xpLearning.calibration={questID=id,level=level,expectedXP=expected,actualXP=b,absoluteError=math.abs(expected-b),percentError=math.abs(expected-b)/expected*100,source=source,seen=W.Now()}
+                end
+            end
+        end
     end
 end
 function W.SampleExperience()
@@ -139,7 +152,7 @@ function W.ExperienceStats()
         grind={rate=g.trustedXP*3600/(s.elapsed-g.start),point=W.Copy(g.point),kills=g.kills,seconds=s.elapsed-g.start,valid=true,cooldownUntil=s.grindCooldown or 0}
     end
     return {available=s.available==true,elapsed=s.elapsed,totalXP=s.total,rate=rate,sessionRate=sessionRate,windowSeconds=math.min(span,900),remaining=remaining,eta=rate and rate>0 and remaining and remaining/rate*3600 or nil,
-        level=s.level,maximum=s.maximum,kills=s.kills,questXP=s.questXP,turnins=s.turnins,paused=s.excluded==true,inCombat=W.Safe(InCombatLockdown)==true,moveSpeed=l.moveSpeed or 7,killSeconds=l.killSeconds or 35,killXP=l.killXP,killSamples=l.killSamples,killTrusted=l.killTrusted,grind=grind,enabled=W.GetProfile().xpRouting~=false and s.maximum~=0}
+        level=s.level,maximum=s.maximum,kills=s.kills,questXP=s.questXP,turnins=s.turnins,paused=s.excluded==true,inCombat=W.Safe(InCombatLockdown)==true,moveSpeed=l.moveSpeed or 7,killSeconds=l.killSeconds or 35,killXP=l.killXP,killSamples=l.killSamples,killTrusted=l.killTrusted,grind=grind,calibration=l.calibration,enabled=W.GetProfile().xpRouting~=false and s.maximum~=0}
 end
 function W.EndGrindBreak() session().grindCooldown=W.Now()+120 end
 local function goalKey(q,o,index) return tostring(q.id)..":"..tostring(o.type)..":"..(o.text or ""):gsub("%d+","#")..":"..index end
@@ -171,6 +184,10 @@ function W.ObserveExperienceProgress(state)
     if #ids>200 then table.sort(ids,function(a,b) return l.quests[a].seen<l.quests[b].seen end);for i=1,#ids-200 do l.quests[ids[i]]=nil end end
 end
 function W.QuestRewardEstimate(id,state)
+    local learned=learning().questRewards[id]
+    if type(learned)=="table" and finite(learned.xp) and learned.xp>0 and learned.level==state.level then
+        return learned.xp,"Observed quest reward (same level)"
+    end
     local support=LibQuestieDB and LibQuestieDB.Support
     local data=support and W.Safe(support.Get,"QuestXP");local row=type(data)=="table" and type(data.db)=="table" and data.db[id]
     local module=W.Import("QuestXP")
@@ -262,6 +279,12 @@ function W.ProjectQuestXP(model,origin,pace)
     if not finite(seconds) or not finite(rate) or not finite(travelDistance) then return nil end
     return {xpPerHour=rate,rewardXP=model.rewardXP,killXP=killXP,seconds=seconds,travelSeconds=travel,travelDistance=travelDistance,workSeconds=work,confidence=model.confidence,source=model.source,remainingGoals=count}
 end
+function W.XPRouteEfficiency(projected,pace,baseline,bias)
+    if type(projected)~="table" or projected.confidence~="medium" or type(pace)~="table" or pace.enabled~=true then return 0 end
+    if not finite(projected.xpPerHour) or not finite(pace.referenceRate) then return 0 end
+    baseline=finite(baseline) and baseline or 0;bias=finite(bias) and bias or 1000
+    return -baseline-bias*(projected.xpPerHour/math.max(1,pace.referenceRate))
+end
 function W.PrepareQuestEconomies(candidates,state)
     local models={}
     local grouped={};local ids={}
@@ -317,7 +340,8 @@ function W.PrepareQuestEconomies(candidates,state)
             end
             if not active and #steps==0 then reward=nil end
             if reward~=nil then
-                local model={rewardXP=reward,source=source,receiver=receiver,pickup=pickup,goals=goals,confidence=known and source=="Questie adjusted reward" and "medium" or "low",interactionSeconds=pickup and 40 or 20}
+                local calibrated=source=="Observed quest reward (same level)"
+                local model={rewardXP=reward,source=source,receiver=receiver,pickup=pickup,goals=goals,confidence=known and (source=="Questie adjusted reward" or calibrated) and "medium" or "low",interactionSeconds=pickup and 40 or 20}
                 model.questIDs={id};model.active=active~=nil;models[id]=model
             end
         end
