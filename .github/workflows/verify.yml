@@ -21,5 +21,16 @@ jobs:
         run: bash tools/install-lua.sh
       - name: Run scenarios, contracts and replay
         run: python3 tools/check.py
+      - name: Verify installation dependency matrix
+        run: python3 tools/check_install_matrix.py
+      - name: Test against pinned QuestieDB Forever release
+        run: |
+          python3 -m pip install --disable-pip-version-check lupa==2.5 cbor2==5.6.5
+          mkdir -p /tmp/trailwarden-provider
+          curl --fail --location --silent --show-error \
+            https://github.com/Questie/QuestieDB/releases/download/v1.0.14/QuestieDB-1.0.14-Forever.zip \
+            --output /tmp/trailwarden-provider/QuestieDB-1.0.14-Forever.zip
+          unzip -q /tmp/trailwarden-provider/QuestieDB-1.0.14-Forever.zip -d /tmp/trailwarden-provider
+          python3 tools/check_provider.py /tmp/trailwarden-provider/QuestieDB --expected-version 1.0.14
       - name: Validate installable addon
         run: python3 tools/package.py

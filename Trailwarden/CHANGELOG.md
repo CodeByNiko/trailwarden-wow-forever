@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.8
+- Run provider contract checks against the pinned QuestieDB Forever 1.0.14 release in CI.
+- Check required/optional addon declarations and document the installation matrix and in-game smoke log.
+
 ## 1.8.7
 - Calibrate quest reward estimates from observed same-level turn-in XP and expose the latest prediction error in diagnostics.
 - Keep XP rate influence out of route ranking unless reward and objective-time evidence reach medium confidence.
