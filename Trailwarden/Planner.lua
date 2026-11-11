@@ -252,6 +252,7 @@ end
 -- Candidate collection is the only routing layer that reads provider APIs.
 function W.CollectCandidates(state)
     local out,deferred,gates={},{},{}
+    local transitionStatus
     if state.questLogReady then
         for _,q in ipairs(state.activeQuests) do
             local allowed,why=W.QuestPolicy(q.id,state,true)
@@ -277,9 +278,12 @@ function W.CollectCandidates(state)
         local localActions=0
         for _,c in ipairs(out) do if c.mapID==state.mapID or c.kind=="item" then localActions=localActions+1 end end
         if (localActions==0 or state.experience and state.experience.enabled) and state.freeSlots>0 and W.CatalogReady then
-            local zone=W.Zones[state.mapID];local maps={}
-            for _,id in ipairs(zone and zone.next or {}) do maps[id]=true end
+            local zoneID=state.regionMapID or state.mapID
+            local zone=W.Zones[zoneID];local maps={}
+            if zone then for _,id in ipairs(zone.next or {}) do if W.Zones[id] then maps[id]=true else transitionStatus="missing-edge-target" end end
+            else transitionStatus="unmapped-zone" end
             if next(maps)==nil then for id,z in pairs(W.Zones) do if zone and z.region==zone.region and z.min<=state.level and z.max>=state.level then maps[id]=true end end end
+            if next(maps)==nil and not transitionStatus then transitionStatus="no-supported-neighbor" elseif next(maps)~=nil then transitionStatus=nil end
             local ordered={};for id in pairs(maps) do ordered[#ordered+1]=id end;table.sort(ordered)
             for _,id in ipairs(ordered) do if id~=state.mapID then appendPickups(out,id,state,gates) end end
         end
@@ -295,7 +299,7 @@ function W.CollectCandidates(state)
     end
     if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state) end
     local policyUnknown=false;for _,gate in pairs(gates) do if gate.status=="unknown" and gate.source=="policy" then policyUnknown=true;break end end
-    return {candidates=out,deferred=deferred,gates=gates,policyUnknown=policyUnknown,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
+    return {candidates=out,deferred=deferred,gates=gates,policyUnknown=policyUnknown,transitionStatus=transitionStatus,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
 W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
 local function planningMap(c) return c.regionMapID or c.mapID end
@@ -368,6 +372,7 @@ local function fallback(input)
     if not s.questLogReady then title="Waiting for your quest log";text="The live quest log is not ready. Trailwarden will retry without guessing your progress."
     elseif not m.ready then text=m.databaseStatus
     elseif m.policyUnknown then title="Quest review needed";text="Questie is optional. Without its quest policy module, Trailwarden holds new database quest pickups whose PvP, raid or group type cannot be confirmed. Install Questie or use it to review new quests; accepted quests remain usable."
+    elseif m.transitionStatus=="unmapped-zone" or m.transitionStatus=="no-supported-neighbor" or m.transitionStatus=="missing-edge-target" then title="Local quests exhausted";text="No supported neighboring zone is configured for this area. Existing accepted quests remain available; use the map or Questie to choose another zone, then refresh Trailwarden."
     elseif not s.historyReady then text="Waiting for completed quest history. Active quests remain usable; database pickups wait for confirmation."
     elseif s.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
     elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /tw debug for details."
