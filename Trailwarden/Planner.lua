@@ -51,12 +51,12 @@ local function matchObjectiveRows(q,group,entries)
     local proposals={}
     for rowIndex,row in ipairs(typed) do if not used[rowIndex] and type(row.text)=="string" then
         local winner,length,tied=nil,0,false
-        for i,candidate in ipairs(entries) do if not matched[i] then
+        for i,candidate in ipairs(entries) do
             local name=W.DBGet(entityKind,candidate[1],"name")
             if type(name)=="string" and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
                 if #name>length then winner,length,tied=i,#name,false elseif #name==length then tied=true end
             end
-        end end
+        end
         if winner and not tied then proposals[rowIndex]=winner end
     end end
     local proposalCounts={};for _,candidateIndex in pairs(proposals) do proposalCounts[candidateIndex]=(proposalCounts[candidateIndex] or 0)+1 end
