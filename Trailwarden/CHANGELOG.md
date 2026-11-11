@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.16
+- Build reference XP normalization only from medium-confidence quest-cycle projections.
+- Keep uncertain reward forecasts out of the baseline used to compare otherwise reliable routes.
+
 ## 1.8.15
 - Fully rerender the quest panel when navigation enters or recovers from an access error, including title, controls, progress, and queue.
 - Keep routine live distance updates lightweight when the navigation state is unchanged.

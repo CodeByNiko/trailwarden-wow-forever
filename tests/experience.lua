@@ -131,6 +131,21 @@ W.PrepareQuestEconomies({a},state);check("base reward with unknown bonuses remai
 W.Import=function(name) if name=="QuestXP" then return {GetQuestLogRewardXP=function(self,id) return rewards[id] and rewards[id][2] or 0 end} end end
 state.experience.killTrusted=3;state.experience.killXP=100
 W.PrepareQuestEconomies({a},state);check("observed progress plus adjusted reward upgrades confidence",a.economy.confidence=="medium")
+local rewardEstimator=W.QuestRewardEstimate
+local uncertainReward=1
+W.QuestRewardEstimate=function(id)
+ if id==90001 then return 2000,"Questie adjusted reward" end
+ return uncertainReward,"Uncertain provider reward"
+end
+state.experience.enabled=true;state.experience.referenceRate=nil
+local lowA=step(90002,100,"pickup");local lowB=step(90004,200,"pickup")
+W.PrepareQuestEconomies({a,lowA,lowB},state)
+local stableReference=state.experience.referenceRate
+local stableEfficiency=W.XPRouteEfficiency(a.economy,state.experience,0,1000)
+uncertainReward=10000
+W.PrepareQuestEconomies({a,lowA,lowB},state)
+check("low-confidence reward changes cannot distort reference XP normalization",stableReference and near(state.experience.referenceRate,stableReference) and stableEfficiency==W.XPRouteEfficiency(a.economy,state.experience,0,1000) and lowA.economy.confidence=="low" and lowB.economy.confidence=="low")
+W.QuestRewardEstimate=rewardEstimator
 local before=a.economy.rewardXP
 state.activeByID[90003]={objectives={}};local ready=step(90003,0,"turnin")
 W.PrepareQuestEconomies({a,ready},state);check("shared hand-in hub counts each quest reward once",a.economy.rewardXP==before+500 and #a.economyModel.questIDs==2)
