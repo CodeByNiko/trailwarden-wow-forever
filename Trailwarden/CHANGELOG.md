@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.13
+- Split diagnostics/target explanations and slash-command dispatch out of the event/planning core into dedicated modules.
+- Keep the runtime load order explicit and preserve existing command, feedback, and diagnostic behavior.
+
 ## 1.8.12
 - Explain why the current target was chosen, how many eligible steps were considered, and up to two other eligible steps.
 - Add `/tw feedback`, a local copyable summary containing only release/provider identity and aggregate route counts; omit character names, quest names/IDs, coordinates, preferences and raw errors.
