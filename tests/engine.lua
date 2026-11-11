@@ -49,6 +49,11 @@ end
 check("candidate enumeration order does not change route or queue",identical)
 local leg=input({step("objective",400,.8,.5),step("objective",401,.81,.5),step("objective",402,.2,.5)},.1,.5);leg.state.profile.pinned="objective:400"
 local first,nextSteps=W.SelectRoute(leg);check("queue evaluates from preceding leg",first.questID==400 and nextSteps[1].questID==401)
+local many={};for i=1,129 do many[i]=step("objective",10000+i,.1+(i%10)*.02,.1+math.floor(i/10)*.02) end
+local large=input(many);large.state.profile.pinned=many[1].key
+local largeRoute,largeQueue,largeDetail=W.SelectRoute(large)
+check("large candidate sets preserve the best route and shorten only the preview",largeRoute.key==many[1].key and largeDetail.candidateCount==129 and largeDetail.queuePreviewShortened and #largeQueue==1)
+check("planner score evaluation count is recorded",largeDetail.scoreEvaluations>129)
 local pinned=input({a,b});pinned.state.profile.pinned="no-longer-valid"
 local _,_,detail=W.SelectRoute(pinned);check("expired focus is returned as an effect, not written into input",detail.clearPin and pinned.state.profile.pinned=="no-longer-valid")
 local skipped=input({a,b});skipped.state.profile.skipped["quest:100"]=1000
