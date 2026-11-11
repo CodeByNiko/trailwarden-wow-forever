@@ -20,6 +20,7 @@ function methods:GetHeight() return self.h end
 function methods:SetText(t) self.text=t or "" end
 function methods:GetText() return self.text end
 function methods:SetFont(path,size) self.fontSize=size end
+function methods:GetStringWidth() return #self.text*(self.fontSize or 10)*.52 end
 function methods:GetStringHeight()
  return math.max(1,math.ceil(#self.text*(self.fontSize or 10)*.52/math.max(1,self.w)))*(self.fontSize or 10)*1.2
 end
@@ -550,11 +551,26 @@ do
  check("long travel guidance grows without shrinking or clipping",instruction and instruction.fontSize==12 and instruction.h>=instruction:GetStringHeight() and W.MainFrame.h>shortHeight and -strip.points[1][3]>=-instruction.points[1][3]+instruction.h+10)
  W.Navigation.travel.instruction=route.instruction;W.UpdateLiveUI()
  check("live instruction changes reclaim unused panel space",W.MainFrame.h==shortHeight)
- W.GetProfile().collapsed=true;W.UpdateUI();local summary
- for _,n in ipairs(nodes) do if n.kind=="font" and n.text=="Readable quest · 120 yd" then summary=n end end
- check("collapsed panel retains current quest and distance",summary and visible(summary) and W.MainFrame.h==48)
+ W.GetProfile().collapsed=true;W.UpdateUI();local summary,summaryDistance
+ for _,n in ipairs(nodes) do if n.kind=="font" and n.text=="Readable quest" and visible(n) then summary=n end end
+ for _,n in ipairs(nodes) do if n.kind=="font" and n.text=="120 yd" and summary and n.parent==summary.parent then summaryDistance=n end end
+ check("collapsed panel retains current quest and distance",summary and summaryDistance and visible(summaryDistance) and W.MainFrame.h==48)
+ route.questName="The Long and Complicated Adventures of an Unusually Persistent Adventurer";W.UpdateUI()
+ check("long collapsed quest names retain the complete distance without overlap",summary.text:sub(-3)=="..." and summary:GetStringHeight()<=summary.h and visible(summaryDistance) and summaryDistance.text=="120 yd" and summaryDistance.w>=summaryDistance:GetStringWidth() and summary.points[1][2]+summary.w+10<=summaryDistance.points[1][2])
+ W.Navigation.distance=12400;W.UpdateLiveUI()
+ check("live collapsed distance changes reserve their full measured width",summaryDistance.text=="12.4 k yd" and summaryDistance.w>=summaryDistance:GetStringWidth() and summary.points[1][2]+summary.w+10<=summaryDistance.points[1][2] and summaryDistance.points[1][2]+summaryDistance.w==305)
+ W.Navigation.distance=0;W.UpdateLiveUI()
+ check("collapsed distance includes zero yards at the destination",summaryDistance.text=="0 yd" and visible(summaryDistance))
  W.Navigation.decisionID=W.Decision.id-1;W.UpdateLiveUI()
- check("collapsed summary clears a stale decision's distance",summary.text=="Readable quest")
+ check("collapsed summary clears a stale decision's distance and reclaims its width",not visible(summaryDistance) and summaryDistance.text=="" and summary.w==290)
+ route.questName="Readable quest";W.Navigation.decisionID=W.Decision.id;W.Navigation.distance=nil;W.UpdateUI()
+ check("collapsed quest uses full width when no distance is available",summary.text=="Readable quest" and summary.w==290 and not visible(summaryDistance))
+ W.Navigation.distance=120;W.UpdateLiveUI();W.GetProfile().collapsed=false;W.UpdateUI()
+ check("expanded guide restores subtitle width and hides compact distance",summary.w==290 and not visible(summaryDistance) and summaryDistance.text=="")
+ W.GetProfile().collapsed=true;W.UpdateUI();W.ToggleSettings()
+ check("preferences hide compact distance while restoring the subtitle width",summary.w==290 and not visible(summaryDistance) and summaryDistance.text=="")
+ W.ToggleSettings()
+ check("leaving preferences restores the collapsed distance",visible(summaryDistance) and summaryDistance.text=="120 yd" and W.MainFrame.h==48)
  local text=string.rep("Étoile ",20);W.FitCaption(titleNode,text)
  check("caption truncation preserves UTF-8 characters and readable size",not titleNode.text:find("\195%.%.%.") and titleNode.fontSize==16 and titleNode:GetStringHeight()<=40)
  W.GetProfile().collapsed=oldCollapsed;W.CurrentRoute=oldRoute;W.Navigation=oldNav;W.UpdateUI()

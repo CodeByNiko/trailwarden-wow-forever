@@ -104,8 +104,15 @@ local function layout()
     for i,r in ipairs(rows) do r:SetShown(not compact and i<=count and r.step~=nil) end
     fields.fold.label:SetText(compact and "+" or "-")
     local s=W.State;local r=W.CurrentRoute or {};local n=W.Navigation or {}
+    -- Reserve the measured distance width before shortening the quest caption.
+    -- Navigation from an older decision must never survive in the header.
+    local distance=compact and n.decisionID==(W.Decision and W.Decision.id or 0) and n.distance and W.FormatDistance(n.distance) or ""
+    fields.summaryDistance:SetText(distance);fields.summaryDistance:SetShown(distance~="")
+    local distanceWidth=distance~="" and math.ceil(fields.summaryDistance:GetStringWidth()) or 0
+    place(fields.summaryDistance,305-distanceWidth,27,distanceWidth,14)
+    fields.subtitle:SetWidth(290-(distanceWidth>0 and distanceWidth+10 or 0))
     if compact then
-        W.FitCaption(fields.subtitle,(r.questName or r.title or "Preparing your route")..(n.decisionID==(W.Decision and W.Decision.id or 0) and n.distance and (" · "..W.FormatDistance(n.distance)) or ""))
+        W.FitCaption(fields.subtitle,r.questName or r.title or "Preparing your route")
     elseif s then W.FitCaption(fields.subtitle,"Level "..s.level.." · "..(s.zone or "Questing")) end
 end
 function W.CreateUI()
@@ -119,6 +126,7 @@ function W.CreateUI()
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
     atText(head,"TRAILWARDEN",13,C.text,15,7,126,18)
     fields.subtitle=atText(head,"",11,C.muted,15,27,290,14);fields.subtitle:SetWordWrap(true)
+    fields.summaryDistance=atText(head,"",11,C.gold,305,27,0,14);fields.summaryDistance:SetJustifyH("RIGHT");fields.summaryDistance:SetWordWrap(false)
     fields.mode=atText(head,"",10,C.cyan,144,10,93,13);fields.mode:SetJustifyH("RIGHT")
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(322,1)
     local close=W.Button(head,"×",20,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(20)
