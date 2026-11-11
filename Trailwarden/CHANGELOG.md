@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.4
+- Hold new quest pickups when optional quest-type classification is unavailable; expose a clear Questie guidance message.
+- Preserve routing for already accepted quests and the existing combat-safety gates.
+
+## 1.8.3
 ## 1.8.3
 - Clear owned pins and waypoints together when navigation or access calculation fails.
 - Show a shared retry state across the panel, navigator, map overlay, and map waypoint.
