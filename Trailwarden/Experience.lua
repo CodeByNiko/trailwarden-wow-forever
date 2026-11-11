@@ -376,7 +376,7 @@ function W.PrepareQuestEconomies(candidates,state)
             combined.goals=merged;table.sort(combined.questIDs)
             for _,c in ipairs(list) do c.economyModel=combined;c.economy=W.ProjectQuestXP(combined,state.player,pace) end
             local projection=list[1].economy
-            if projection and projection.xpPerHour>0 then rates[#rates+1]=projection.xpPerHour end
+            if projection and projection.xpPerHour>0 and projection.confidence=="medium" then rates[#rates+1]=projection.xpPerHour end
         end
     end
     if state.experience and #rates>0 then table.sort(rates);state.experience.referenceRate=rates[math.ceil(#rates/2)] end
