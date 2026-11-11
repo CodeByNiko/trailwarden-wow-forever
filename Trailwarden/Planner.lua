@@ -92,6 +92,7 @@ end
 function W.ActiveSteps(q,state)
     local blocked={}
     local out={safetyBlocked=blocked}
+    if q.failed then return out end
     if q.isComplete then
         local p,source=relationPoint(q,"finishedBy","turnin",state)
         p=p or q.waypoint

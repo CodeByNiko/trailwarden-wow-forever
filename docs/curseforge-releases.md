@@ -25,7 +25,10 @@ Source setting changes tag classification.
 
 `.pkgmeta` flattens the repository's nested addon directory and uses the bundled
 `Trailwarden/CHANGELOG.md` as the CurseForge changelog. Development files remain
-outside the installable package. No external libraries or quest databases are
+outside the installable package. `required-dependencies` declares `questiedb`; the
+project Default Relations must also retain QuestieDB as Required Dependency.
+Default Relations do not retrofit existing files: inspect the file-specific
+Related Projects section when repairing an already published package. No external libraries or quest databases are
 downloaded into it.
 
 For each release, update the TOC, bundled README/version references, changelog,
@@ -47,3 +50,8 @@ Existing tags are not automatically replayed when a new webhook is installed.
 References:
 - https://support.curseforge.com/support/solutions/articles/9000197281
 - https://support.curseforge.com/support/solutions/articles/9000203228
+
+Optional real-provider check (developer dependencies only): install `lupa` and
+`cbor2`, extract the official QuestieDB Forever ZIP, then run
+`python3 tools/check_provider.py /path/to/QuestieDB`. It checks actual provider
+code/data with synthetic client APIs; it does not replace in-game testing.

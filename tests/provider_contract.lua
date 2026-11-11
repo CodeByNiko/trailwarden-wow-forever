@@ -7,6 +7,7 @@ TrailwardenDB=nil
 local epoch=1000;local failLevel=false;local nilLevel=false;local calls={};local timers={}
 local tableFields={startedBy=true,finishedBy=true,objectives=true,objectivesText=true,triggerEnd=true,preQuestGroup=true,preQuestSingle=true,childQuests=true,inGroupWith=true,exclusiveTo=true,requiredSkill=true,requiredMinRep=true,requiredMaxRep=true,requiredSourceItems=true,reputationReward=true,breadcrumbs=true,extraObjectives=true,requiredRanks=true}
 local ids={1,2,3}
+local unknownStarter=false
 LibQuestieDB={contractVersion=4,RequireContract=function(v) return v<=4 end,Enum={raceMaskById={[4]=8}},
  Quest={GetAllIds=function() return ids end,Get=function(id,key)
     assert(type(id)=="number" and type(key)=="string","Entity.Get must be dot-called")
@@ -15,13 +16,13 @@ LibQuestieDB={contractVersion=4,RequireContract=function(v) return v<=4 end,Enum
     if id==2 and key=="questLevel" and failLevel then error("transient provider failure") end
     if id==3 and key=="questLevel" and nilLevel then return nil end
     if key=="name" then return "Contract quest "..id end
-    if key=="startedBy" then return {{100}} end
+    if key=="startedBy" then return {{unknownStarter and id==2 and 102 or 100}} end
     if key=="finishedBy" or key=="objectives" then return {} end
     if tableFields[key] then return nil end
     if key=="questLevel" then return 7 end
     return 0
  end},
- Npc={Get=function(id,key) if id~=100 then return nil end if key=="name" then return "Contract giver" elseif key=="spawns" then return {[10]={{.5,.25}}} end return 0 end},
+ Npc={Get=function(id,key) if id~=100 and id~=101 and id~=102 then return nil end if key=="name" then return "Contract giver" elseif key=="spawns" then return {[10]=id==102 and {{-1,-1}} or id==101 and {{-1,-1},{.5,.25}} or {{.5,.25}}} end return 0 end},
  Support={Get=function(name) assert(name=="ZoneDB");return {private={areaIdToUiMapId="return { [10]=9999 }",areaIdToUiMapIdOverride="return { [10]=1438 }"}} end}}
 function UnitGUID(unit) return unit=="player" and "Player-Contract" or "Creature-0-0-0-0-100-1" end
 function UnitName(unit) return unit=="player" and "Contract" or "Contract giver" end
@@ -46,6 +47,10 @@ check("unknown entity fields remain nil",W.Q(999,"questLevel")==nil and W.Q(999,
 check("provider support strings and overrides are consumed",W.MapForArea(10)==1438)
 local points=W.EntityPoints("Npc",100)
 check("provider coordinates are percentages even below one",#points==1 and points[1].x==.005 and points[1].y==.0025)
+local mixed,mixedStatus=W.EntityPoints("Npc",101)
+check("unknown-position sentinels retain other valid spawn points",mixedStatus=="ok" and #mixed==1 and mixed[1].x==.005)
+local unmapped,unmappedStatus=W.EntityPoints("Npc",102)
+check("sentinel-only entities are unmapped rather than invalid",#unmapped==0 and unmappedStatus=="empty")
 failLevel=true;local value,status=W.Q(2,"questLevel");check("API failure is distinguishable from a nil field",value==nil and status=="error")
 failLevel=false;check("transient field errors are not cached as absence",W.Q(2,"questLevel")==7)
 nilLevel=true;value,status=W.Q(3,"questLevel");check("contract violation remains unknown",value==nil and status=="invalid")
@@ -54,7 +59,9 @@ local s=W.ReadCharacter();check("documented race-mask contract is used",s.raceMa
 W.ObserveQuest(1,"Contract quest 1","pickup");s=W.ReadCharacter();local observed=W.ObservedPoint(1,"pickup",s)
 check("live observation includes identity time units and provenance",observed and observed.x==.4 and observed.confidence=="interaction-area" and observed.entityID==100)
 epoch=1301;s=W.ReadCharacter();check("observation freshness has an explicit boundary",W.ObservedPoint(1,"pickup",s)==nil)
+unknownStarter=true
 W.BuildQuestCatalog();while #timers>0 do table.remove(timers,1)() end
+check("one unmapped starter cannot disable the entire quest catalog",W.CatalogReady and W.CatalogCount==3 and W.CatalogError==nil)
 local published=W.CatalogByMap;local supportAPI=LibQuestieDB.Support.Get
 LibQuestieDB.Support.Get=function() return nil end;W.BuildQuestCatalog(true)
 check("temporarily missing map support retains published data",not W.BuildingCatalog and W.CatalogByMap==published and W.CatalogError~=nil)

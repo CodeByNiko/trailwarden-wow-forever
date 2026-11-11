@@ -695,7 +695,20 @@ player.map=1438;maps[60]=nil
 log[#log+1]={id=99053,title="Escaping Ban'ethil",level=10,rows={{type="event",text="Escort Lynessa Duskblossom out of Ban'ethil",numFulfilled=0,numRequired=1}}};W.Refresh(true)
 check("accepted escort becomes the active task without an exit bearing",W.CurrentRoute.kind=="escort" and not W.CurrentRoute.point and not W.Navigation.bearing)
 check("active escort does not recommend running ahead to an endpoint",W.Navigation.label=="Stay with the escort")
-log[#log].complete=true;W.Refresh(true)
+-- Failed quests must invalidate the noisy-event throttle without waiting a minute.
+local escortIndex=#log
+local beforeFailure=W.Decision.id
+log[escortIndex].complete=-1;W.Refresh(false,"QUEST_LOG_UPDATE")
+check("failed escort immediately releases guidance on quest-log update",W.CurrentRoute.kind~="escort" and W.Decision.id>beforeFailure)
+check("failed escort has no direct actionable steps",#W.ActiveSteps(W.State.activeByID[99053],W.State)==0)
+log[escortIndex].complete=false;W.Refresh(false,"QUEST_LOG_UPDATE")
+check("restarted escort immediately becomes actionable again",W.CurrentRoute.kind=="escort")
+local failedPlanner=W.PlanRoute
+W.PlanRoute=function() error("synthetic failure at escort failure") end
+log[escortIndex].complete=-1;W.Refresh(true,"fault-test")
+check("planner recovery never preserves a failed escort",W.CurrentRoute.kind~="escort" and not W.CurrentRoute.point)
+W.PlanRoute=failedPlanner
+log[escortIndex].complete=true;W.Refresh(true)
 check("completed escort releases escort activity",W.CurrentRoute.kind~="escort")
 -- The general progress guideline also works without a named cave record.
 W.CaveAccess={};GetSubZoneText=function() return "Unmapped underground area" end

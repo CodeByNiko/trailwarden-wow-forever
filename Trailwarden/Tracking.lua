@@ -127,7 +127,7 @@ function W.ReadCharacter()
             end
             local m,x,y=W.Safe(ql.GetNextWaypoint,id);q.waypoint=W.Point(m,x,y)
             if q.waypoint then q.waypoint.source="Client waypoint" end
-            local fingerprint={tostring(id),tostring(q.isComplete),tostring(q.objectivesReady)}
+            local fingerprint={tostring(id),tostring(q.isComplete),tostring(q.failed),tostring(q.objectivesReady)}
             for _,o in ipairs(q.objectives) do fingerprint[#fingerprint+1]=table.concat({tostring(o.type),tostring(o.objectiveType),tostring(o.id),tostring(o.fulfilled),tostring(o.required),tostring(o.finished)},":") end
             q.fingerprint=table.concat(fingerprint,"/")
             state.activeQuests[#state.activeQuests+1]=q;state.activeByID[id]=q

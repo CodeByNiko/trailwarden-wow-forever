@@ -90,10 +90,15 @@ function W.EntityPoints(kind,id)
             for i=1,#coords,stride do
                 local c=coords[i]
                 if type(c)~="table" then return {},"invalid" end
-                local p=W.PercentPoint(mapID,c[1],c[2])
-                if not p then return {},"invalid" end
-                p.name=name;p.entityID=id;p.entityKind=kind;p.phase=c[3];p.source="QuestieDB";p.confidence="database"
-                points[#points+1]=p
+                -- QuestieDB uses {-1,-1} for a known entity without a mapped
+                -- position (for example an instance NPC). It is not a corrupt
+                -- coordinate and must not abort the entire quest catalog.
+                if c[1]~=-1 or c[2]~=-1 then
+                    local p=W.PercentPoint(mapID,c[1],c[2])
+                    if not p then return {},"invalid" end
+                    p.name=name;p.entityID=id;p.entityKind=kind;p.phase=c[3];p.source="QuestieDB";p.confidence="database"
+                    points[#points+1]=p
+                end
             end
         end
     end
