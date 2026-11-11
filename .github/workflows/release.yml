@@ -2,8 +2,14 @@ name: Verify and release Trailwarden
 on:
   push:
     branches: [main]
-    paths: ['Trailwarden/**', 'tools/**', 'tests/**', '.github/workflows/release.yml', 'docs/release-notes-*.md']
+    paths: ['Trailwarden/**', 'tools/**', 'tests/**', '.pkgmeta', '.github/workflows/release.yml', 'docs/release-notes-*.md']
   workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options: [beta, release]
+        default: beta
 permissions:
   contents: write
 concurrency:
@@ -11,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify-and-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,15 +33,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TRAILWARDEN_VERSION: ${{ steps.package.outputs.version }}
           TRAILWARDEN_ASSET: ${{ steps.package.outputs.asset }}
+          TRAILWARDEN_CHANNEL: ${{ inputs.channel || 'beta' }}
         run: |
           tag="v${TRAILWARDEN_VERSION}"
+          release_args=()
+          title="Trailwarden $TRAILWARDEN_VERSION"
+          if [ "$TRAILWARDEN_CHANNEL" = beta ]; then
+            tag="${tag}-beta"
+            title="$title - Forever Beta"
+            release_args+=(--prerelease)
+          elif [ "$TRAILWARDEN_CHANNEL" != release ]; then
+            echo "Unknown release channel: $TRAILWARDEN_CHANNEL" >&2
+            exit 1
+          fi
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $tag already exists; keeping the published archive."
           else
             gh release create "$tag" "$TRAILWARDEN_ASSET" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "Trailwarden $TRAILWARDEN_VERSION" \
+              --title "$title" "${release_args[@]}" \
               --notes-file "docs/release-notes-${TRAILWARDEN_VERSION}.md"
           fi
 

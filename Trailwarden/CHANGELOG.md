@@ -7,6 +7,7 @@
 - Show a proportional objective progress bar and a numeric count; hide it for steps without counts.
 - Separate planned quest names from their action/target, with hover feedback and readable truncation.
 - Keep the current quest and fresh distance visible when collapsed.
+- Reserve a separate distance field so long collapsed quest names cannot hide it.
 - Align preference labels and values, and let long instructions and warnings grow without clipping.
 - Retain the transparent compass pointer with larger distance and two-line captions; arrival reads "IN AREA".
 

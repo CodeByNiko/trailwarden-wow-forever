@@ -2,7 +2,7 @@
 
 A calm quest-routing companion that resumes from **the character you are playing**. Trailwarden reads your quest log and completed quests, chooses a useful next action, and guides you with its own movable arrow. Questie remains your quest tracker and map overlay.
 
-**[Download the latest installable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases/latest)**
+**[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
 ## New in 1.7.4: easier to read at a glance
 
@@ -37,7 +37,7 @@ Nearby eligible quest offers are retained as opportunities. Escort offers wait u
 
 ## Install or update
 
-1. Download `Trailwarden-1.7.4-Forever.zip` under the release's **Assets**.
+1. Open **Releases**, choose the newest Forever beta or stable version, and download its `Trailwarden-<version>-Forever.zip` under **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Trailwarden` with the `Trailwarden` folder inside the ZIP.
 3. Keep **QuestieDB for Forever**, **Questie** and your existing **OpenMap** enabled. Questie supplies the map-pin library; the core quest planner still requires QuestieDB.
 4. Start the game. Your character's route and navigator appear automatically. For an upgrade from Wayfinder, migrate your saved settings as described below.

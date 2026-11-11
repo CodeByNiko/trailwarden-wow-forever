@@ -81,7 +81,8 @@ quests still advance from real progress. Auto route respects this region;
 Replan region now in settings or /tw refresh can reconsider other zones.
 
 XP/h and next-level ETA use actual XP bar gains, including kills and quests.
-Travel/downtime count; explicit pause/AFK do not. The first minute collects data.
+Travel/downtime count; explicit pause/AFK do not. Five active minutes are
+required before measured XP/h and next-level ETA appear.
 Quest XP/h is an estimate of the remaining cycle, not a guaranteed rate.
 Unknown new quest rewards remain unknown; current Forever data is used.
 Short grind suggestions require verified local kill data and a clear advantage.
