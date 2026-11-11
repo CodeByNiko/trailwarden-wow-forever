@@ -28,6 +28,9 @@ function W.UpdateRouteOverlay()
         menuRegistered=status=="ok"
     end
     local n=W.Navigation;local travel=n and n.travel;local lib=pins()
+    if W.Decision and (not n or n.decisionID~=W.Decision.id or W.Decision.navigationError) then
+        W.ClearRouteOverlay();W.OverlayStatus="Synchronizing route";return
+    end
     if not lib or W.GetProfile().routeOverlay==false or not travel or not travel.goal then
         W.ClearRouteOverlay();W.OverlayStatus=not lib and "Map pins unavailable / Questie map library not loaded" or "Map pins inactive";return
     end

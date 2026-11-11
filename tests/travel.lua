@@ -82,6 +82,7 @@ LibStub=setmetatable({GetLibrary=function(self,name,silent) assert(self==LibStub
 W.Navigation={travel=a};W.UpdateRouteOverlay()
 check("no HBD is a graceful optional feature absence",#icons==0)
 available=true
+W.Navigation={decisionID=W.Decision.id,travel=a,navRoute=a.navRoute}
 local menu;OpenMapAPI={major=1,RegisterMenuToggle=function(owner,definition) menu=definition;check("OpenMap menu uses public addon registration",owner=="Trailwarden") end}
 W.UpdateRouteOverlay()
 check("entrance and objective use separate mini and world frames",#mini==2 and #world==2 and mini[1].icon~=world[1].icon)
@@ -89,7 +90,7 @@ check("minimap receives normalized entrance and parent/edge flags",mini[1].map==
 check("entrance cyan and goal gold remain distinct",mini[1].icon.pinTexture.color[2]==.9 and mini[2].icon.pinTexture.color[2]==.78)
 before=#mini;W.UpdateRouteOverlay()
 check("unchanged access points do not rebuild icons",#mini==before)
-W.Navigation={travel=W.ResolveAccess(outside,player,{})};W.UpdateRouteOverlay()
+W.Navigation={decisionID=W.Decision.id,travel=W.ResolveAccess(outside,player,{})};W.UpdateRouteOverlay()
 check("reused marker updates its tooltip and color",mini[#mini].icon.pinLabel=="Quest objective / not walking path" and mini[#mini].icon.pinTexture.color[2]==.78)
 local originalAdd=hbd.AddMinimapIconMap
 hbd.AddMinimapIconMap=function() error("map library refreshing") end
@@ -99,8 +100,10 @@ hbd.AddMinimapIconMap=originalAdd;before=#mini;W.UpdateRouteOverlay()
 check("map pins recover without another quest event",#mini>before and W.OverlayStatus=="Entrance/objective map pins active")
 menu.set(false)
 check("OpenMap visibility toggle persists character preference",not profile.routeOverlay and menu.get()==false)
-profile.routeOverlay=true;W.Navigation={travel={mode="none"}};W.UpdateRouteOverlay()
+profile.routeOverlay=true;W.Navigation={decisionID=W.Decision.id,travel={mode="none"}};W.UpdateRouteOverlay()
 check("no actionable route hides pooled icons",icons[1].hidden and icons[2].hidden)
+W.Decision={id=200};W.Navigation={decisionID=199,travel=a};W.UpdateRouteOverlay()
+check("stale decision map pins are cleared",icons[1].hidden and icons[2].hidden and W.OverlayStatus=="Synchronizing route")
 local priorInfo=C_Map.GetMapInfo;local priorZones=W.Zones
 W.Zones={[1438]={}}
 C_Map.GetMapInfo=function(id) return id==777 and {name="Unmapped floor",parentMapID=1438} or priorInfo(id) end

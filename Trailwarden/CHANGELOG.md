@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.3
+- Clear owned pins and waypoints together when navigation or access calculation fails.
+- Show a shared retry state across the panel, navigator, map overlay, and map waypoint.
+
+## 1.8.2
 ## 1.8.2
 - Match live objectives to provider targets by validated entity ID and objective type, then by unique text.
 - Keep ambiguous objective states unknown instead of assigning completion from list order.

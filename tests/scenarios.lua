@@ -213,12 +213,14 @@ local cross=W.Point(1438,.5,.5)
 check("different continents never invent direction",W.Bearing(cross,playerPoint)==nil)
 player.noPosition=true;check("missing position never reuses stale arrow",W.NavigationInfo({point=target,mapID=1431,x=target.x,y=target.y}).bearing==nil);player.noPosition=false
 local step={kind="objective",key="navtest",point=target,mapID=1431,x=target.x,y=target.y}
+local savedDecision=W.Decision;W.Decision=nil
 W.SyncWaypoint(step,true);local old=clearCount;W.ReleaseWaypoint();check("owned waypoint cleared",clearCount==old+1)
 W.SyncWaypoint(step,true);waypoint=UiMapPoint.CreateFromCoordinates(1431,.2,.2);old=clearCount;W.ReleaseWaypoint();check("another user waypoint is preserved",clearCount==old)
 local oldSet=setCount;W.GetProfile().mapSync=false;W.SyncWaypoint(step,true);check("custom navigation does not need map sync",setCount==oldSet and W.NavigationInfo(step).distance~=nil);W.GetProfile().mapSync=true
 local movedStep={kind="objective",key="navtest",point=W.Point(1431,.8,.5),mapID=1431,x=.8,y=.5}
 W.SyncWaypoint(step,true);oldSet=setCount;W.SyncWaypoint(movedStep,false);check("map waypoint follows a changed target within a step",setCount==oldSet+1)
 W.SyncWaypoint(movedStep,false);check("unchanged target does not repeatedly replace map waypoint",setCount==oldSet+1)
+W.Decision=savedDecision
 -- Skip is character-specific, expires and can be undone.
 log={};s=scan();r=plan();local skipped=r.questID;W.SkipCurrent();check("skip removes quest temporarily",not W.CurrentRoute.questID or W.CurrentRoute.questID~=skipped)
 W.UndoSkip();check("undo restores skipped quest",W.GetProfile().lastSkipped==nil and W.Count(W.GetProfile().skipped)==0)
@@ -446,6 +448,11 @@ W.ReadCharacter=captureAPI;W.Refresh(true)
 -- Every visible route consumer shares one committed decision.
 ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false}}}};W.Refresh(true)
 check("panel navigator and map consume one decision version",W.Decision.id==W.Navigation.decisionID and W.Decision.id==W.MainFrame.renderDecisionID and W.Decision.id==W.NavigatorFrame.renderDecisionID and W.Decision.id==W.WaypointDecisionID)
+local accessReader=W.ReadAccess;W.ReadAccess=function() error("synthetic access failure") end;W.Refresh(true)
+check("navigation failure publishes a shared safe wait state",W.Decision.navigationError and W.CurrentRoute.key=="navigation-error" and W.Navigation.decisionID==W.Decision.id and W.Navigation.travel.mode=="error")
+check("navigation failure clears only Trailwarden owned waypoint",waypoint==nil and W.WaypointDecisionID==W.Decision.id)
+W.ReadAccess=accessReader;W.UpdateNavigation()
+check("navigation recovers for the same decision without a quest event",not W.Decision.navigationError and W.CurrentRoute.key==W.Decision.route.key and W.Navigation.decisionID==W.Decision.id)
 local beforeInput=W.Json(W.Decision.detail.input);local statePin=W.Decision.detail.input.state.profile.pinned
 W.SelectRoute(W.Decision.detail.input)
 check("selector does not modify input or profile state",beforeInput==W.Json(W.Decision.detail.input) and statePin==W.Decision.detail.input.state.profile.pinned)
