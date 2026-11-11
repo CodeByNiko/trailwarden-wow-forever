@@ -91,6 +91,8 @@ Drag the window's header or the navigator to move them. **−/+** collapses the 
 
 Use `/tw language auto`, `/tw language en` or `/tw language da` to choose Trailwarden's action labels and map-cue language per character. The entrance and objective map pins include **E/Q** glyphs as well as color. QuestieDB quest names and in-game world names retain their source language.
 
+Hover the current target to see why it was selected and which other steps remain eligible. `/tw feedback` opens a copyable summary that excludes character and quest names, quest IDs, exact coordinates, preferences and raw error text. Nothing is sent automatically. `/tw debug` and `/tw trace` include more detailed information; review them before sharing.
+
 | Command | Action |
 | --- | --- |
 | `/tw` | Show/hide the guide |
@@ -109,6 +111,7 @@ Use `/tw language auto`, `/tw language en` or `/tw language da` to choose Trailw
 | `/tw reset` | Reset both window positions |
 | `/tw rebuild` | Rebuild the QuestieDB index after data changes |
 | `/tw trace` | Copy a bounded local decision replay; export before reload/logout |
+| `/tw feedback` | Open a minimal reviewable summary without character/quest names or location details |
 | `/tw xp` | Toggle XP-aware routing; measured statistics remain available |
 | `/tw xpreset` | Reset this character’s current XP session, retaining learned pace |
 | `/tw debug` | Copyable local diagnostics; nothing is transmitted |
