@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.2
+- Match live objectives to provider targets by validated entity ID and objective type, then by unique text.
+- Keep ambiguous objective states unknown instead of assigning completion from list order.
+
 ## 1.8.1
 - Refresh active quest guidance when the client waypoint changes without objective progress.
 - Release a stabilized client waypoint when a newer authoritative waypoint is reported.

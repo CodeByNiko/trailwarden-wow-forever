@@ -258,6 +258,10 @@ W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login i
 -- 1.1 quality regressions.
 ne();log={{id=40,title="Similar creature names",rows={{type="monster",objectiveID=9901,text="Dire Wolf: 4/4",finished=true},{type="monster",objectiveID=9902,text="Wolf: 0/4",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
 check("similar names and reversed objective order do not suppress unfinished target",#activeSteps==1 and activeSteps[1].target=="Wolf")
+log={{id=40,title="Similar creature names",rows={{type="monster",objectiveID=304,text="Generic target: 1/1",finished=true},{type="monster",objectiveID=303,text="Generic target: 0/1",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("verified objective IDs beat reversed generic live rows",#activeSteps==1 and activeSteps[1].objectiveID==303)
+log={{id=40,title="Similar creature names",rows={{type="monster",text="Generic target: 1/1",finished=true},{type="monster",text="Generic target: 0/1",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("ambiguous objectives stay unknown instead of inheriting provider order",#activeSteps==0 and #activeSteps.safetyBlocked>0)
 log={{id=41,title="Vendor supplies",rows={{type="item",text="Supply pack: 0/1",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
 check("vendor item instruction says buy",activeSteps[1] and activeSteps[1].instruction:find("Buy from Quartermaster",1,true)~=nil)
 check("source annotations do not mutate cached NPC points",W.EntityPoints("Npc",202)[1].acquisition==nil)
