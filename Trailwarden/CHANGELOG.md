@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.18
+- Restore the matched live objective row's text when building monster and item instructions.
+- Keep client-provided target wording visible instead of falling back to generic provider instructions.
+
 ## 1.8.17
 - Resolve the strongest objective-name match before considering whether that provider entity is already claimed by an ID match.
 - Keep a conflicting or already claimed long-name identity unknown instead of assigning its progress to a shorter substring target.

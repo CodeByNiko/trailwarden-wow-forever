@@ -123,7 +123,7 @@ function W.ActiveSteps(q,state)
         local entries=objectives[group] or {}
         local liveByEntry=matchObjectiveRows(q,group,entries)
         for i,entry in ipairs(entries) do
-            local live=liveByEntry[i]
+            local live=liveByEntry[i];local text=live and live.text
             if not live then
                 blocked[#blocked+1]={status="unknown",reason="Live objective could not be matched safely to its provider target"}
             elseif not live.finished then
