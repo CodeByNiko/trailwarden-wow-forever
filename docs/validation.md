@@ -1,60 +1,35 @@
-# Validation for 1.7.3 (feature branch)
+# Validation process and client evidence
 
-**440 checks and 40 replay frames** pass locally under both Lua 5.1.5 and the Lua 5.4 development fallback: 202 scenario/client, 70 pure engine, 21 provider/client, 74 XP, 36 combat safety and 37 access/map checks.
+## Automated release checks
 
-The previous branch's experience suite timed out on its first nonempty objective cycle. The corrected projection consumes a shrinking pending list and orders goals separately. Tests cover a route where the greedy ordering is 160 yards and the improved ordering is 140 yards, origin/pickup/return legs, once-only work/kill accounting, unchanged inputs, empty/coincident goals, malformed/sparse data, overflow, and bounded execution at the 64-goal limit. Forecasts above that limit remain unknown and retain normal quest-routing behavior. Two-opt has at most eight improving passes; these are direct-distance estimates, not terrain paths or a global optimum.
+Run `python3 tools/check.py` for installation-metadata checks, scenario/client simulations, pure route-engine checks, provider/client contracts, XP accounting, combat safety, travel, and replay verification. The local Lua runner uses Lua 5.4 with the compatibility layer; GitHub Actions repeats the suites under Lua 5.1.
 
-Additional client scenarios verify progress invalidates stale forecast quantities while unchanged data still uses the cache; collapse hides all body content; preview height follows actual rows; warnings, preview and XP do not overlap; nearby offers preserve data/combat warnings; long titles stay at least 11px and fit two lines; tooltip gaps do not discard later instructions; measured rate/ETA appear at five active minutes; and an out-of-date navigation decision cannot show an old bearing or arrival state.
+Every feature pull request also runs `python3 tools/check_install_matrix.py`, the installable package validator, and an integration check against the pinned QuestieDB Forever release. The integration loads real provider code and data under Lua 5.1 while client APIs, position, and objective counts remain synthetic. It is not a live-client test.
 
-Feature pushes and PRs now run the Lua 5.1 suite plus package validation through a read-only verification workflow. Each suite times out after 90 seconds and the CI job after five minutes. The release workflow remains separate. Local package validation checks the installable archive; repeat builds must be byte-identical. Updated `docs/previews/` renders use the actual frame calls with synthetic data and a substitute font. They support layout inspection and do not establish live WoW behavior.
+Use [the installation matrix](installation-matrix.md) to see which suite covers each addon combination. Use [the client smoke log template](client-smoke-template.md) to record the actual Forever build, installed addon versions, route behavior, and visual outcome. Keep that evidence separate from automated test results.
 
-Live Forever testing is still required for real fonts, readability at the chosen UI scale, actual cave/escort behavior and provider coverage. The feature branch is not a published release.
+The package builder checks TOC dependencies, required media, ZIP CRCs, and a single `Trailwarden/` root. Repeated builds from identical inputs must be byte-identical.
 
-# Validation for 1.7.1
+## Recorded evidence limits
 
-**409 checks and 40 replay frames** pass: 189 scenario/client, 70 pure engine, 21 provider/client, 56 XP, 36 combat safety and 37 access/map checks. Three new replay frames cover cave collection, last-item persistence and release after local completion.
+No automated scenario establishes real terrain connectivity, accurate transport routing, real fonts, in-game event timing, phase placement, or successful live cave navigation. Synthetic scenarios and provider contracts cannot replace testing in the actual Forever client. Do not mark a client smoke check as passed without running it in game.
 
-New synthetic integration tests reproduce Ban'ethil local collection versus Crown of the Earth, a closer outside item source, a remaining quest item, an eligible unaccepted Forever escort, discovery from a cave floor, accepted escort guidance and completion. Separate checks cover progress retention in an unnamed interior, missing-safe-source review and leaving an area. Engine tests challenge the policy with exaggerated outside XP, stale previous goals, floor maps, skips, manual focus, danger and unsafe targets. No successful real-client behavior is claimed yet.
+Historic feature-branch snapshots follow. Their counts and runtime notes describe those earlier branches, not the current release process.
 
-The runtime policy uses area/progress/event metadata rather than quest IDs. The real quest ID 99053 appears only in a provider-contract-shaped test fixture, based on current public QuestieDB Forever records; the original screenshot alone does not establish the user's installed database version or exact eligibility gate.
+## Archived: Validation for 1.7.3
 
-# Validation for 1.7.0
+The 1.7.3 feature branch recorded 440 checks and 40 replay frames under its then-current local and CI runners. It covered bounded quest-cycle optimization, objective refresh, panel layout scenarios, tooltip behavior, XP estimates, and navigation decision consistency. Those counts are a historical snapshot.
 
-The scoped OpenMap access release passes **368 checks and 37 replay frames**: 171 client/scenario, 49 pure engine, 21 provider/client, 56 experience, 36 combat safety and 35 access/map checks. Access tests cover live POI precedence, reference fallback, cave-stage truth, preserved arrival instructions, inverse map transforms, real callable-table LibStub lookup, HBD colon-call signatures, pin ownership, marker reuse and recovery from transient map errors.
+The branch used synthetic frame renders and did not establish live Forever behavior. The current commands and client evidence requirements are described above.
 
-`python3 tools/check.py` runs all suites. The installable package is checked for TOC files, media, ZIP CRCs and a single Wayfinder/ root. Two builds from the same inputs must be byte-identical. Frame renders include cave-access guidance and show synthetic data, not actual gameplay.
+## Archived: Validation for 1.7.1
 
-No test establishes real terrain connectivity or successful cave navigation. The accepted 1.7 scope is entrance-first guidance plus minimap/OpenMap markers, **without a continuous walking polyline**. Live validation is next; see [scope and test notes](V1.7-openmap-navigation.md).
+The 1.7.1 branch added three replay frames for cave collection, last-item persistence, and local-work release. Its scenarios used synthetic client data and did not establish successful real-client behavior.
 
-## Retained 1.6 coverage
+## Archived: Validation for 1.7.0
 
+The 1.7.0 OpenMap access branch recorded 368 checks and 37 replay frames. It covered entrance guidance, map transforms, marker ownership, and recovery from temporary map errors. It did not draw a continuous walking route or establish real terrain connectivity.
 
-Run `python3 tools/check.py`. The fail-fast suite currently passes **332 checks** and **37 replay frames**:
+## Archived: Validation for 1.6 and earlier
 
-| Suite | Count | Coverage |
-| --- | ---: | --- |
-| Client/scenario integration | 170 | Existing 1.0/1.1 regressions, quest truth, profiles, catalog recovery, coordinates, decision ownership, UI callbacks and trace export |
-| Pure route engine | 49 | No-client execution, immutable inputs, deterministic ordering, score sums, queue legs, nearby work, Duskwood and Teldrassil journeys, four-quest batching and level-aware deferral |
-| Provider/client contracts | 21 | Dot-call signatures, numeric zero/nil semantics, percent spawns, support strings, transient failures, race masks, observations, nullable client rows and shown/total log counts |
-| Experience | 56 | XP accounting, level-up ordering/correction, new rewards, full cycles, learning, ranking and grind decisions |
-| Combat safety | 36 | Source level/rank checks, live corrections, held goals and navigation interlocks |
-| Safety replay | 1 frame | Live level-29 danger overrides a committed goal |
-| XP replay | 1 frame | XP-aware unaccepted quest choice through the pure engine |
-| Journey replay | 31 frames | Expected decisions reproduced from synthetic serialized inputs |
-| Export replay | 4 frames | Exported synthetic integration decisions reproduced |
-
-Local execution uses system Lua 5.4 with test-only Lua 5.1 compatibility globals. GitHub Actions installs Lua 5.1 and repeats all suites before release publication. A failing suite prevents packaging/release. See [combat-level review](V1.6-combat-safety.md), [stability review](V1.5-stability.md), [XP validation and limits](V1.4-experience.md) and [1.3 regressions](V1.3-live-feedback.md).
-
-Contract fixtures follow primary sources pinned for review:
-
-- [QuestieDB documented API](https://github.com/Questie/QuestieDB/blob/5c14272d61ad2c8d08526b15d633322fc561588e/docs/api.md).
-- [Forever quest-log API](https://github.com/Gethe/wow-ui-source/blob/f0da0a9171aa736c8a64d2b3a8ae70195f5d2afb/Interface/AddOns/Blizzard_APIDocumentationGenerated/QuestLogDocumentation.lua).
-
-The package builder validates TOC dependencies, arrow asset, ZIP CRCs and the single `Wayfinder/` root. Deterministic metadata produces identical archives from identical inputs.
-
-Development renders in `docs/previews/` come from actual frame calls with synthetic quest data and a substitute font. They support spacing review; they are not in-game screenshots.
-
-Live-client testing remains outstanding. Synthetic scenarios and documented contracts cannot establish actual Forever database coverage, phase placement, transport behavior, or real event timing. `/wf debug` provides current diagnostics and `/wf trace` exports recent local decisions for reproducible follow-up. No real gameplay traces are bundled or claimed.
-
-Audit point 7 (performance profiling/budgets) is intentionally deferred. Existing 1.1 idle/movement regression checks remain, without a new performance claim.
-
+Older release records and contract references remain in the Git history. Current provider and client contracts are exercised through the versioned workflow and repository tests.

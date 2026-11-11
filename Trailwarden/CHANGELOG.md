@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.9
+- Reconcile current README, CurseForge description, validation guidance, and release instructions with the 1.8 feature line.
+- Enforce TOC/Common/changelog/release-note version consistency and unique changelog headings before tests and packaging.
+
 ## 1.8.8
 - Run provider contract checks against the pinned QuestieDB Forever 1.0.14 release in CI.
 - Check required/optional addon declarations and document the installation matrix and in-game smoke log.
@@ -14,22 +18,18 @@
 - Validate zone metadata and graph targets; explain when no supported neighboring zone is configured.
 
 ## 1.8.5
-## 1.8.5
 - Cache candidate clustering per planner pass and build the remaining queue once per leg instead of once per candidate.
 - Shorten only the queue preview above 128 candidates; preserve full evaluation of the primary route.
 - Skip candidate collection entirely while paused or dead and expose planner budget data in diagnostics.
 
 ## 1.8.4
-## 1.8.4
 - Hold new quest pickups when optional quest-type classification is unavailable; expose a clear Questie guidance message.
 - Preserve routing for already accepted quests and the existing combat-safety gates.
 
 ## 1.8.3
-## 1.8.3
 - Clear owned pins and waypoints together when navigation or access calculation fails.
 - Show a shared retry state across the panel, navigator, map overlay, and map waypoint.
 
-## 1.8.2
 ## 1.8.2
 - Match live objectives to provider targets by validated entity ID and objective type, then by unique text.
 - Keep ambiguous objective states unknown instead of assigning completion from list order.
