@@ -59,7 +59,26 @@ function W.NavigationInfo(route)
 end
 function W.UpdateNavigation()
     local decision=W.Decision
-    local n=readNavigation(decision and decision.route or W.CurrentRoute,W.Navigation)
+    local status,n=W.Call(readNavigation,decision and decision.route or W.CurrentRoute,W.Navigation)
+    if status~="ok" or n.travel and n.travel.mode=="error" then
+        local message=status~="ok" and tostring(n) or n.travel.label or "Access data unavailable"
+        local id=decision and decision.id or 0
+        W.Navigation={decisionID=id,label="Navigation unavailable",travel={mode="error",label="Navigation unavailable"}}
+        W.NavigationError=message
+        if decision then
+            decision.navigationError=message
+            W.CurrentRoute={kind="wait",key="navigation-error",title="Navigation unavailable",instruction="The current target could not be mapped safely. Trailwarden is retrying; no old map marker or waypoint is being kept.",reason=message,ownerKey=decision.state and decision.state.key}
+            W.Queue={}
+        end
+        W.WaypointDecisionID=id
+        if W.ClearRouteOverlay then W.ClearRouteOverlay() end
+        if W.ReleaseWaypoint then W.ReleaseWaypoint();W.WaypointStatus="Navigation unavailable" end
+        return W.Navigation
+    end
+    W.NavigationError=nil
+    if decision and decision.navigationError then
+        decision.navigationError=nil;W.CurrentRoute=decision.route;W.Queue=decision.queue or {}
+    end
     n.decisionID=decision and decision.id or 0;W.Navigation=n
     if W.SyncWaypoint then W.SyncWaypoint(decision and decision.route or W.CurrentRoute,false) end
     return n
@@ -132,7 +151,8 @@ end
 function W.SyncWaypoint(route,force)
     W.WaypointDecisionID=W.Decision and W.Decision.id or 0
     local n=W.Navigation
-    if n and n.decisionID==W.WaypointDecisionID and (not route or route==W.CurrentRoute or W.Decision and route==W.Decision.route) then
+    if W.Decision then
+        if not n or n.decisionID~=W.Decision.id then W.ReleaseWaypoint();W.WaypointStatus="Synchronizing route";return end
         route=n.navRoute
     end
     if not W.GetProfile().mapSync then W.ReleaseWaypoint();W.WaypointStatus="Map sync off";return end
