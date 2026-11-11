@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 17718)
-Total output lines: 763
-
 -- Deterministic game/client doubles; no live gameplay claims.
 unpack=unpack or table.unpack;loadstring=loadstring or load;math.atan2=math.atan2 or function(y,x) return math.atan(y,x) end
 local player={guid="Player-NE",name="Raelorn",class="WARRIOR",className="Warrior",race=4,raceName="Night Elf",map=1438,x=.56,y=.6,level=7}
@@ -231,7 +228,331 @@ player.dead=true;plan();check("death suspends quest navigation",W.CurrentRoute.k
 -- Live negative gossip is scoped to this exact quest snapshot, not permanent.
 dwarf();log={};local gs=scan();offers={};W.ObserveGossip();gs=W.ScanCharacter()
 check("live gossip removes phantom offers at the inspected NPC",not W.IsQuestAvailable(1,gs))
-log={{id=10,title="The Ni…7718 tokens truncated…2 and instruction.h>=instruction:GetStringHeight() and W.MainFrame.h>shortHeight and -strip.points[1][3]>=-instruction.points[1][3]+instruction.h+10)
+log={{id=10,title="The Night Watch",rows={{type="monster",text="Skeleton",objectiveID=300}}}};gs=scan()
+check("quest changes invalidate negative gossip",W.IsQuestAvailable(1,gs))
+check("group option starts excluded",not W.IsQuestAvailable(13,gs));gs.profile.includeGroup=true;check("group option can include eligible elites",W.IsQuestAvailable(13,gs));gs.profile.includeGroup=false
+log={{id=777,title="New high-level quest",level=45,wp={1431,.5,.5},rows={{type="event",text="New content"}}}};gs=scan();plan();local clientStep=W.ActiveSteps(gs.activeQuests[1],gs)[1];check("accepted quests retain client waypoint beyond pickup comfort",clientStep~=nil)
+W.GetProfile().pinned=clientStep.key;W.Refresh(true);local waypointDecision=W.Decision.id;local waypointX=W.CurrentRoute.x;log[1].wp={1431,.8,.5};W.Refresh(false,"QUEST_LOG_UPDATE")
+check("client waypoint-only changes invalidate the quest signature",W.Decision.id==waypointDecision+1 and W.CurrentRoute.x==.8 and W.CurrentRoute.x~=waypointX)
+waypointDecision=W.Decision.id;W.Refresh(false,"QUEST_LOG_UPDATE")
+check("unchanged waypoint events remain throttled",W.Decision.id==waypointDecision)
+-- A working area remains stable until its objective changes.
+ne();log={{id=32,title="Two creatures",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false},{type="monster",objectiveID=302,text="Webwood spider",finished=false}}}}
+gs=scan();local working=W.ActiveSteps(gs.activeQuests[1],gs)[1];W.GetProfile().pinned=working.key;W.Refresh(true);local oldX=W.CurrentRoute.x
+player.x=.615;player.y=.615;W.Refresh(false)
+check("moving within an objective does not chase a different spawn",W.CurrentRoute.key==working.key and W.CurrentRoute.x==oldX)
+log[1].rows[1].finished=true;W.Refresh(false);check("finished objective releases focused step",W.CurrentRoute.key~=working.key)
+-- Level 7 stays in Kalimdor even with an unrelated Eastern Kingdoms quest.
+ne();log={{id=10,title="The Night Watch",level=23,rows={{type="monster",objectiveID=300,text="Skeleton"}}}};scan();local rr=plan();check("night elf route stays local",rr.mapID==1438)
+-- Old 0.3.0 stages do not leak into a new profile.
+TrailwardenDB.profiles["Fresh - Forever"]={waterTotemStage=5,navigatorHidden=true};player.name="Fresh";player.guid="Player-Fresh";local fresh=W.GetProfile()
+check("migration preserves display preference",fresh.navigatorHidden==true)
+check("migration removes class-specific manual stage",fresh.waterTotemStage==nil and fresh.completed~=TrailwardenDB.profiles["Player-Dwarf"].completed)
+
+-- All UI and login code executes against a strict frame API double.
+ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
+check("main and navigator created",W.MainFrame and W.NavigatorFrame)
+check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h<500)
+check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
+W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
+-- 1.1 quality regressions.
+ne();log={{id=40,title="Similar creature names",rows={{type="monster",objectiveID=9901,text="Dire Wolf: 4/4",finished=true},{type="monster",objectiveID=9902,text="Wolf: 0/4",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("similar names and reversed objective order do not suppress unfinished target",#activeSteps==1 and activeSteps[1].target=="Wolf")
+log={{id=41,title="Vendor supplies",rows={{type="item",text="Supply pack: 0/1",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("vendor item instruction says buy",activeSteps[1] and activeSteps[1].instruction:find("Buy from Quartermaster",1,true)~=nil)
+check("source annotations do not mutate cached NPC points",W.EntityPoints("Npc",202)[1].acquisition==nil)
+log={{id=31,title="Two items",rows={{type="item",text="First item",finished=true},{type="item",text="Second item",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("object item instruction says search",activeSteps[1] and activeSteps[1].instruction:find("Search Quest chest",1,true)~=nil)
+dwarf();log={{id=15,title="Gather wolf pelts",rows={{type="item",text="Wolf pelt",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("creature item instruction says defeat",activeSteps[1] and activeSteps[1].instruction:find("Defeat Skeleton",1,true)~=nil)
+check("non-finite map inputs rejected",W.Point(1431,0/0,.5)==nil and W.Point(1431,math.huge,.5)==nil)
+local worldAPI=C_Map.GetWorldPosFromMapPos
+C_Map.GetWorldPosFromMapPos=function(id,p) if id==999 then return 0,CreateVector2D(0,0) end return worldAPI(id,p) end
+check("degenerate map transform does not report false position",W.Point(999,.5,.5).wx==nil)
+C_Map.GetWorldPosFromMapPos=worldAPI;maps[999]={c=0,ox=0,oy=0,w=4000,h=3000}
+check("map transform recovers when data becomes valid",W.Point(999,.5,.5).wx~=nil)
+local facingAPI=GetPlayerFacing;GetPlayerFacing=function() return nil end
+local pnt=W.Point(1431,.8,.5)
+check("missing facing is explicit",W.NavigationInfo({kind="objective",key="facing",point=pnt,mapID=1431,x=.8,y=.5}).label=="Facing unavailable")
+GetPlayerFacing=facingAPI
+player.x=.5;player.y=.5
+local near=W.Point(1431,.5033,.5);local arrival={kind="pickup",key="arrival",point=near,mapID=1431,x=near.x,y=near.y}
+check("arrival enters within interaction radius",W.NavigationInfo(arrival).arrived==true)
+player.x=.4986;check("arrival tolerates small position jitter",W.NavigationInfo(arrival).arrived==true)
+player.x=.496;check("arrival releases after leaving area",W.NavigationInfo(arrival).arrived~=true)
+W.SyncWaypoint(arrival,true);old=clearCount
+local setAPI=C_Map.SetUserWaypoint;C_Map.SetUserWaypoint=function() return false end
+W.SyncWaypoint({kind="pickup",key="rejected",point=pnt,mapID=1431,x=.8,y=.5},true)
+check("rejected replacement clears stale owned marker",clearCount==old+1 and W.WaypointStatus=="Map waypoint rejected")
+C_Map.SetUserWaypoint=setAPI
+local p=W.GetProfile();p.uiScale=0/0;p.maxLevelAbove=999;p.locked="bad";p=W.GetProfile()
+check("invalid saved preference values repaired",p.uiScale==.9 and p.maxLevelAbove==2 and p.locked==false)
+p.skipped.expired=epoch-1;p.lastSkipped="expired";W.GetProfile();check("expired skip clears undo state",p.lastSkipped==nil)
+local moduleAPI=QuestieLoader.ImportModule;local moduleCalls=0;local late=nil
+QuestieLoader.ImportModule=function(self,name) if name=="LateModule" then moduleCalls=moduleCalls+1;return late end return moduleAPI(self,name) end
+check("unavailable modules can be retried",W.Import("LateModule")==nil);late={ready=true};check("late module becomes available",W.Import("LateModule")==late)
+W.Import("LateModule");check("available module imports are reused",moduleCalls==2)
+QuestieLoader.ImportModule=moduleAPI
+-- Idle work is throttled, while movement/events still update the route.
+ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false}}}};W.Refresh(true)
+local executions=W.PlanExecutions
+for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2) end
+check("standing still avoids repeated full planning",W.PlanExecutions==executions)
+epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
+epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
+log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+3)
+W.PinStep(W.ActiveSteps(W.State.activeByID[2],W.State)[1])
+local planAPI=W.PlanRoute;W.PlanRoute=function() error("synthetic planner failure") end;W.Refresh(true)
+check("planning failure retains a freshly verified unfinished step",W.CurrentRoute.questID==2 and W.CurrentRoute.kind=="objective" and W.LastError~=nil)
+W.PlanRoute=planAPI;W.Refresh(true);check("successful refresh clears current error and retains recovery details",W.LastError==nil and W.RecoveredError~=nil)
+-- Visible UI controls perform their advertised actions.
+W.ToggleSettings();local group=button("Quest difficulty:");group.scripts.OnClick();check("group setting callback updates character preference",W.GetProfile().includeGroup==true);group.scripts.OnClick()
+local lock=button("Window positions:");lock.scripts.OnClick();check("window lock preference enabled",W.GetProfile().locked==true)
+local header
+for _,n in ipairs(nodes) do if n.parent==W.MainFrame and n.scripts.OnDragStart then header=n end end
+local mainMoves=W.MainFrame.moves or 0;local navMoves=W.NavigatorFrame.moves or 0
+header.scripts.OnDragStart();W.NavigatorFrame.scripts.OnDragStart(W.NavigatorFrame)
+check("locked windows ignore accidental drags",(W.MainFrame.moves or 0)==mainMoves and (W.NavigatorFrame.moves or 0)==navMoves)
+lock.scripts.OnClick();header.scripts.OnDragStart();W.NavigatorFrame.scripts.OnDragStart(W.NavigatorFrame)
+check("unlocked windows remain draggable",W.MainFrame.moves==mainMoves+1 and W.NavigatorFrame.moves==navMoves+1)
+button("Back to your route").scripts.OnClick()
+W.GetProfile().paused=true;W.Refresh(true);button("Resume route").scripts.OnClick();check("resume button actually resumes routing",not W.GetProfile().paused and W.CurrentRoute.key~="paused")
+W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately visible",undo.shown==true);undo.scripts.OnClick();check("undo control restores quest",W.GetProfile().lastSkipped==nil and undo.shown==false)
+W.Queue={};W.UpdateUI();local empty
+for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
+check("empty planned list explains what happens next",empty and empty.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides body content",W.MainFrame.h==48 and not empty.shown and not undo.shown)
+local function visible(n) return n.shown and (not n.parent or visible(n.parent)) end
+local bodyHidden=true
+for _,n in ipairs(nodes) do if n.parent==empty.parent and visible(n) then bodyHidden=false end end
+check("collapse hides navigation labels and all other body children",bodyHidden)
+W.GetProfile().collapsed=false;W.Refresh(true)
+local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest title ",5)
+W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
+local titleNode
+for _,n in ipairs(nodes) do if n.kind=="font" and n.text:sub(1,20)==longTitle:sub(1,20) then titleNode=n end end
+check("long current titles keep two readable lines",titleNode and titleNode.fontSize==16 and titleNode:GetStringHeight()<=40 and titleNode.text:sub(-3)=="...")
+W.CurrentRoute=originalRoute;W.UpdateUI()
+do
+ local oldError,oldUnmapped,oldDetail=W.CatalogError,W.Unmapped,W.Decision.detail
+ local oldQueue,oldCount=W.Queue,W.GetProfile().queueRows
+ W.CatalogError="synthetic catalog fault";W.Unmapped={{safety=true,reason="Enemy above cap"}}
+ W.Decision.detail={opportunities={{name="A nearby escort",activity="escort"}}}
+ W.Queue={};for i=1,4 do W.Queue[i]=W.Copy(W.CurrentRoute) end
+ W.GetProfile().queueRows=4;W.UpdateUI()
+ local warning,xpBox
+ for _,n in ipairs(nodes) do
+  if n.kind=="font" and n.text:find("Quest data needs attention",1,true) then warning=n end
+  if n.kind=="font" and n.text=="YOUR XP / HOUR" then xpBox=n.parent end
+ end
+ check("nearby offers preserve catalog and combat warnings",warning and warning.text:find("combat objective",1,true) and warning.text:find("nearby",1,true))
+ local xpTop=-xpBox.points[1][3];local clear=true
+ for _,n in ipairs(nodes) do
+  if n.step and visible(n) then
+   local top=-n.points[1][3]
+   if top< -warning.points[1][3]+warning.h+20 or top+n.h>xpTop-8 then clear=false end
+  end
+ end
+ check("warnings preview and XP occupy separate vertical space",clear)
+ W.GetProfile().queueRows=0;W.UpdateUI()
+ check("warnings remain visible when the preview is disabled",visible(warning) and -xpBox.points[1][3]>=-warning.points[1][3]+warning.h)
+ W.CatalogError=oldError;W.Unmapped=oldUnmapped;W.Decision.detail=oldDetail;W.Queue=oldQueue;W.GetProfile().queueRows=oldCount;W.UpdateUI()
+ local statsAPI=W.SafeExperienceStats
+ local sample={available=true,maximum=1000,windowSeconds=299,rate=12000,eta=210}
+ W.SafeExperienceStats=function() return sample end
+ local rate,eta
+ for _,n in ipairs(nodes) do if n.parent==xpBox and n.kind=="font" then local pnt=n.points[1];if pnt[3]==-21 then if pnt[2]==10 then rate=n else eta=n end end end end
+ W.UpdateLiveUI();check("both rate and ETA wait until five active minutes",rate.text=="Learning..." and eta.text=="Building sample")
+ sample.windowSeconds=300;W.UpdateLiveUI();check("stable sample displays measured rate and finite ETA",rate.text=="12,000" and eta.text=="~4m")
+ sample.rate=0;sample.eta=nil;W.UpdateLiveUI();check("stable zero rate has no fabricated ETA",rate.text=="0" and eta.text=="--")
+ sample.paused=true;W.UpdateLiveUI();check("paused sample hides rate and ETA",rate.text=="Paused" and eta.text=="--")
+ sample.paused=false;sample.maximum=0;W.UpdateLiveUI();check("level cap has no next-level ETA",rate.text=="Level cap" and eta.text=="--")
+ W.SafeExperienceStats=statsAPI;W.UpdateLiveUI()
+ local tooltipAPI=GameTooltip;local tooltipLines={}
+ GameTooltip={SetOwner=function() end,SetText=function() end,AddLine=function(_,text) tooltipLines[#tooltipLines+1]=text end,Show=function() end}
+ W.Tooltip(W.MainFrame,"Test",{[1]="First",[3]="Details after an unavailable line"})
+ check("optional tooltip gaps do not discard later guidance",#tooltipLines==2 and tooltipLines[2]=="Details after an unavailable line")
+ GameTooltip=tooltipAPI
+ local nav=W.Navigation;local profile=W.GetProfile();local hidden=profile.navigatorHidden
+ profile.navigatorHidden=false
+ W.Navigation={decisionID=W.Decision.id-1,bearing=1,facing=0,arrived=true,distance=20};W.UpdateNavigator()
+ local staleHidden,syncShown=true,false
+ for _,n in ipairs(nodes) do if n.parent==W.NavigatorFrame then
+  if (n.texture or ""):find("Arrow.tga",1,true) or n.text=="IN AREA" then if visible(n) then staleHidden=false end end
+  if n.text=="Synchronizing route" and visible(n) then syncShown=true end
+ end end
+ check("navigator clears stale bearing and arrival after a new decision",staleHidden and syncShown)
+ W.Navigation=nav;profile.navigatorHidden=hidden;W.UpdateNavigator()
+end
+
+-- 1.2 foundation regressions; these were demonstrated during the audit.
+ne();player.guid="Player-Foundation";player.name="Foundation";log={};complete={};W.CurrentRoute=nil
+quests[1001]={name="Offer ending after turn-in",questLevel=7,startedBy={{201}},availableUntilCompleted=24}
+W.ObserveQuest(1001,quests[1001].name,"pickup");s=W.ScanCharacter();check("fresh offer initially eligible",W.IsQuestAvailable(1001,s))
+W.RememberTurnIn(24);s=W.ScanCharacter();local gate=W.QuestEligibility(1001,s)
+check("confirmed turn-in overrides old live offer",gate.status=="blocked" and gate.reason=="Availability ended by turn-in")
+quests[1002]={name="Disabled offer",questLevel=7,startedBy={{201}},disabledByQuest=26}
+W.ObserveQuest(1002,quests[1002].name,"pickup");log={{id=26,title="Blocking quest"}};s=W.ScanCharacter()
+check("active blocking quest overrides old offer",W.QuestEligibility(1002,s).status=="blocked")
+quests[1003]={name="Live race exception",questLevel=7,requiredRaces=4,startedBy={{201}}}
+log={};W.ObserveQuest(1003,quests[1003].name,"pickup");s=W.ScanCharacter();check("fresh observation can resolve a static race discrepancy",W.IsQuestAvailable(1003,s))
+log={{id=2,title="Warrior training"}};s=W.ScanCharacter();check("progression change invalidates a previous offer exception",not W.IsQuestAvailable(1003,s))
+local oldHistory=C_QuestLog.GetAllCompletedQuestIDs;C_QuestLog.GetAllCompletedQuestIDs=function() error("History loading") end
+log={};s=W.ScanCharacter();check("unavailable history stays unknown despite cached completions",not s.historyReady and W.QuestEligibility(36,s).status=="unknown")
+C_QuestLog.GetAllCompletedQuestIDs=oldHistory
+local oldInfo=C_QuestLog.GetInfo;log={{id=2,title="Warrior training"}};C_QuestLog.GetInfo=function() return nil end
+W.Refresh(true);check("incomplete log waits without producing actionable guidance",W.CurrentRoute.kind=="wait" and not W.State.questLogReady and not W.CurrentRoute.point)
+C_QuestLog.GetInfo=oldInfo
+local oldObjectives=C_QuestLog.GetQuestObjectives;C_QuestLog.GetQuestObjectives=function() return nil end
+s=W.ScanCharacter();check("unknown objective state is not treated as a delivery",not s.activeQuests[1].objectivesReady and #W.ActiveSteps(s.activeQuests[1],s)==0)
+C_QuestLog.GetQuestObjectives=oldObjectives
+s=W.ScanCharacter();local savedProfile=W.GetProfile();savedProfile.completed[777]=true;savedProfile.paused=not s.profile.paused
+check("captured state does not alias mutable saved progression",not s.completed[777] and s.profile.paused~=savedProfile.paused)
+savedProfile.paused=false
+savedProfile.skipped="bad";savedProfile.offers=42;savedProfile.locations=false;savedProfile.gossip="bad";savedProfile.panelPoint={point="BAD",relativePoint="CENTER",x=0,y=0}
+savedProfile=W.GetProfile();check("nested saved containers and invalid anchors recover",type(savedProfile.skipped)=="table" and type(savedProfile.offers)=="table" and type(savedProfile.locations)=="table" and type(savedProfile.gossip)=="table" and savedProfile.panelPoint==nil)
+quests[1004]={name="Receiver corrected",questLevel=7,finishedBy={{201}}}
+savedProfile.locations["turnin:1004"]={mapID=1431,x=.1,y=.1,units="normalized",name="Old receiver",entityID=201,entityKind="Npc",seen=epoch-1000000,provider=W.ProviderIdentity()}
+log={{id=1004,title="Receiver corrected",complete=true}};s=W.ScanCharacter();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
+check("expired observation yields to current database receiver",activeSteps[1].mapID==1438)
+local location=savedProfile.locations["turnin:1004"];location.seen=epoch;location.provider.version="older-provider";s=W.ScanCharacter()
+check("provider version change invalidates observed coordinates",W.ObservedPoint(1004,"turnin",s)==nil)
+location.provider=W.ProviderIdentity();location.entityID=999;s=W.ScanCharacter();check("different NPC identity invalidates observation",W.ObservedPoint(1004,"turnin",s)==nil)
+check("percent coordinate conversion below one percent is explicit",math.abs(W.PercentPoint(1438,.5,.25).x-.005)<.000001 and W.Point(1438,50,25)==nil)
+-- Catalog replacement is atomic; failures are bounded and restartable.
+local published=W.CatalogByMap;local countBefore=W.CatalogCount;local originalSpawns=npcs[201].spawns
+npcs[201].spawns="malformed";W.BuildQuestCatalog(true)
+check("failed build releases the building flag",not W.BuildingCatalog and W.CatalogError~=nil)
+check("failed build retains the previously published index",W.CatalogByMap==published and W.CatalogCount==countBefore)
+drain();check("automatic failure retries are bounded",not W.BuildingCatalog and #tasks==0)
+npcs[201].spawns=originalSpawns;W.BuildQuestCatalog(true)
+check("partial new catalog is never published",W.CatalogByMap==published and W.BuildingCatalog)
+drain();check("explicit rebuild recovers and replaces catalog atomically",W.CatalogReady and not W.BuildingCatalog and W.CatalogError==nil and W.CatalogByMap~=published)
+-- Unreadable rows stay explicitly unknown; capture failures are contained.
+local rowAPI=C_QuestLog.GetInfo;C_QuestLog.GetInfo=function() return {isHeader=false,questID=0} end
+log={{id=2,title="Warrior training"}};W.Refresh(true);check("placeholder quest IDs do not imply a complete log",not W.State.questLogReady and W.CurrentRoute.kind=="wait")
+C_QuestLog.GetInfo=rowAPI
+local objectiveAPI=C_QuestLog.GetQuestObjectives;C_QuestLog.GetQuestObjectives=function() return {{text="Malformed objective",type="monster",numFulfilled="bad",numRequired=1}} end
+s=W.ScanCharacter();check("malformed objective counts remain unknown",not s.activeQuests[1].objectivesReady)
+C_QuestLog.GetQuestObjectives=objectiveAPI
+local captureAPI=W.ReadCharacter;W.ReadCharacter=function() error("synthetic capture failure") end
+W.Refresh(true);check("capture-stage failure clears actionable guidance safely",W.CurrentRoute.key=="error" and not W.CurrentRoute.point and W.Navigation.decisionID==W.Decision.id)
+W.ReadCharacter=captureAPI;W.Refresh(true)
+
+-- Every visible route consumer shares one committed decision.
+ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false}}}};W.Refresh(true)
+check("panel navigator and map consume one decision version",W.Decision.id==W.Navigation.decisionID and W.Decision.id==W.MainFrame.renderDecisionID and W.Decision.id==W.NavigatorFrame.renderDecisionID and W.Decision.id==W.WaypointDecisionID)
+local beforeInput=W.Json(W.Decision.detail.input);local statePin=W.Decision.detail.input.state.profile.pinned
+W.SelectRoute(W.Decision.detail.input)
+check("selector does not modify input or profile state",beforeInput==W.Json(W.Decision.detail.input) and statePin==W.Decision.detail.input.state.profile.pinned)
+log[#log+1]={id=36,title="Object starter"};W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_ACCEPTED",36);drain()
+log[1].complete=true;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain()
+table.remove(log,1);W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_TURNED_IN",2);drain()
+check("local replay retains accept objective and turn-in transitions",#(W.ReplayFrames or {})>=4)
+local export=W.ExportReplay("synthetic-contract")
+check("local replay contains objectives provider and expected decisions",export:find('"schema":1',1,true) and export:find('"objective',1,true) and export:find('"expected"',1,true) and export:find('"provider"',1,true))
+check("replay removes player identifiers",not export:find('Player-NE',1,true) and not export:find('Raelorn',1,true))
+local traceFile=io.open('tests/replay-export.json','w');traceFile:write(export);traceFile:close()
+
+-- 1.3 live-report regressions: level-22 cemetery batch and level-aware deferral.
+dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685
+npcs[2100]={name="Insane Ghoul",minLevel=23,maxLevel=24,spawns={[10]={{79.8,68.6}}}}
+npcs[2101]={name="Spider",minLevel=23,maxLevel=24,spawns={[10]={{60,30}}}}
+items[2100]={name="Skeleton Finger",npcDrops={2100}}
+items[2101]={name="Ghoul Fang",npcDrops={2100}}
+items[2102]={name="Vial of Spider Venom",npcDrops={2101}}
+quests[2100]={name="The Totem of Infliction",questLevel=25,finishedBy={{100}},objectives={[3]={{2101},{2102},{2100}}}}
+log={{id=10,title="The Night Watch",level=24,complete=true},{id=2100,title="The Totem of Infliction",level=25,rows={
+ {type="item",text="Ghoul Fang: 0/10",numFulfilled=0,numRequired=10},
+ {type="item",text="Vial of Spider Venom: 0/5",numFulfilled=0,numRequired=5},
+ {type="item",text="Skeleton Finger: 7/10",numFulfilled=7,numRequired=10}}}}
+C_QuestLog.GetMaxNumQuestsCanAccept=function() return 40 end
+W.Refresh(true)
+check("live cemetery report keeps level-25 accepted collection quest",W.CurrentRoute.questID==2100 and W.CurrentRoute.kind=="objective")
+check("all unfinished item objectives map without client objective IDs",#W.ActiveSteps(W.State.activeByID[2100],W.State)==3)
+check("queue retains other local objectives from the same quest",W.Queue[1] and W.Queue[1].questID==2100 and W.Queue[1].kind=="objective")
+check("known return to town waits for remaining local collection",W.Decision.detail.candidates[1].questID~=10 and W.CurrentRoute.mapID==1431)
+check("quest capacity uses Forever client API",W.State.logLimit==40 and W.State.freeSlots==38)
+log[2].rows[3].finished=true;log[2].rows[3].numFulfilled=10;W.Refresh(false)
+check("finishing fingers still retains remaining local ghoul objective",W.CurrentRoute.questID==2100 and W.CurrentRoute.target=="Ghoul Fang")
+log[2].rows[1].finished=true;log[2].rows[1].numFulfilled=10;W.Refresh(false)
+check("return to town becomes available after local batch is complete",W.CurrentRoute.kind=="turnin" and W.CurrentRoute.questID==10)
+log[2].rows[1].finished=false;log[2].rows[1].numFulfilled=0;log[2].rows[3].finished=false;log[2].rows[3].numFulfilled=7;W.Refresh(true)
+local actualLog=log;log={};for i=1,29 do log[i]={id=3000+i,title="Capacity quest"} end
+local forty=W.ReadCharacter();check("29 of 40 quests leaves eleven free slots",forty.questLogReady and forty.freeSlots==11)
+log=actualLog;W.Refresh(true)
+check("above-range quest offers explicit skip for now",button("Skip for now").enabled)
+button("Skip for now").scripts.OnClick()
+local deferredStep;for _,step in ipairs(W.Queue) do if step.questID==2100 then deferredStep=step end end
+check("skip for now preserves quest as a later queue entry",W.GetProfile().deferredLevels[2100]==25 and deferredStep and deferredStep.levelDeferred and deferredStep.resumeLevel==23 and W.CurrentRoute.questID~=2100)
+check("level deferral is independent of the 15-minute skip",not W.GetProfile().skipped["quest:2100"])
+epoch=epoch+1000;W.Refresh(true);check("level deferral does not expire on the clock",W.GetProfile().deferredLevels[2100]==25)
+W.PinStep(deferredStep);check("later queue step can explicitly resume now",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+W.DeferCurrent();player.level=23;W.Refresh(false,"PLAYER_LEVEL_UP")
+check("deferred quest returns automatically within level range",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+player.level=22;W.GetProfile().pinned=nil;W.Refresh(true);W.DeferCurrent();W.GetProfile().maxLevelAbove=4;W.Refresh(true)
+check("changing level range reactivates deferred quests",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+W.GetProfile().maxLevelAbove=2;W.Refresh(true);W.DeferCurrent();W.UndoSkip()
+check("undo restores a level-deferred quest",W.GetProfile().deferredLevels[2100]==nil and W.CurrentRoute.questID==2100)
+W.DeferCurrent();W.GetProfile().panelPoint={point="CENTER",relativePoint="CENTER",x=0,y=0}
+local batchProfile=W.GetProfile();ne();W.Refresh(true)
+check("level deferrals remain character-specific",W.GetProfile().deferredLevels[2100]==nil and batchProfile.deferredLevels[2100]==25)
+dwarf();player.guid="Player-Batch";player.x=.797;player.y=.685;log=actualLog;log[2].complete=true;W.Refresh(true)
+check("completed deferred quest always becomes a turn-in",W.GetProfile().deferredLevels[2100]==nil and W.ActiveSteps(W.State.activeByID[2100],W.State)[1].kind=="turnin")
+C_QuestLog.GetMaxNumQuestsCanAccept=function() error("temporarily unavailable") end
+MAX_QUESTLOG_QUESTS=40;check("capacity falls back safely when client call fails",W.ReadCharacter().logLimit==40)
+MAX_QUESTLOG_QUESTS=nil;C_QuestLog.GetMaxNumQuestsCanAccept=nil
+-- Display adjustments are independent, persistent and bounded.
+SlashCmdList.TRAILWARDEN("scale 75");SlashCmdList.TRAILWARDEN("arrowscale 85")
+check("panel and arrow accept independent exact scales",W.MainFrame.scale==.75 and W.NavigatorFrame.scale==.85)
+SlashCmdList.TRAILWARDEN("scale 1");SlashCmdList.TRAILWARDEN("arrowscale 999")
+check("display scales clamp to usable limits",W.MainFrame.scale==.6 and W.NavigatorFrame.scale==1.5)
+W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
+local scaleHeader;for _,n in ipairs(nodes) do if n.parent==W.MainFrame and n.scripts.OnDragStart then scaleHeader=n end end
+scaleHeader.scripts.OnMouseWheel(scaleHeader,-1)
+check("header mouse wheel resizes panel only",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==1)
+W.NavigatorFrame.scripts.OnMouseWheel(W.NavigatorFrame,-1)
+check("arrow mouse wheel resizes navigator only",W.NavigatorFrame.scale==.95 and W.MainFrame.scale==.85)
+W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.NavigatorFrame.scripts.OnMouseWheel(W.NavigatorFrame,-1)
+check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
+W.GetProfile().locked=false
+check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==174 and W.NavigatorFrame.h==122)
+local savedQueue=W.Queue;W.Queue={}
+for i=1,4 do W.Queue[i]=W.Copy(W.CurrentRoute) end
+W.GetProfile().queueRows=4;W.UpdateUI();local fourHeight=W.MainFrame.h
+W.GetProfile().queueRows=2;W.UpdateUI();check("four actual preview steps add only their two row heights",fourHeight-W.MainFrame.h==88)
+W.GetProfile().queueRows=0;W.UpdateUI();check("preview can be hidden while keeping a compact next-step card",W.MainFrame.h<410)
+local hiddenHeight=W.MainFrame.h;W.Queue={W.Copy(W.CurrentRoute)};W.GetProfile().queueRows=4;W.UpdateUI();local oneHeight=W.MainFrame.h
+W.GetProfile().queueRows=2;W.UpdateUI();check("unused preview slots do not leave blank space",W.MainFrame.h==oneHeight and oneHeight<fourHeight)
+W.Queue=savedQueue
+W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
+
+-- Content-sized layout must expand for guidance, then shrink again. Keep the
+-- provider/route unchanged; exercise both initial rendering and live navigation.
+do
+ local oldRoute,oldNav=W.CurrentRoute,W.Navigation
+ local oldCollapsed=W.GetProfile().collapsed
+ local route=W.Copy(oldRoute);route.kind="objective";route.questName="Readable quest";route.instruction="Continue here."
+ route.required=10;route.remaining=3;W.CurrentRoute=route
+ W.Navigation={decisionID=W.Decision.id,distance=120,label="Following your step"}
+ W.UpdateUI();local shortHeight=W.MainFrame.h
+ local count,track,fill
+ for _,n in ipairs(nodes) do
+  if n.kind=="font" and n.text=="7 / 10" then count=n end
+  if n.kind=="texture" and n.parent and n.parent.w==268 and n.parent.h==3 then fill=n;track=n.parent end
+ end
+ check("objective progress has a readable count and proportional bar",count and count.fontSize==10 and visible(track) and fill.w==268*.7)
+ route.remaining=10;W.UpdateUI();check("zero progress does not draw a misleading filled sliver",not fill.shown)
+ route.required=nil;W.UpdateUI();check("non-counted steps hide the progress bar",not track.shown and count.text=="")
+ route.required=10;route.remaining=3
+ local longInstruction=string.rep("Follow the road to the entrance and use the lower tunnel. ",6)
+ W.Navigation.travel={instruction=longInstruction};W.UpdateUI()
+ local instruction,strip
+ for _,n in ipairs(nodes) do
+  if n.kind=="font" and n.text==longInstruction then instruction=n end
+  if n.kind=="font" and n.text=="120 yd" then strip=n.parent end
+ end
+ check("long travel guidance grows without shrinking or clipping",instruction and instruction.fontSize==12 and instruction.h>=instruction:GetStringHeight() and W.MainFrame.h>shortHeight and -strip.points[1][3]>=-instruction.points[1][3]+instruction.h+10)
  W.Navigation.travel.instruction=route.instruction;W.UpdateLiveUI()
  check("live instruction changes reclaim unused panel space",W.MainFrame.h==shortHeight)
  W.GetProfile().collapsed=true;W.UpdateUI();local summary,summaryDistance
