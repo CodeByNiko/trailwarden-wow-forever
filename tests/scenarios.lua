@@ -140,7 +140,7 @@ local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=
  IsDailyQuest=function() return false end,IsWeeklyQuest=function() return false end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Locale","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Trailwarden/"..file..".lua") end
+for _,file in ipairs({"Common","Locale","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Core","Commands"}) do dofile("Trailwarden/"..file..".lua") end
 local W=Trailwarden
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end

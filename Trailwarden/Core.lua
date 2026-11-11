@@ -63,62 +63,6 @@ local function schedule(force,event)
     end
     if C_Timer then C_Timer.After(.5,update) else update() end
 end
-function W.TargetExplanation()
-    local route=W.CurrentRoute or {};local detail=W.Decision and W.Decision.detail or {}
-    local lines={route.reason or route.instruction or "Trailwarden is waiting for reliable quest data."}
-    local count=tonumber(detail.candidateCount) or 0
-    if count>0 then lines[#lines+1]=count.." eligible step(s) were considered." end
-    local shown=0
-    for _,candidate in ipairs(detail.candidates or {}) do
-        if candidate.key~=route.key and shown<2 then
-            local name=candidate.questName or candidate.title
-            if type(name)=="string" and name~="" then
-                local distance=W.IsFinite(candidate.distance) and (" · "..W.FormatDistance(candidate.distance)) or ""
-                lines[#lines+1]="Also eligible: "..name..distance;shown=shown+1
-            end
-        end
-    end
-    if shown>0 then lines[#lines+1]="Other eligible steps remain in the planned list." end
-    return lines
-end
-function W.Diagnostics()
-    local s=W.State or W.ReadCharacter();local r=W.CurrentRoute or {};local n=W.Navigation or {}
-    local lines={"Trailwarden "..W.Version,"Decision: "..tostring(W.Decision and W.Decision.id).." / navigation "..tostring(n.decisionID).." / map "..tostring(W.WaypointDecisionID),
-        "Character: "..s.name.." / "..s.raceName.." "..s.className.." / level "..s.level,
-        "Zone: "..s.zone.." / map "..tostring(s.mapID),"Quest log ready: "..tostring(s.questLogReady).." / history ready: "..tostring(s.historyReady),
-        "Quest log: "..#s.activeQuests.." active / "..s.completedCount.." completed / revision "..tostring(s.revision),
-        "Catalog: "..tostring(W.CatalogState).." / "..tostring(W.CatalogCount or 0).." quests / "..tostring(W.DatabaseStatus),"Catalog error: "..tostring(W.CatalogError or "none"),
-        "Step: "..tostring(r.key).." / "..tostring(r.title),"Target: "..tostring(r.target).." / "..tostring(r.mapID).." / "..tostring(r.x)..", "..tostring(r.y),
-        "Map pins: "..tostring(W.OverlayStatus),"Planner work area: "..tostring(s.workArea and s.workArea.id).." / region "..tostring(s.regionMapID),
-        "Access: "..tostring(n.travel and n.travel.mode).." / cave "..tostring(n.travel and n.travel.caveID).." / source "..tostring(n.travel and n.travel.entry and n.travel.entry.accessSource).." / error "..tostring(W.AccessError or "none"),
-        "Navigation: "..(n.label or "none").." / distance "..tostring(n.distance),"Last plan: "..string.format("%.2f",W.LastPlanMilliseconds or 0).." ms / event "..tostring(W.LastEvent),
-        "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /tw trace (last 20 decisions)","Deferred / unmapped:"}
-    for _,issue in ipairs(s.readIssues or {}) do lines[#lines+1]="Read issue: "..issue end
-    for _,q in ipairs(W.Unmapped or {}) do lines[#lines+1]=q.id.." / "..q.title.." / "..q.reason end
-    local e=W.SafeExperienceStats()
-    lines[#lines+1]="XP: "..W.FormatXP(e.totalXP).." / rolling "..W.FormatXP(e.rate).." per hour / next level "..W.FormatETA(e.eta)
-    lines[#lines+1]="XP sources: "..e.kills.." rewarded kills / "..e.turnins.." turn-ins / "..e.questXP.." event quest XP"
-    lines[#lines+1]="XP pace: "..string.format("%.1f",e.moveSpeed).." yards/sec / "..string.format("%.1f",e.killSeconds).." seconds/kill"
-    lines[#lines+1]="XP quest model: "..(r.economy and W.FormatXP(r.economy.xpPerHour) or "unknown").." / "..(r.economy and r.economy.confidence or "unknown")
-    if e.calibration then lines[#lines+1]="Last quest XP calibration: "..tostring(e.calibration.questID).." / predicted "..W.FormatXP(e.calibration.expectedXP).." / actual "..W.FormatXP(e.calibration.actualXP).." / error "..string.format("%.1f%%",e.calibration.percentError)..(e.calibration.percentError>=50 and " (large estimate error)" or "") end
-    lines[#lines+1]="Region plan: "..tostring(W.Decision and W.Decision.commitment and W.Decision.commitment.mapID)
-    lines[#lines+1]="Forecast error: "..tostring(W.ForecastError or "none").." / learning error: "..tostring(W.LearningError or "none")
-    lines[#lines+1]="Combat target cap: +"..W.CombatLevelMargin.." / risk revision "..tostring(s.combatSafety and s.combatSafety.revision)
-    for issue in pairs(s.policyIssues or {}) do lines[#lines+1]="Quest policy: "..issue end
-    lines[#lines+1]="Planning: "..tostring(W.PlanExecutions).." selections / "..tostring(W.ForecastBuilds or 0).." forecasts / "..tostring(W.ForecastCacheHits or 0).." cached forecasts"
-    local planDetail=W.Decision and W.Decision.detail or {}
-    lines[#lines+1]="Planner budget: "..tostring(planDetail.candidateCount or 0).." candidates / "..tostring(planDetail.scoreEvaluations or 0).." scores / preview shortened="..tostring(planDetail.queuePreviewShortened==true)
-    for id,message in pairs(W.TargetErrors or {}) do lines[#lines+1]="Target "..id..": "..message end
-    lines[#lines+1]="Active quest objectives:"
-    for _,q in ipairs(s.activeQuests) do
-        lines[#lines+1]=q.id.." / "..q.title.." / complete="..tostring(q.isComplete).." / objectives ready="..tostring(q.objectivesReady)
-        for _,o in ipairs(q.objectives) do lines[#lines+1]="  "..tostring(o.type).." / "..tostring(o.id).." / "..o.text.." / "..tostring(o.fulfilled).."/"..tostring(o.required).." / done="..tostring(o.finished) end
-    end
-    lines[#lines+1]="Output/data errors:"
-    for key,value in pairs(W.OutputErrors or {}) do lines[#lines+1]=key..": "..value end
-    for key,value in pairs(W.DataIssues or {}) do lines[#lines+1]=key..": "..value end
-    return table.concat(lines,"\n")
-end
 for _,event in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
     W.LastEvent=event
@@ -173,40 +117,3 @@ frame:SetScript("OnUpdate",function(_,dt)
         end
     end
 end)
-SLASH_TRAILWARDEN1="/trailwarden";SLASH_TRAILWARDEN2="/tw"
-SlashCmdList.TRAILWARDEN=function(message)
-    local cmd=string.lower((message or ""):match("^%s*(.-)%s*$"));local p=W.GetProfile()
-    local scale=cmd:match("^scale%s+(%d+)$");local arrowScale=cmd:match("^arrowscale%s+(%d+)$")
-    if scale or arrowScale then W.SetDisplayScale(scale and "uiScale" or "navigatorScale",tonumber(scale or arrowScale)/100);return end
-    local language=cmd:match("^language%s+(%a+)$")
-    if language then
-        language=string.lower(language)
-        if language=="auto" or language=="en" or language=="da" then
-            p.language=language;W.ActionLabels={escort=W.L("action_escort"),grind=W.L("action_grind"),pickup=W.L("action_pickup"),objective=W.L("action_objective"),turnin=W.L("action_turnin"),deliver=W.L("action_deliver"),item=W.L("action_item"),travel=W.L("action_travel"),wait=W.L("action_wait")}
-            print("|cff5dd4d6Trailwarden|r "..W.L("language_changed"));W.Refresh(true);W.ClearRouteOverlay();W.UpdateRouteOverlay()
-        else print("|cff5dd4d6Trailwarden|r "..W.L("language_usage")) end
-        return
-    end
-    if cmd=="" then W.ToggleUI()
-    elseif cmd=="arrow" then W.ToggleNavigator()
-    elseif cmd=="routepins" then p.routeOverlay=not p.routeOverlay;W.ClearRouteOverlay();W.UpdateRouteOverlay()
-    elseif cmd=="settings" then W.ToggleSettings()
-    elseif cmd=="lock" then p.locked=not p.locked;W.Refresh(true)
-    elseif cmd=="refresh" then p.pinned=nil;W.Refresh(true,"manual-replan")
-    elseif cmd=="rebuild" then W.BuildQuestCatalog(true)
-    elseif cmd=="skip" then W.SkipCurrent()
-    elseif cmd=="later" then W.DeferCurrent()
-    elseif cmd=="undo" then W.UndoSkip()
-    elseif cmd=="pause" then p.paused=true;W.Refresh(true)
-    elseif cmd=="resume" then p.paused=false;p.pinned=nil;W.Refresh(true)
-    elseif cmd=="group" then p.includeGroup=not p.includeGroup;W.Refresh(true)
-    elseif cmd=="auto" then p.mapSync=not p.mapSync;W.Refresh(true)
-    elseif cmd=="reset" then p.panelPoint=nil;p.navigatorPoint=nil;W.ApplyPositions()
-    elseif cmd=="debug" then W.ShowDiagnostics()
-    elseif cmd=="feedback" then W.ShowDiagnostics(W.ExportFeedback())
-    elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
-    elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
-    elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, language auto|en|da, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, feedback (reviewable summary), trace (local replay), xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
-end
-
