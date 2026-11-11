@@ -294,7 +294,8 @@ function W.CollectCandidates(state)
         end
     end
     if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state) end
-    return {candidates=out,deferred=deferred,gates=gates,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
+    local policyUnknown=false;for _,gate in pairs(gates) do if gate.status=="unknown" and gate.source=="policy" then policyUnknown=true;break end end
+    return {candidates=out,deferred=deferred,gates=gates,policyUnknown=policyUnknown,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
 W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
 local function planningMap(c) return c.regionMapID or c.mapID end
@@ -352,6 +353,7 @@ local function fallback(input)
     local title,text="Finding your next quest"
     if not s.questLogReady then title="Waiting for your quest log";text="The live quest log is not ready. Trailwarden will retry without guessing your progress."
     elseif not m.ready then text=m.databaseStatus
+    elseif m.policyUnknown then title="Quest review needed";text="Questie is optional. Without its quest policy module, Trailwarden holds new database quest pickups whose PvP, raid or group type cannot be confirmed. Install Questie or use it to review new quests; accepted quests remain usable."
     elseif not s.historyReady then text="Waiting for completed quest history. Active quests remain usable; database pickups wait for confirmation."
     elseif s.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
     elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /tw debug for details."

@@ -85,6 +85,7 @@ function W.Diagnostics()
     lines[#lines+1]="Region plan: "..tostring(W.Decision and W.Decision.commitment and W.Decision.commitment.mapID)
     lines[#lines+1]="Forecast error: "..tostring(W.ForecastError or "none").." / learning error: "..tostring(W.LearningError or "none")
     lines[#lines+1]="Combat target cap: +"..W.CombatLevelMargin.." / risk revision "..tostring(s.combatSafety and s.combatSafety.revision)
+    for issue in pairs(s.policyIssues or {}) do lines[#lines+1]="Quest policy: "..issue end
     lines[#lines+1]="Planning: "..tostring(W.PlanExecutions).." selections / "..tostring(W.ForecastBuilds or 0).." forecasts / "..tostring(W.ForecastCacheHits or 0).." cached forecasts"
     for id,message in pairs(W.TargetErrors or {}) do lines[#lines+1]="Target "..id..": "..message end
     lines[#lines+1]="Active quest objectives:"

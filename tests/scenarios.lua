@@ -136,6 +136,8 @@ end
 LibQuestieDB={Quest=db(quests),Npc=db(npcs),Item=db(items),Object=db(objects),contractVersion=4,RequireContract=function() return true end,
  Enum={raceMaskById={[3]=4,[4]=8}},Support={Get=function() return {private={areaIdToUiMapId="return { [10]=1431, [20]=1438, [30]=1439 }"}} end}}
 local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=function(id) return id==17 end,
+ IsRaidQuest=function() return false end,IsDungeonQuest=function() return false end,IsRepeatable=function() return false end,
+ IsDailyQuest=function() return false end,IsWeeklyQuest=function() return false end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
 for _,file in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Trailwarden/"..file..".lua") end
@@ -233,6 +235,11 @@ check("live gossip removes phantom offers at the inspected NPC",not W.IsQuestAva
 log={{id=10,title="The Night Watch",rows={{type="monster",text="Skeleton",objectiveID=300}}}};gs=scan()
 check("quest changes invalidate negative gossip",W.IsQuestAvailable(1,gs))
 check("group option starts excluded",not W.IsQuestAvailable(13,gs));gs.profile.includeGroup=true;check("group option can include eligible elites",W.IsQuestAvailable(13,gs));gs.profile.includeGroup=false
+local groupClassifier=qmodule.IsGroupQuest;qmodule.IsGroupQuest=nil;gs.profile.includeGroup=false
+local unknownGate=W.QuestEligibility(13,gs)
+check("QuestieDB-only installation holds unclassified pickups as unknown",unknownGate.status=="unknown" and unknownGate.source=="policy")
+check("QuestieDB-only policy explains the missing classification",unknownGate.reason:find("Questie",1,true)~=nil)
+qmodule.IsGroupQuest=groupClassifier;check("Questie installation applies group classification",not W.IsQuestAvailable(13,gs))
 log={{id=777,title="New high-level quest",level=45,wp={1431,.5,.5},rows={{type="event",text="New content"}}}};gs=scan();plan();local clientStep=W.ActiveSteps(gs.activeQuests[1],gs)[1];check("accepted quests retain client waypoint beyond pickup comfort",clientStep~=nil)
 W.GetProfile().pinned=clientStep.key;W.Refresh(true);local waypointDecision=W.Decision.id;local waypointX=W.CurrentRoute.x;log[1].wp={1431,.8,.5};W.Refresh(false,"QUEST_LOG_UPDATE")
 check("client waypoint-only changes invalidate the quest signature",W.Decision.id==waypointDecision+1 and W.CurrentRoute.x==.8 and W.CurrentRoute.x~=waypointX)
