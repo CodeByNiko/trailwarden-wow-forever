@@ -29,34 +29,44 @@ local function relationPoint(q,field,kind,state)
     return (kind=="pickup" and nearestObjective(points,state) or W.NearestPoint(points,state.player,state.mapID)),"QuestieDB"
 end
 local typeName={[1]="monster",[2]="object",[3]="item"}
-local function objectiveFinished(q,group,index,entry,entries)
+local function matchObjectiveRows(q,group,entries)
     local kind=typeName[group]
     local entityKind=group==1 and "Npc" or group==2 and "Object" or "Item"
     local typed={}
     for _,row in ipairs(q.objectives) do if row.type==kind then typed[#typed+1]=row end end
-    local assigned,used={},{}
+    local matched,used={},{}
+    local function validEntityID(value) return type(value)=="number" and W.IsFinite(value) and value>0 and value%1==0 end
+    -- The client's objective ID is useful only inside the matching objective
+    -- type. Duplicate IDs on either side are not authoritative.
     for rowIndex,row in ipairs(typed) do
+        if validEntityID(row.id) then
+            local candidateIndex,candidateCount=nil,0
+            for i,candidate in ipairs(entries) do if validEntityID(candidate[1]) and candidate[1]==row.id then candidateIndex=i;candidateCount=candidateCount+1 end end
+            local rowCount=0;for _,other in ipairs(typed) do if other.id==row.id then rowCount=rowCount+1 end end
+            if candidateCount==1 and rowCount==1 then matched[candidateIndex]=row;used[rowIndex]=true end
+        end
+    end
+    -- Fall back to text only when it identifies one remaining provider entity
+    -- unambiguously. Never infer completion from provider/list order.
+    local proposals={}
+    for rowIndex,row in ipairs(typed) do if not used[rowIndex] and type(row.text)=="string" then
         local winner,length,tied=nil,0,false
-        for i,candidate in ipairs(entries) do
+        for i,candidate in ipairs(entries) do if not matched[i] then
             local name=W.DBGet(entityKind,candidate[1],"name")
-            if name and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
+            if type(name)=="string" and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
                 if #name>length then winner,length,tied=i,#name,false elseif #name==length then tied=true end
             end
-        end
-        if winner and not tied and not assigned[winner] then assigned[winner]=row;used[rowIndex]=true end
+        end end
+        if winner and not tied then proposals[rowIndex]=winner end
+    end end
+    local proposalCounts={};for _,candidateIndex in pairs(proposals) do proposalCounts[candidateIndex]=(proposalCounts[candidateIndex] or 0)+1 end
+    for rowIndex,candidateIndex in pairs(proposals) do
+        if proposalCounts[candidateIndex]==1 and not matched[candidateIndex] then matched[candidateIndex]=typed[rowIndex] end
     end
-    if #typed==#entries then
-        local missingEntries,missingRows={},{}
-        for i=1,#entries do if not assigned[i] then missingEntries[#missingEntries+1]=i end end
-        for i,row in ipairs(typed) do if not used[i] then missingRows[#missingRows+1]=row end end
-        if #missingEntries==1 and #missingRows==1 then assigned[missingEntries[1]]=missingRows[1]
-        elseif #missingEntries==#entries then
-            -- If no names are available, retain the provider's type-local order.
-            for i,row in ipairs(typed) do assigned[i]=row end
-        end
-    end
-    local row=assigned[index]
-    return row and row.finished or false,row and row.text,row
+    -- A sole live row and sole provider entity form a unique pair even when
+    -- the client omits objective IDs and localized text omits the entity name.
+    if #typed==1 and #entries==1 and not matched[1] then matched[1]=typed[1] end
+    return matched
 end
 local function entityObjectivePoints(kind,id,state,blocked,combat)
     if kind=="Npc" and combat~=false then return W.CombatPoints(id,state,blocked) end
@@ -111,9 +121,12 @@ function W.ActiveSteps(q,state)
     local objectives=W.Q(q.id,"objectives") or {}
     for group=1,3 do
         local entries=objectives[group] or {}
+        local liveByEntry=matchObjectiveRows(q,group,entries)
         for i,entry in ipairs(entries) do
-            local finished,text,live=objectiveFinished(q,group,i,entry,entries)
-            if not finished then
+            local live=liveByEntry[i]
+            if not live then
+                blocked[#blocked+1]={status="unknown",reason="Live objective could not be matched safely to its provider target"}
+            elseif not live.finished then
                 local riskStart=#blocked
                 local kind=group==1 and "Npc" or "Object"
                 local points=group==3 and itemPoints(entry[1],state,blocked) or entityObjectivePoints(kind,entry[1],state,blocked)
