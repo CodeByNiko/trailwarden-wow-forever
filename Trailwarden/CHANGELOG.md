@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.5
+
+- Immediately invalidate cached guidance when a quest fails or restarts, including active escorts.
+- Never retain a failed quest as fallback guidance after a planner error.
+- Treat QuestieDB {-1,-1} positions as unmapped; retain valid alternatives and allow catalog loading when map metadata is unavailable.
+- Declare QuestieDB as a required CurseForge dependency.
+- Add regression coverage and an optional integration check against the official QuestieDB Forever package.
+
 ## 1.7.4
 
 - Increase objective, instruction, queue and navigator text sizes; improve secondary-text contrast.

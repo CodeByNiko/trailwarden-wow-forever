@@ -6,6 +6,10 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
+## New in 1.7.5: reliable quest updates
+
+Failed quests, including escorts, release guidance immediately. Unknown-position markers in quest data no longer stop catalog loading when map metadata is unavailable. CurseForge packages declare QuestieDB as a required dependency.
+
 ## New in 1.7.4: easier to read at a glance
 
 Larger text, clearer contrast and a content-sized quest card put the current objective first. Progress uses a count and a slim bar; distance is part of the same card. Planned steps separate the quest name from its action, while the collapsed guide retains your current quest and distance. Navigator captions are larger and preferences use aligned labels and values.

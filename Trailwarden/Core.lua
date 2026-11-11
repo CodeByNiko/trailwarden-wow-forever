@@ -30,7 +30,7 @@ function W.Refresh(force,trigger)
         -- Preserve only a step revalidated against the fresh live quest log.
         local prior=W.Decision and W.Decision.route
         local q=captured and state.questLogReady and prior and state.activeByID and state.activeByID[prior.questID]
-        if q and not (state.combatSafety and state.combatSafety.alert) and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
+        if q and not q.failed and not (state.combatSafety and state.combatSafety.alert) and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
             local status,steps=W.Call(W.ActiveSteps,q,state)
             if status=="ok" then for _,step in ipairs(steps) do if step.key==prior.key then route=step;route.ownerKey=state.key;break end end end
         end

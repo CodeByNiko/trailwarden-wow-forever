@@ -1,6 +1,9 @@
 package-as: Trailwarden
 enable-nolib-creation: no
 
+required-dependencies:
+  - questiedb
+
 # The repository keeps the installable addon below its root. Flatten it so the
 # archive installs as Trailwarden/Trailwarden.toc, not Trailwarden/Trailwarden/.
 move-folders:
