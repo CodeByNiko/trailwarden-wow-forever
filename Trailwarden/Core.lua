@@ -45,6 +45,7 @@ function W.Refresh(force,trigger)
     if detail and detail.clearPin then W.GetProfile().pinned=nil;state.profile.pinned=nil end
     if state.questLogReady then W.LastGoodState=W.Copy(state) end
     render("navigation",W.UpdateNavigation)
+    W.NavigationPanelRefresh=nil -- The complete panel render below consumes any transition.
     render("waypoint",W.SyncWaypoint,decision.route,force)
     local panelOK=render("panel",W.UpdateUI)
     if not panelOK and W.MainFrame then W.MainFrame:Hide() end
@@ -103,7 +104,15 @@ frame:SetScript("OnUpdate",function(_,dt)
         if W.State then render("route overlay",W.UpdateRouteOverlay) end
         if W.Safe(W.PollCombatSafety) then W.Refresh(false,"combat-safety") end
     end
-    if navElapsed>=.1 then navElapsed=0;if W.State then render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator);render("live panel",W.UpdateLiveUI) end end
+    if navElapsed>=.1 then
+        navElapsed=0
+        if W.State then
+            render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator)
+            if W.NavigationPanelRefresh then
+                W.NavigationPanelRefresh=nil;render("navigation transition panel",W.UpdateUI)
+            else render("live panel",W.UpdateLiveUI) end
+        end
+    end
     if planElapsed>=2 then
         planElapsed=0
         if W.State then

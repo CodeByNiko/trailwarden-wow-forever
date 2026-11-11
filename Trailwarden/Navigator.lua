@@ -68,12 +68,14 @@ function W.NavigationInfo(route)
 end
 function W.UpdateNavigation()
     local decision=W.Decision
+    local wasUnavailable=W.NavigationError~=nil or decision and decision.navigationError~=nil
     local status,n=W.Call(readNavigation,decision and decision.route or W.CurrentRoute,W.Navigation)
     if status~="ok" or n.travel and n.travel.mode=="error" then
         local message=status~="ok" and tostring(n) or n.travel.label or "Access data unavailable"
         local id=decision and decision.id or 0
         W.Navigation={decisionID=id,label="Navigation unavailable",travel={mode="error",label="Navigation unavailable"}}
         W.NavigationError=message
+        if not wasUnavailable then W.NavigationPanelRefresh=true end
         if decision then
             decision.navigationError=message
             W.CurrentRoute={kind="wait",key="navigation-error",title="Navigation unavailable",instruction="The current target could not be mapped safely. Trailwarden is retrying; no old map marker or waypoint is being kept.",reason=message,ownerKey=decision.state and decision.state.key}
@@ -85,6 +87,7 @@ function W.UpdateNavigation()
         return W.Navigation
     end
     W.NavigationError=nil
+    if wasUnavailable then W.NavigationPanelRefresh=true end
     if decision and decision.navigationError then
         decision.navigationError=nil;W.CurrentRoute=decision.route;W.Queue=decision.queue or {}
     end
