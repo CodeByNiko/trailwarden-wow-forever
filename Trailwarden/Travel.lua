@@ -63,7 +63,8 @@ function W.PointFromWorld(mapID,continent,wx,wy)
 end
 local function inBounds(p,cave)
     local b=cave.bounds
-    return p and p.continent==cave.continent and W.IsFinite(p.wx) and W.IsFinite(p.wy) and p.wx>=b[1] and p.wx<=b[3] and p.wy>=b[2] and p.wy<=b[4]
+    return type(b)=="table" and W.IsFinite(b[1]) and W.IsFinite(b[2]) and W.IsFinite(b[3]) and W.IsFinite(b[4]) and
+        p and p.continent==cave.continent and W.IsFinite(p.wx) and W.IsFinite(p.wy) and p.wx>=b[1] and p.wx<=b[3] and p.wy>=b[2] and p.wy<=b[4]
 end
 function W.MatchCave(route)
     if not route or not route.point then return end
@@ -142,10 +143,10 @@ function W.ReadAccess(route,player)
         local poi=C_AreaPoiInfo and W.Safe(C_AreaPoiInfo.GetAreaPOIInfo,cave.mapID,cave.poiID)
         local point=cave.dynamic and cave.entrancePoint or nil
         if type(poi)=="table" and poi.position and (poi.name==facts.names[cave.id] or cave.interiorMaps[poi.linkedUiMapID]) then
-            local x,y=W.Safe(poi.position.GetXY,poi.position);point=W.Point(cave.mapID,x,y)
-            if point then point.accessSource="Live entrance POI" end
+            local x,y=W.Safe(poi.position.GetXY,poi.position);local livePoint=x and y and W.Point(cave.mapID,x,y)
+            if livePoint then point=livePoint;point.accessSource="Live entrance POI" end
         end
-        if not point then
+        if not point and cave.entrance then
             point=W.PointFromWorld(cave.mapID,cave.continent,cave.entrance[1],cave.entrance[2])
             if not point and cave.fallback then point=W.Point(cave.mapID,cave.fallback[1],cave.fallback[2]) end
             if point then point.accessSource="Reference entrance" end

@@ -2,7 +2,7 @@
 ## Title: Trailwarden
 ## Notes: Character-aware quest routing for World of Warcraft: Forever.
 ## Author: CodeByNiko
-## Version: 1.8.13
+## Version: 1.8.14
 ## SavedVariables: TrailwardenDB
 ## Dependencies: QuestieDB
 ## OptionalDeps: Questie, OpenMap

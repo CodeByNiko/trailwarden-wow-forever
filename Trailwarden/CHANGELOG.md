@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.14
+- Guard cave access checks when a dynamically discovered entrance has no reference bounds or coordinates.
+- Preserve a previously validated live entrance when a refreshed POI returns invalid coordinates; keep exit guidance conservative.
+
 ## 1.8.13
 - Split diagnostics/target explanations and slash-command dispatch out of the event/planning core into dedicated modules.
 - Keep the runtime load order explicit and preserve existing command, feedback, and diagnostic behavior.
