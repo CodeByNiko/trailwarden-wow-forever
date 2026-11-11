@@ -1,5 +1,5 @@
 local W=Trailwarden
-local C={bg={0.025,0.043,0.065,0.97},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},line={0.15,0.25,0.31,1},text={0.93,0.94,0.94},muted={0.59,0.69,0.74},cyan={0.36,0.83,0.84},gold={0.98,0.76,0.40},green={0.48,0.83,0.64}}
+local C={bg={0.025,0.043,0.065,0.97},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},line={0.15,0.25,0.31,1},text={0.94,0.96,0.97},muted={0.70,0.77,0.81},cyan={0.39,0.86,0.85},gold={0.98,0.79,0.47},green={0.53,0.88,0.68}}
 W.Colors=C
 function W.Font(parent,size,color)
     local f=parent:CreateFontString(nil,"OVERLAY","GameFontNormal")
@@ -11,7 +11,7 @@ function W.Backdrop(frame,color)
 end
 function W.Button(parent,label,width,onClick)
     local b=CreateFrame("Button",nil,parent,"BackdropTemplate");b:SetSize(width,28);W.Backdrop(b,C.raised)
-    b.label=W.Font(b,10,C.text);b.label:SetPoint("CENTER");b.label:SetJustifyH("CENTER");b.label:SetText(label)
+    b.label=W.Font(b,11,C.text);b.label:SetPoint("CENTER");b.label:SetJustifyH("CENTER");b.label:SetText(label)
     b:SetScript("OnClick",onClick)
     b:SetScript("OnDisable",function(self) self.label:SetTextColor(unpack(C.muted)) end)
     b:SetScript("OnEnable",function(self) self.label:SetTextColor(unpack(C.text)) end)
@@ -30,6 +30,24 @@ local frame,body,settings,settingsOpen,rows,settingRows
 local fields={}
 local function atText(parent,text,size,color,x,y,width,height)
     local f=W.Font(parent,size,color);f:SetPoint("TOPLEFT",x,-y);f:SetSize(width,height);f:SetText(text);return f
+end
+-- Keep readable type sizes. Truncate captions on UTF-8 character boundaries;
+-- instructions and safety messages instead grow to their measured height.
+function W.FitCaption(font,text)
+    text=text or "";font:SetText(text)
+    if not font.GetStringHeight then return end
+    local height=font:GetHeight()
+    while font:GetStringHeight()>height and #text>0 do
+        local shortened,n=text:gsub("[%z\1-\127\194-\244][\128-\191]*$","")
+        text=n>0 and shortened or text:sub(1,-2)
+        font:SetText(text.."...")
+    end
+end
+local function place(font,x,y,width,height)
+    font:ClearAllPoints();font:SetPoint("TOPLEFT",x,-y);font:SetSize(width,height)
+end
+local function textHeight(font,minimum)
+    return math.max(minimum,math.ceil(font.GetStringHeight and font:GetStringHeight() or minimum))
 end
 function W.SetDisplayScale(field,value)
     if (field~="uiScale" and field~="navigatorScale") or not W.IsFinite(value) then return end
@@ -51,22 +69,44 @@ local function layout()
     local count=math.min(p.queueRows,#(W.Queue or {}))
     local hasStatus=fields.statusText~=""
     local undo=p.lastSkipped~=nil or p.lastDeferred~=nil
-    local y=258+(hasStatus and 32 or 0)
+    local titleH=textHeight(fields.title,20)
+    place(fields.title,12,30,268,titleH)
+    local y=30+titleH+6
+    fields.target:SetShown(fields.target:GetText()~="")
+    if fields.target:GetText()~="" then
+        local h=textHeight(fields.target,16);place(fields.target,12,y,268,h);y=y+h+6
+    end
+    fields.progressTrack:SetShown(fields.hasProgress==true)
+    if fields.hasProgress then
+        fields.progressTrack:ClearAllPoints();fields.progressTrack:SetPoint("TOPLEFT",12,-y);y=y+3+9
+    end
+    local instructionH=textHeight(fields.instruction,15)
+    place(fields.instruction,12,y,268,instructionH);y=y+instructionH+10
+    fields.strip:ClearAllPoints();fields.strip:SetPoint("TOPLEFT",1,-y)
+    fields.card:SetHeight(y+35)
+    y=60+y+35+12
     body:SetShown(not settingsOpen and not compact);settings:SetShown(settingsOpen==true)
     fields.status:SetShown(not compact and hasStatus)
-    fields.thenLabel:SetShown(not compact and p.queueRows>0)
+    if hasStatus then
+        local h=textHeight(fields.status,14);place(fields.status,16,y,292,h);y=y+h+12
+    end
+    fields.thenLabel:SetShown(not compact and (p.queueRows>0 or undo))
     fields.thenLabel:ClearAllPoints();fields.thenLabel:SetPoint("TOPLEFT",16,-y)
     fields.undo:ClearAllPoints();fields.undo:SetPoint("TOPRIGHT",-16,-(y-3))
     fields.undo:SetShown(not compact and undo)
     local empty=not compact and p.queueRows>0 and count==0
     fields.empty:SetShown(empty)
-    fields.empty:ClearAllPoints();fields.empty:SetPoint("TOPLEFT",25,-(y+22))
-    for i,r in ipairs(rows) do r:ClearAllPoints();r:SetPoint("TOPLEFT",16,-(y+22+(i-1)*32)) end
-    local xpY=y+(p.queueRows>0 and (22+(count>0 and count*32 or 42)+10) or undo and 26 or 0)
-    frame:SetHeight(settingsOpen and 626 or compact and 44 or xpY+89)
+    local emptyH=textHeight(fields.empty,28);place(fields.empty,16,y+22,292,emptyH)
+    for i,r in ipairs(rows) do r:ClearAllPoints();r:SetPoint("TOPLEFT",16,-(y+22+(i-1)*44)) end
+    local xpY=y+(p.queueRows>0 and (22+(count>0 and count*44-4 or emptyH)+12) or undo and 30 or 0)
+    frame:SetHeight(settingsOpen and 626 or compact and 48 or xpY+84)
     fields.xpHover:ClearAllPoints();fields.xpHover:SetPoint("TOPLEFT",16,-xpY)
     for i,r in ipairs(rows) do r:SetShown(not compact and i<=count and r.step~=nil) end
-    fields.fold.label:SetText(p.collapsed and "+" or "-")
+    fields.fold.label:SetText(compact and "+" or "-")
+    local s=W.State;local r=W.CurrentRoute or {};local n=W.Navigation or {}
+    if compact then
+        W.FitCaption(fields.subtitle,(r.questName or r.title or "Preparing your route")..(n.decisionID==(W.Decision and W.Decision.id or 0) and n.distance and (" · "..W.FormatDistance(n.distance)) or ""))
+    elseif s then W.FitCaption(fields.subtitle,"Level "..s.level.." · "..(s.zone or "Questing")) end
 end
 function W.CreateUI()
     if frame then return end
@@ -74,23 +114,24 @@ function W.CreateUI()
     frame=CreateFrame("Frame","TrailwardenMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
     frame:SetSize(324,456);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
-    local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(322,42);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
+    local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(322,46);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
     head:SetScript("OnDragStop",function() frame:StopMovingOrSizing();local a,_,b,x,y=frame:GetPoint(1);W.GetProfile().panelPoint={point=a,relativePoint=b,x=x,y=y} end)
-    atText(head,"TRAILWARDEN",13,C.text,15,7,190,18)
-    fields.subtitle=atText(head,"",8,C.muted,15,25,290,13);fields.subtitle:SetWordWrap(false)
+    atText(head,"TRAILWARDEN",13,C.text,15,7,126,18)
+    fields.subtitle=atText(head,"",11,C.muted,15,27,290,14);fields.subtitle:SetWordWrap(true)
+    fields.mode=atText(head,"",10,C.cyan,144,10,93,13);fields.mode:SetJustifyH("RIGHT")
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(322,1)
     local close=W.Button(head,"×",20,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(20)
     fields.fold=W.Button(head,"−",20,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-32,-8);fields.fold:SetHeight(20)
     local config=W.Button(head,"⋯",22,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-56,-8);config:SetHeight(20)
-    fields.eyebrow=atText(body,"UP NEXT",9,C.cyan,16,54,120,13)
-    fields.mode=atText(body,"SOLO",8,C.muted,170,54,138,13);fields.mode:SetJustifyH("RIGHT")
-    local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-72);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
-    fields.action=atText(card,"",8,C.gold,11,8,270,12)
-    fields.title=atText(card,"",15,C.text,11,25,270,34);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
-    fields.target=atText(card,"",10,C.cyan,11,61,270,15);fields.target:SetWordWrap(false)
-    fields.progress=atText(card,"",9,C.muted,11,79,270,12);fields.progress:SetWordWrap(false)
-    fields.instruction=atText(card,"",10,C.text,11,96,270,38);fields.instruction:SetJustifyV("TOP");fields.instruction:SetWordWrap(true)
+    local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-60);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
+    fields.action=atText(card,"",10,C.gold,12,10,190,14);fields.action:SetWordWrap(false)
+    fields.title=atText(card,"",16,C.text,12,30,268,40);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
+    fields.target=atText(card,"",12,C.cyan,12,61,268,16);fields.target:SetWordWrap(true);fields.target:SetJustifyV("TOP")
+    fields.progress=atText(card,"",10,C.text,210,10,70,14);fields.progress:SetJustifyH("RIGHT");fields.progress:SetWordWrap(false)
+    fields.progressTrack=CreateFrame("Frame",nil,card,"BackdropTemplate");fields.progressTrack:SetSize(268,3);W.Backdrop(fields.progressTrack,C.line)
+    fields.progressFill=fields.progressTrack:CreateTexture(nil,"ARTWORK");fields.progressFill:SetPoint("TOPLEFT");fields.progressFill:SetSize(1,3);fields.progressFill:SetColorTexture(unpack(C.cyan))
+    fields.instruction=atText(card,"",12,C.text,12,96,268,30);fields.instruction:SetJustifyV("TOP");fields.instruction:SetWordWrap(true)
     card:SetScript("OnEnter",function(self)
         local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
         local point=r.point
@@ -98,29 +139,29 @@ function W.CreateUI()
         W.Tooltip(self,r.title or "Why this step?",{r.instruction or "",W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction or "",r.reason or "",location,z and z.hint or "",fields.statusText or "","Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow is direction only. Cyan pins mark known cave entrances; gold pins mark objectives. A marker is not a walking path.","Click a planned step to focus it. The plan updates as your quests change."})
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
-    local strip=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.strip=strip;strip:SetPoint("TOPLEFT",16,-222);strip:SetSize(292,28);W.Backdrop(strip,C.raised)
-    fields.distance=atText(strip,"",11,C.gold,10,6,92,16)
-    fields.navStatus=atText(strip,"",8,C.muted,101,7,181,14);fields.navStatus:SetJustifyH("RIGHT")
-    fields.thenLabel=atText(body,"PLANNED NEXT",8,C.cyan,16,242,160,13)
-    fields.undo=W.Button(body,"Undo skip",68,W.UndoSkip);fields.undo:SetPoint("TOPRIGHT",-16,-238);fields.undo:SetHeight(19)
-    fields.empty=atText(body,"",9,C.muted,25,267,270,42);fields.empty:SetJustifyV("TOP");fields.empty:SetWordWrap(true)
+    local strip=CreateFrame("Frame",nil,card,"BackdropTemplate");fields.strip=strip;strip:SetSize(290,34);W.Backdrop(strip,C.raised)
+    fields.distance=atText(strip,"",14,C.gold,11,8,80,18)
+    fields.navStatus=atText(strip,"",11,C.muted,95,4,184,27);fields.navStatus:SetJustifyH("RIGHT");fields.navStatus:SetWordWrap(true)
+    fields.thenLabel=atText(body,"PLANNED NEXT",10,C.muted,16,242,160,14)
+    fields.undo=W.Button(body,"Undo skip",78,W.UndoSkip);fields.undo:SetPoint("TOPRIGHT",-16,-238);fields.undo:SetHeight(22)
+    fields.empty=atText(body,"",11,C.muted,16,267,292,42);fields.empty:SetJustifyV("TOP");fields.empty:SetWordWrap(true)
     rows={}
     for i=1,4 do
-        local row=CreateFrame("Button",nil,body,"BackdropTemplate");row:SetPoint("TOPLEFT",16,-(260+(i-1)*32));row:SetSize(292,30);W.Backdrop(row,C.card)
-        local number=atText(row,string.format("%02d",i+1),8,C.muted,8,8,20,12)
-        row.title=atText(row,"",10,C.text,32,3,251,13);row.title:SetWordWrap(false)
-        row.detail=atText(row,"",9,C.muted,32,17,251,12);row.detail:SetWordWrap(false)
+        local row=CreateFrame("Button",nil,body,"BackdropTemplate");row:SetPoint("TOPLEFT",16,-(260+(i-1)*44));row:SetSize(292,40);W.Backdrop(row,C.card)
+        atText(row,string.format("%02d",i+1),10,C.muted,8,13,21,14)
+        row.title=atText(row,"",12,C.text,34,4,246,16);row.title:SetWordWrap(true)
+        row.detail=atText(row,"",10,C.muted,34,23,246,13);row.detail:SetWordWrap(true)
         row:SetScript("OnClick",function(self) W.PinStep(self.step) end)
-        row:SetScript("OnEnter",function(self) if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.safetyHeld and "Automatic combat limits cannot be bypassed with manual focus." or self.step.levelDeferred and "Click to resume this deferred quest now." or "Click to focus this quest step."}) end end)
-        row:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
+        row:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan));if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.safetyHeld and "Automatic combat limits cannot be bypassed with manual focus." or self.step.levelDeferred and "Click to resume this deferred quest now." or "Click to focus this quest step."}) end end)
+        row:SetScript("OnLeave",function(self) self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
         rows[i]=row
     end
-    fields.status=atText(body,"",9,C.muted,16,258,292,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP");fields.statusText=""
-    local xpHover=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.xpHover=xpHover;xpHover:SetPoint("BOTTOMLEFT",16,49);xpHover:SetSize(292,44);xpHover:EnableMouse(true);W.Backdrop(xpHover,C.card)
-    atText(xpHover,"YOUR XP / HOUR",7,C.muted,10,6,130,10)
-    atText(xpHover,"NEXT LEVEL",7,C.muted,158,6,124,10)
-    fields.xp=atText(xpHover,"Learning...",13,C.gold,10,21,130,17)
-    fields.xpETA=atText(xpHover,"--",13,C.text,158,21,124,17)
+    fields.status=atText(body,"",11,C.gold,16,258,292,28);fields.status:SetWordWrap(true);fields.status:SetJustifyV("TOP");fields.statusText=""
+    local xpHover=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.xpHover=xpHover;xpHover:SetPoint("BOTTOMLEFT",16,49);xpHover:SetSize(292,42);xpHover:EnableMouse(true)
+    atText(xpHover,"YOUR XP / HOUR",10,C.muted,10,4,130,14)
+    atText(xpHover,"NEXT LEVEL",10,C.muted,158,4,124,14)
+    fields.xp=atText(xpHover,"Learning...",13,C.text,10,21,130,17)
+    fields.xpETA=atText(xpHover,"--",12,C.text,158,21,124,17)
     local divider=xpHover:CreateTexture(nil,"ARTWORK");divider:SetColorTexture(unpack(C.line));divider:SetPoint("TOPLEFT",147,-7);divider:SetSize(1,30)
     xpHover:SetScript("OnEnter",function(self)
         local e=W.SafeExperienceStats();local r=W.CurrentRoute or {};local m=r.economy
@@ -135,16 +176,16 @@ function W.CreateUI()
             W.ForecastError and "Forecast temporarily unavailable. Normal quest guidance remains active." or "Grind comparison needs at least 8 verified kills over 2 minutes. /tw xpreset resets session statistics."})
     end)
     xpHover:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
-    fields.skip=W.Button(body,"Skip",82,function() local r=W.CurrentRoute;local state=W.State;if W.DeferLevel(r,state) then W.DeferCurrent() else W.SkipCurrent() end end);fields.skip:SetPoint("BOTTOMLEFT",16,11);fields.skip:SetHeight(24)
+    fields.skip=W.Button(body,"Skip",92,function() local r=W.CurrentRoute;local state=W.State;if W.DeferLevel(r,state) then W.DeferCurrent() else W.SkipCurrent() end end);fields.skip:SetPoint("BOTTOMLEFT",16,11);fields.skip:SetHeight(26)
     fields.skip:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan));local r=W.CurrentRoute;local state=W.State
         local high=W.DeferLevel(r,state)
         if r and r.kind=="grind" then W.Tooltip(self,"Return to questing",{"End this grind break and resume the quest route. Automatic grind suggestions pause for two minutes."});return end
         W.Tooltip(self,high and "Skip for now" or "Defer this quest",{high and ("Keep this quest for later. It returns automatically at level "..(r.level-state.profile.maxLevelAbove).." with your current level range.") or "Skip the whole current quest for 15 minutes on this character.","Use Undo skip or click a Later step to resume immediately."}) end)
-    fields.refresh=W.Button(body,"Auto route",92,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true,"resume-auto") end);fields.refresh:SetPoint("BOTTOMLEFT",104,11);fields.refresh:SetHeight(24)
-    fields.arrow=W.Button(body,"Arrow on",84,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,11);fields.arrow:SetHeight(24)
+    fields.refresh=W.Button(body,"Auto route",100,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true,"resume-auto") end);fields.refresh:SetPoint("BOTTOMLEFT",113,11);fields.refresh:SetHeight(26)
+    fields.arrow=W.Button(body,"Arrow on",90,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,11);fields.arrow:SetHeight(26)
     settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(292,545)
-    atText(settings,"YOUR JOURNEY",10,C.cyan,0,0,292,16)
-    atText(settings,"Preferences are saved for this character.",9,C.muted,0,25,292,28)
+    atText(settings,"YOUR JOURNEY",12,C.cyan,0,0,292,16)
+    atText(settings,"Saved for this character. Click a row to change.",11,C.muted,0,25,292,28)
     local definitions={
         {"XP-aware routing",function(p) return p.xpRouting and "On" or "Off" end,function(p) p.xpRouting=not p.xpRouting end},
         {"Quest difficulty",function(p) return p.includeGroup and "Include group quests" or "Solo quests" end,function(p) p.includeGroup=not p.includeGroup end},
@@ -160,6 +201,8 @@ function W.CreateUI()
     settingRows={}
     for i,d in ipairs(definitions) do
         local b=W.Button(settings,"",292,function() local profile=W.GetProfile();d[3](profile);W.ApplyPositions();W.Refresh(false,"settings") end)
+        b.label:ClearAllPoints();b.label:SetPoint("LEFT",10,0);b.label:SetJustifyH("LEFT");b.label:SetSize(138,16)
+        b.value=W.Font(b,11,C.cyan);b.value:SetPoint("RIGHT",-10,0);b.value:SetJustifyH("RIGHT");b.value:SetSize(136,16)
         b:SetPoint("TOPLEFT",0,-(58+(i-1)*29));b:SetHeight(26);settingRows[i]={button=b,definition=d}
     end
     local undo=W.Button(settings,"Restore skipped quests",292,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.GetProfile().deferredLevels={};W.GetProfile().lastDeferred=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-362)
@@ -169,7 +212,7 @@ function W.CreateUI()
     local back=W.Button(settings,"Back to your route",292,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-510)
     head:EnableMouseWheel(true)
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
-    head:SetScript("OnEnter",function(self) W.Tooltip(self,"Trailwarden",{"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
+    head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
     head:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     W.ApplyPositions();layout();if p.panelHidden then frame:Hide() end
 end
@@ -178,34 +221,29 @@ function W.UpdateUI()
     local state=W.State;if not state then return end
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     local p=state.profile;local r=W.CurrentRoute or {}
-    fields.subtitle:SetText(string.format("%s · %s %s · LEVEL %d",state.name,state.raceName,state.className,state.level))
-    fields.mode:SetWordWrap(false);fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED" or string.upper(state.zone or "QUESTING"))
-    fields.action:SetText((W.ActionLabels[r.kind] or "ROUTE")..(r.level and r.level>0 and (" · LEVEL "..r.level) or "")..(W.DeferLevel(r,state) and " · ABOVE RANGE" or ""))
-    fields.title:SetFont("Fonts\\FRIZQT__.TTF",15,"")
-    fields.title:SetText(r.kind=="wait" and r.title or r.questName or r.title or "Preparing your route")
-    if fields.title.GetStringHeight then
-        for size=14,11,-1 do
-            if fields.title:GetStringHeight()<=34 then break end
-            fields.title:SetFont("Fonts\\FRIZQT__.TTF",size,"")
-        end
-        -- Keep two readable lines; full quest text remains in the card tooltip.
-        local text=fields.title:GetText()
-        while fields.title:GetStringHeight()>34 and #text>0 do
-            local shortened,n=text:gsub("[%z\1-\127\194-\244][\128-\191]*$","")
-            text=n>0 and shortened or text:sub(1,-2)
-            fields.title:SetText(text.."...")
-        end
-    end
+    fields.mode:SetWordWrap(false);fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED" or "AUTO")
+    fields.mode:SetTextColor(unpack(p.paused and C.gold or C.cyan))
+    fields.action:SetText((r.kind=="objective" and "OBJECTIVE" or W.ActionLabels[r.kind] or "ROUTE")..(r.level and r.level>0 and (" · LV "..r.level) or "")..(W.DeferLevel(r,state) and " · ABOVE RANGE" or ""))
+    fields.title:SetHeight(40)
+    W.FitCaption(fields.title,r.kind=="wait" and r.title or r.questName or r.title or "Preparing your route")
     local target=r.target or state.zone or "Your current area"
     if r.kind=="objective" and r.point and r.point.name and r.point.name~=target then target=target.." · "..r.point.name end
     fields.target:SetText(target..(r.combatRisk and r.combatRisk.maxLevel and (" · Lv "..r.combatRisk.maxLevel) or ""))
-    if W.IsFinite(r.required) and r.required>0 and W.IsFinite(r.remaining) then
-        fields.progress:SetText(string.format("%d / %d complete",math.max(0,math.min(r.required,r.required-r.remaining)),r.required))
-    else fields.progress:SetText(r.kind=="turnin" and "Ready to turn in" or r.kind=="pickup" and "Quest available" or r.kind=="escort" and "Stay with the escort" or "") end
+    fields.hasProgress=W.IsFinite(r.required) and r.required>0 and W.IsFinite(r.remaining)
+    if fields.hasProgress then
+        local done=math.max(0,math.min(r.required,r.required-r.remaining))
+        fields.progress:SetText(string.format("%d / %d",done,r.required))
+        fields.progressFill:SetWidth(math.max(1,268*done/r.required));fields.progressFill:SetShown(done>0)
+    else fields.progress:SetText(r.kind=="turnin" and "Ready" or "") end
     fields.instruction:SetText(r.instruction or "Reading your quest progress...")
     for i,row in ipairs(rows) do
         local step=(W.Queue or {})[i];row.step=step
-        if step then row.title:SetText(step.safetyHeld and step.title or step.levelDeferred and ("Later: "..(step.questName or step.title)) or step.title);row.detail:SetText(step.safetyHeld and (step.resumeLevel and ("Enemy levels / reconsider at level "..step.resumeLevel) or "Combat level data unverified") or step.levelDeferred and ("Returns at level "..step.resumeLevel.." / click to resume now") or (step.target or W.MapName(step.mapID)).."  /  "..(step.mapID and W.MapName(step.mapID) or "Your bags")) end
+        if step then
+            W.FitCaption(row.title,step.safetyHeld and step.title or step.levelDeferred and ("Later: "..(step.questName or step.title)) or step.questName or step.title)
+            local detail=step.safetyHeld and (step.resumeLevel and ("Held · retry at level "..step.resumeLevel) or "Held · enemy levels unverified") or step.levelDeferred and ("Later · returns at level "..step.resumeLevel) or (W.ActionLabels[step.kind] or "QUEST").." · "..(step.target or (step.mapID and W.MapName(step.mapID)) or "Your bags")
+            W.FitCaption(row.detail,detail)
+            row.detail:SetTextColor(unpack((step.safetyHeld or step.levelDeferred) and C.gold or C.muted))
+        end
     end
     local status=""
     if W.CatalogError then status="Quest data needs attention · /tw debug"
@@ -216,9 +254,10 @@ function W.UpdateUI()
     for _,q in ipairs(W.Unmapped or {}) do if q.safety then safetyCount=safetyCount+1 end end
     if safetyCount>0 then status=(status~="" and status.."\n" or "")..safetyCount.." combat objective(s) held · cap +2" end
     fields.statusText=status;fields.status:SetText(status)
-    local empty=not W.CatalogReady and "Reading quest data. Your next steps will appear here shortly."
-        or #(W.Unmapped or {})>0 and "No further mapped steps yet. Some active quests need Questie, a different comfort setting or more complete quest data."
-        or "This is the only mapped step right now. The plan will update when you accept, complete or turn in a quest."
+    fields.status:SetTextColor(unpack((W.CatalogError or safetyCount>0 or #(W.Unmapped or {})>0) and C.gold or C.muted))
+    local empty=not W.CatalogReady and "Reading quest data. Next steps will appear shortly."
+        or #(W.Unmapped or {})>0 and "No further mapped steps. Check quest data or level settings."
+        or "The only mapped step for now. Your plan updates with quest progress."
     fields.empty:SetText(empty)
     fields.refresh.label:SetText(p.paused and "Resume route" or "Auto route")
     fields.arrow.label:SetText(p.navigatorHidden and "Arrow off" or "Arrow on")
@@ -234,7 +273,7 @@ function W.UpdateUI()
         fields.statusText=fields.statusText~="" and (fields.statusText.." · "..#opportunities.." nearby") or nearby
         fields.status:SetText(fields.statusText)
     end
-    for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":  "..v.definition[2](p)) end
+    for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":");v.button.value:SetText(v.definition[2](p)) end
     layout();W.UpdateLiveUI()
 end
 function W.UpdateLiveUI()
@@ -246,12 +285,19 @@ function W.UpdateLiveUI()
     if e.available and not e.paused and e.maximum~=0 then etaLabel=stable and e.eta and ("~"..W.FormatETA(e.eta)) or not stable and "Building sample" or "--" end
     fields.xpETA:SetText(etaLabel)
     local n=W.Navigation or {}
-    if W.Decision and n.decisionID~=W.Decision.id then fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route");return end
+    if W.Decision and n.decisionID~=W.Decision.id then
+        fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route")
+        if W.GetProfile().collapsed and not settingsOpen then layout() end
+        return
+    end
     local travel=n.travel
     local r=W.CurrentRoute
-    fields.instruction:SetText(travel and travel.instruction or r.instruction or "Reading your quest progress...")
+    local instruction=travel and travel.instruction or r.instruction or "Reading your quest progress..."
+    if fields.instruction:GetText()~=instruction then fields.instruction:SetText(instruction);layout() end
     fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="escort" and "Escort active" or W.CurrentRoute.kind=="item" and "In your bags" or ""))
+    fields.distance:SetFont("Fonts\\FRIZQT__.TTF",n.distance and 14 or 11,"")
     fields.navStatus:SetText(n.label or "")
+    if W.GetProfile().collapsed and not settingsOpen then layout() end
 end
 function W.ToggleSettings()
     if not frame then W.CreateUI() end

@@ -4,6 +4,10 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest installable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases/latest)**
 
+## New in 1.7.4: easier to read at a glance
+
+Larger text, clearer contrast and a content-sized quest card put the current objective first. Progress uses a count and a slim bar; distance is part of the same card. Planned steps separate the quest name from its action, while the collapsed guide retains your current quest and distance. Navigator captions are larger and preferences use aligned labels and values.
+
 ## New in 1.7.3: compact routes and clearer estimates
 
 The route panel uses a tighter layout, shows objective progress at a glance and keeps route details in the hover explanation. The navigator has a redesigned compass pointer. Quest-cycle estimates reduce unnecessary backtracking, while live XP/hour and next-level time wait for a five-minute active sample.
@@ -33,7 +37,7 @@ Nearby eligible quest offers are retained as opportunities. Escort offers wait u
 
 ## Install or update
 
-1. Download `Trailwarden-1.7.3-Forever.zip` under the release's **Assets**.
+1. Download `Trailwarden-1.7.4-Forever.zip` under the release's **Assets**.
 2. Exit WoW. Replace `Interface/AddOns/Trailwarden` with the `Trailwarden` folder inside the ZIP.
 3. Keep **QuestieDB for Forever**, **Questie** and your existing **OpenMap** enabled. Questie supplies the map-pin library; the core quest planner still requires QuestieDB.
 4. Start the game. Your character's route and navigator appear automatically. For an upgrade from Wayfinder, migrate your saved settings as described below.

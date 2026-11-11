@@ -16,6 +16,7 @@ function methods:GetPoint() local p=self.points[1] or {"CENTER",nil,"CENTER",0,0
 function methods:SetSize(w,h) self.w=w;self.h=h end
 function methods:SetWidth(w) self.w=w end
 function methods:SetHeight(h) self.h=h end
+function methods:GetHeight() return self.h end
 function methods:SetText(t) self.text=t or "" end
 function methods:GetText() return self.text end
 function methods:SetFont(path,size) self.fontSize=size end
@@ -39,6 +40,9 @@ function methods:CreateFontString(name) return region("font",self,name) end
 function methods:CreateTexture(name) return region("texture",self,name) end
 function methods:SetScrollChild(v) self.scrollChild=v end
 for _,m in ipairs({"EnableMouseWheel","SetFrameStrata","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
+function methods:SetJustifyH(value) self.justifyH=value end
+function methods:SetJustifyV(value) self.justifyV=value end
+function methods:SetWordWrap(value) self.wordWrap=value end
 UIParent=region("frame",nil,"UIParent");UIParent:SetSize(1920,1080)
 ChatFontNormal={};SlashCmdList={}
 function CreateFrame(kind,name,parent) return region(kind,parent,name) end
@@ -312,7 +316,7 @@ W.SkipCurrent();local undo=button("Undo skip");check("undo skip is immediately v
 W.Queue={};W.UpdateUI();local empty
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:find("only mapped step",1,true) then empty=n end end
 check("empty planned list explains what happens next",empty and empty.shown)
-W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides body content",W.MainFrame.h==44 and not empty.shown and not undo.shown)
+W.GetProfile().collapsed=true;W.UpdateUI();check("compact mode hides body content",W.MainFrame.h==48 and not empty.shown and not undo.shown)
 local function visible(n) return n.shown and (not n.parent or visible(n.parent)) end
 local bodyHidden=true
 for _,n in ipairs(nodes) do if n.parent==empty.parent and visible(n) then bodyHidden=false end end
@@ -322,7 +326,7 @@ local originalRoute=W.CurrentRoute;local longTitle=string.rep("A longer quest ti
 W.CurrentRoute={kind="wait",key="longtitle",title=longTitle,instruction="Test"};W.UpdateUI()
 local titleNode
 for _,n in ipairs(nodes) do if n.kind=="font" and n.text:sub(1,20)==longTitle:sub(1,20) then titleNode=n end end
-check("long current titles keep two readable lines",titleNode and titleNode.fontSize>=11 and titleNode:GetStringHeight()<=34 and titleNode.text:sub(-3)=="...")
+check("long current titles keep two readable lines",titleNode and titleNode.fontSize==16 and titleNode:GetStringHeight()<=40 and titleNode.text:sub(-3)=="...")
 W.CurrentRoute=originalRoute;W.UpdateUI()
 do
  local oldError,oldUnmapped,oldDetail=W.CatalogError,W.Unmapped,W.Decision.detail
@@ -369,7 +373,7 @@ do
  W.Navigation={decisionID=W.Decision.id-1,bearing=1,facing=0,arrived=true,distance=20};W.UpdateNavigator()
  local staleHidden,syncShown=true,false
  for _,n in ipairs(nodes) do if n.parent==W.NavigatorFrame then
-  if (n.texture or ""):find("Arrow.tga",1,true) or n.text=="HERE" then if visible(n) then staleHidden=false end end
+  if (n.texture or ""):find("Arrow.tga",1,true) or n.text=="IN AREA" then if visible(n) then staleHidden=false end end
   if n.text=="Synchronizing route" and visible(n) then syncShown=true end
  end end
  check("navigator clears stale bearing and arrival after a new decision",staleHidden and syncShown)
@@ -507,16 +511,54 @@ check("arrow mouse wheel resizes navigator only",W.NavigatorFrame.scale==.95 and
 W.GetProfile().locked=true;scaleHeader.scripts.OnMouseWheel(scaleHeader,-1);W.NavigatorFrame.scripts.OnMouseWheel(W.NavigatorFrame,-1)
 check("locked windows ignore wheel resizing",W.MainFrame.scale==.85 and W.NavigatorFrame.scale==.95)
 W.GetProfile().locked=false
-check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==142 and W.NavigatorFrame.h==104)
+check("navigator has no opaque background or large frame",W.NavigatorFrame.bgColor==nil and W.NavigatorFrame.w==174 and W.NavigatorFrame.h==122)
 local savedQueue=W.Queue;W.Queue={}
 for i=1,4 do W.Queue[i]=W.Copy(W.CurrentRoute) end
 W.GetProfile().queueRows=4;W.UpdateUI();local fourHeight=W.MainFrame.h
-W.GetProfile().queueRows=2;W.UpdateUI();check("four actual preview steps add only their two row heights",fourHeight-W.MainFrame.h==64)
+W.GetProfile().queueRows=2;W.UpdateUI();check("four actual preview steps add only their two row heights",fourHeight-W.MainFrame.h==88)
 W.GetProfile().queueRows=0;W.UpdateUI();check("preview can be hidden while keeping a compact next-step card",W.MainFrame.h<410)
 local hiddenHeight=W.MainFrame.h;W.Queue={W.Copy(W.CurrentRoute)};W.GetProfile().queueRows=4;W.UpdateUI();local oneHeight=W.MainFrame.h
 W.GetProfile().queueRows=2;W.UpdateUI();check("unused preview slots do not leave blank space",W.MainFrame.h==oneHeight and oneHeight<fourHeight)
 W.Queue=savedQueue
 W.GetProfile().queueRows=2;W.SetDisplayScale("uiScale",.9);W.SetDisplayScale("navigatorScale",1)
+
+-- Content-sized layout must expand for guidance, then shrink again. Keep the
+-- provider/route unchanged; exercise both initial rendering and live navigation.
+do
+ local oldRoute,oldNav=W.CurrentRoute,W.Navigation
+ local oldCollapsed=W.GetProfile().collapsed
+ local route=W.Copy(oldRoute);route.kind="objective";route.questName="Readable quest";route.instruction="Continue here."
+ route.required=10;route.remaining=3;W.CurrentRoute=route
+ W.Navigation={decisionID=W.Decision.id,distance=120,label="Following your step"}
+ W.UpdateUI();local shortHeight=W.MainFrame.h
+ local count,track,fill
+ for _,n in ipairs(nodes) do
+  if n.kind=="font" and n.text=="7 / 10" then count=n end
+  if n.kind=="texture" and n.parent and n.parent.w==268 and n.parent.h==3 then fill=n;track=n.parent end
+ end
+ check("objective progress has a readable count and proportional bar",count and count.fontSize==10 and visible(track) and fill.w==268*.7)
+ route.remaining=10;W.UpdateUI();check("zero progress does not draw a misleading filled sliver",not fill.shown)
+ route.required=nil;W.UpdateUI();check("non-counted steps hide the progress bar",not track.shown and count.text=="")
+ route.required=10;route.remaining=3
+ local longInstruction=string.rep("Follow the road to the entrance and use the lower tunnel. ",6)
+ W.Navigation.travel={instruction=longInstruction};W.UpdateUI()
+ local instruction,strip
+ for _,n in ipairs(nodes) do
+  if n.kind=="font" and n.text==longInstruction then instruction=n end
+  if n.kind=="font" and n.text=="120 yd" then strip=n.parent end
+ end
+ check("long travel guidance grows without shrinking or clipping",instruction and instruction.fontSize==12 and instruction.h>=instruction:GetStringHeight() and W.MainFrame.h>shortHeight and -strip.points[1][3]>=-instruction.points[1][3]+instruction.h+10)
+ W.Navigation.travel.instruction=route.instruction;W.UpdateLiveUI()
+ check("live instruction changes reclaim unused panel space",W.MainFrame.h==shortHeight)
+ W.GetProfile().collapsed=true;W.UpdateUI();local summary
+ for _,n in ipairs(nodes) do if n.kind=="font" and n.text=="Readable quest · 120 yd" then summary=n end end
+ check("collapsed panel retains current quest and distance",summary and visible(summary) and W.MainFrame.h==48)
+ W.Navigation.decisionID=W.Decision.id-1;W.UpdateLiveUI()
+ check("collapsed summary clears a stale decision's distance",summary.text=="Readable quest")
+ local text=string.rep("Étoile ",20);W.FitCaption(titleNode,text)
+ check("caption truncation preserves UTF-8 characters and readable size",not titleNode.text:find("\195%.%.%.") and titleNode.fontSize==16 and titleNode:GetStringHeight()<=40)
+ W.GetProfile().collapsed=oldCollapsed;W.CurrentRoute=oldRoute;W.Navigation=oldNav;W.UpdateUI()
+end
 
 -- XP event wiring and real panel values, in addition to the isolated XP suite.
 local testXP=100
@@ -658,7 +700,7 @@ local function snapshot(path)
   local parentIndex=0;for j,p in ipairs(nodes) do if node.parent==p then parentIndex=j;break end end
   local point=node.points[1] or {};local x,y=0,0
   if type(point[2])=="number" then x,y=point[2],point[3] or 0 else x,y=point[4] or 0,point[5] or 0 end
-  dump[#dump+1]=string.format('{"kind":%s,"name":%s,"parent":%d,"shown":%s,"text":%s,"anchor":%s,"x":%s,"y":%s,"w":%s,"h":%s,"font":%s,"color":%s,"bg":%s,"texture":%s}',quote(node.kind),quote(node.name or ""),parentIndex,tostring(node.shown),quote(tostring(node.text)),quote(point[1] or "TOPLEFT"),tostring(x),tostring(y),tostring(node.w),tostring(node.h),tostring(node.fontSize or 10),array(node.textColor),array(node.bgColor),quote(node.texture or ""))
+  dump[#dump+1]=string.format('{"kind":%s,"name":%s,"parent":%d,"shown":%s,"text":%s,"anchor":%s,"x":%s,"y":%s,"w":%s,"h":%s,"font":%s,"color":%s,"bg":%s,"texture":%s,"justifyH":%s,"justifyV":%s,"wrap":%s,"rotation":%s}',quote(node.kind),quote(node.name or ""),parentIndex,tostring(node.shown),quote(tostring(node.text)),quote(point[1] or "TOPLEFT"),tostring(x),tostring(y),tostring(node.w),tostring(node.h),tostring(node.fontSize or 10),array(node.textColor),array(node.bgColor),quote(node.texture or ""),quote(node.justifyH or "LEFT"),quote(node.justifyV or "MIDDLE"),tostring(node.wordWrap~=false),tostring(node.rotation or 0))
  end
  local f=io.open(path,'w');f:write('['..table.concat(dump,',')..']');f:close()
 end

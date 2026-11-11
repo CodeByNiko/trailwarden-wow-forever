@@ -1,4 +1,4 @@
-TRAILWARDEN 1.7.2 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.7.4 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -6,6 +6,9 @@ enabled. Questie is strongly recommended. Exit and restart WoW when updating.
 Renamed from Wayfinder in 1.7.2. Commands: /tw and /trailwarden.
 For existing settings, exit WoW and follow:
 https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md
+
+1.7.4 improves readability, content-sized layout, objective progress,
+collapsed guidance, navigator captions and aligned preferences.
 
 1.7.1 keeps accepted local collection ahead of distant quest objectives,
 even when an outside XP estimate is higher. Recent actual quest progress
