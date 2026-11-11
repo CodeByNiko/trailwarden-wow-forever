@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.12
+- Explain why the current target was chosen, how many eligible steps were considered, and up to two other eligible steps.
+- Add `/tw feedback`, a local copyable summary containing only release/provider identity and aggregate route counts; omit character names, quest names/IDs, coordinates, preferences and raw errors.
+- Keep `/tw debug` and `/tw trace` available for deeper troubleshooting; neither export is transmitted automatically.
+
 ## 1.8.11
 - Add persistent automatic, English, and Danish language selection for Trailwarden action labels and map cues.
 - Mark entrances and objectives with distinct E/Q glyphs plus concise help so cues remain identifiable without color.

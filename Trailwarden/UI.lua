@@ -144,7 +144,16 @@ function W.CreateUI()
         local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
         local point=r.point
         local location=point and W.IsFinite(point.x) and W.IsFinite(point.y) and string.format("%s · %.1f, %.1f",W.MapName(point.mapID),point.x*100,point.y*100) or ""
-        W.Tooltip(self,r.title or "Why this step?",{r.instruction or "",W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction or "",r.reason or "",location,z and z.hint or "",fields.statusText or "","Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow is direction only. Cyan pins mark known cave entrances; gold pins mark objectives. A marker is not a walking path.","Click a planned step to focus it. The plan updates as your quests change."})
+        local lines={r.instruction or ""}
+        for _,line in ipairs(W.TargetExplanation and W.TargetExplanation() or {r.reason or ""}) do lines[#lines+1]=line end
+        lines[#lines+1]=W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction or ""
+        lines[#lines+1]=location;lines[#lines+1]=z and z.hint or "";lines[#lines+1]=fields.statusText or ""
+        lines[#lines+1]="Source: "..(r.source or "Live character state")
+        lines[#lines+1]="Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log."
+        lines[#lines+1]=W.L("marker_help");lines[#lines+1]=W.L("marker_path_warning")
+        lines[#lines+1]="Use /tw feedback for a reviewable summary without character names, quest names, or coordinates. Nothing is sent automatically."
+        lines[#lines+1]="Click a planned step to focus it. The plan updates as your quests change."
+        W.Tooltip(self,r.title or "Why this target?",lines)
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     local strip=CreateFrame("Frame",nil,card,"BackdropTemplate");fields.strip=strip;strip:SetSize(290,34);W.Backdrop(strip,C.raised)

@@ -63,6 +63,24 @@ local function schedule(force,event)
     end
     if C_Timer then C_Timer.After(.5,update) else update() end
 end
+function W.TargetExplanation()
+    local route=W.CurrentRoute or {};local detail=W.Decision and W.Decision.detail or {}
+    local lines={route.reason or route.instruction or "Trailwarden is waiting for reliable quest data."}
+    local count=tonumber(detail.candidateCount) or 0
+    if count>0 then lines[#lines+1]=count.." eligible step(s) were considered." end
+    local shown=0
+    for _,candidate in ipairs(detail.candidates or {}) do
+        if candidate.key~=route.key and shown<2 then
+            local name=candidate.questName or candidate.title
+            if type(name)=="string" and name~="" then
+                local distance=W.IsFinite(candidate.distance) and (" · "..W.FormatDistance(candidate.distance)) or ""
+                lines[#lines+1]="Also eligible: "..name..distance;shown=shown+1
+            end
+        end
+    end
+    if shown>0 then lines[#lines+1]="Other eligible steps remain in the planned list." end
+    return lines
+end
 function W.Diagnostics()
     local s=W.State or W.ReadCharacter();local r=W.CurrentRoute or {};local n=W.Navigation or {}
     local lines={"Trailwarden "..W.Version,"Decision: "..tostring(W.Decision and W.Decision.id).." / navigation "..tostring(n.decisionID).." / map "..tostring(W.WaypointDecisionID),
@@ -185,9 +203,10 @@ SlashCmdList.TRAILWARDEN=function(message)
     elseif cmd=="auto" then p.mapSync=not p.mapSync;W.Refresh(true)
     elseif cmd=="reset" then p.panelPoint=nil;p.navigatorPoint=nil;W.ApplyPositions()
     elseif cmd=="debug" then W.ShowDiagnostics()
+    elseif cmd=="feedback" then W.ShowDiagnostics(W.ExportFeedback())
     elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
     elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
     elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, language auto|en|da, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
+    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, language auto|en|da, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, feedback (reviewable summary), trace (local replay), xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
 end
 

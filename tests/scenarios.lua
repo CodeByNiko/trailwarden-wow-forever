@@ -269,6 +269,13 @@ check("main and navigator created",W.MainFrame and W.NavigatorFrame)
 check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h<500)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
+local savedRoute,savedDecision=W.CurrentRoute,W.Decision
+W.CurrentRoute={key="target:a",reason="An unfinished quest is active."}
+W.Decision={detail={candidateCount=3,candidates={{key="target:a"},{key="target:b",questName="Nearby quest",distance=120},{key="target:c",title="Other quest",distance=240},{key="target:d",title="Hidden fourth"}}}}
+local why=W.TargetExplanation()
+check("target explanation names the selection reason and candidate count",why[1]=="An unfinished quest is active." and why[2]=="3 eligible step(s) were considered.")
+check("target explanation shows only two alternatives",why[3]:find("Nearby quest",1,true) and why[4]:find("Other quest",1,true) and not table.concat(why," "):find("Hidden fourth",1,true))
+W.CurrentRoute,W.Decision=savedRoute,savedDecision
 -- 1.1 quality regressions.
 ne();log={{id=40,title="Similar creature names",rows={{type="monster",objectiveID=9901,text="Dire Wolf: 4/4",finished=true},{type="monster",objectiveID=9902,text="Wolf: 0/4",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s)
 check("similar names and reversed objective order do not suppress unfinished target",#activeSteps==1 and activeSteps[1].target=="Wolf")
@@ -613,6 +620,9 @@ local xpText,etaText=false,false;for _,node in ipairs(nodes) do if node.kind=="f
 check("panel waits for a stable XP sample before showing rate and ETA",xpText and etaText and W.ExperienceStats().eta==210)
 check("XP gain and rewarded-kill events are registered",W.EventFrame.events.PLAYER_XP_UPDATE and W.EventFrame.events.CHAT_MSG_COMBAT_XP_GAIN)
 SlashCmdList.TRAILWARDEN("xp");check("XP routing can be disabled without stopping measurement",not W.GetProfile().xpRouting and W.ExperienceStats().rate==12000)
+local displayedFeedback;local showDiagnostics=W.ShowDiagnostics;W.ShowDiagnostics=function(content) displayedFeedback=content end
+SlashCmdList.TRAILWARDEN("feedback");W.ShowDiagnostics=showDiagnostics
+check("feedback command opens the local reviewable summary",displayedFeedback and displayedFeedback:find('"origin":"reviewable-feedback"',1,true) and not displayedFeedback:find("Raelorn",1,true))
 SlashCmdList.TRAILWARDEN("language da");check("language command persists Danish and refreshes labels",W.GetProfile().language=="da" and W.ActionLabels.escort=="ESKORTE")
 SlashCmdList.TRAILWARDEN("language en");check("language command restores English labels",W.GetProfile().language=="en" and W.ActionLabels.escort=="ESCORT")
 SlashCmdList.TRAILWARDEN("language auto")

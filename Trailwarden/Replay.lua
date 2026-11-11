@@ -50,3 +50,33 @@ function W.ExportReplay(origin)
     return W.Json({schema=1,origin=origin or "live-export",addonVersion=W.Version,provider=W.ProviderIdentity(),frames=W.Copy(W.ReplayFrames or {})})
 end
 
+local feedbackKinds={objective=true,turnin=true,pickup=true,deliver=true,item=true,escort=true,grind=true,travel=true,wait=true}
+function W.ExportFeedback()
+    -- Build from an allowlist instead of trying to redact a replay. This keeps
+    -- names, IDs, coordinates, progress, preferences, and raw errors out.
+    local route=W.CurrentRoute or {};local detail=W.Decision and W.Decision.detail or {}
+    local candidateKinds,queueKinds={},{}
+    for _,candidate in ipairs(detail.candidates or {}) do
+        local kind=feedbackKinds[candidate.kind] and candidate.kind or "other"
+        candidateKinds[kind]=(candidateKinds[kind] or 0)+1
+    end
+    for _,step in ipairs(W.Queue or {}) do
+        local kind=feedbackKinds[step.kind] and step.kind or "other"
+        queueKinds[kind]=(queueKinds[kind] or 0)+1
+    end
+    local why=route.safetyHeld and "combat_safety_hold"
+        or route.reviewWork and "recent_progress_needs_review"
+        or route.batchBlocked and "finish_current_work_area"
+        or route.kind=="turnin" and "ready_to_turn_in"
+        or route.kind=="pickup" and "nearby_quest_pickup"
+        or route.kind=="escort" and "active_escort"
+        or route.kind=="item" and "quest_item_available"
+        or route.kind=="objective" and "accepted_quest_objective"
+        or route.kind=="wait" and "waiting_or_paused"
+        or "continue_current_route"
+    return W.Json({schema=1,origin="reviewable-feedback",addonVersion=W.Version,provider=W.ProviderIdentity(),
+        decision={routeKind=feedbackKinds[route.kind] and route.kind or "other",why=why,
+            candidateCount=tonumber(detail.candidateCount) or 0,scoreEvaluations=tonumber(detail.scoreEvaluations) or 0,
+            queueKinds=queueKinds,candidateKinds=candidateKinds}})
+end
+
