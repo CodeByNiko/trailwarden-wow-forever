@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.21
+- Verify the official QuestieDB Forever 1.0.14 provider ZIP against its published SHA-256 digest before extraction.
+- Guard the install-matrix workflow against removing or reordering the archive verification.
+
 ## 1.8.20
 - Give manual cross-continent transit guidance priority over local cave-entrance directions until the player reaches the destination continent.
 - Keep the navigation state explicit that a transport connection is needed.

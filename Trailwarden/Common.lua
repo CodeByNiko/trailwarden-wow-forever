@@ -1,6 +1,6 @@
 Trailwarden = Trailwarden or {}
 local W = Trailwarden
-W.Version = "1.8.20"
+W.Version = "1.8.21"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)
