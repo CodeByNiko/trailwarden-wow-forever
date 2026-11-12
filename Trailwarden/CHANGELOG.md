@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.8.1
+- Polish the CurseForge project description and synchronize the bundled documentation with the 1.8 feature set, including language choices, privacy-conscious feedback, manual travel guidance, and beta limits.
+
 ## 1.8.0
 
 - Replace the “SET” header label with the standard in-game options gear texture, while keeping an explanatory settings tooltip.
