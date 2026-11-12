@@ -10,6 +10,7 @@ local function liveCombat() return combatFlag(W.Safe(InCombatLockdown)) or comba
 function W.IsWorldMapOpen() return WorldMapFrame and combatFlag(W.Safe(WorldMapFrame.IsShown,WorldMapFrame)) or false end
 W.MapQuietRemaining=0
 function W.NoteMapInteraction()
+    if W.CancelPlanning then W.CancelPlanning() end
     W.MapQuietRemaining=.75;counters.mapChanges=counters.mapChanges+1
 end
 local hookedMap
@@ -26,6 +27,7 @@ function W.IsCombatActive()
 end
 function W.SetCombatUI(active)
     W.CombatActive=active==true
+    if W.CombatActive and W.CancelPlanning then W.CancelPlanning() end
     if W.MainFrame then
         if W.CombatActive then W.MainFrame:Hide()
         else W.MainFrame:SetShown(not W.GetProfile().panelHidden) end
@@ -44,44 +46,7 @@ local function pollSafety()
     local status,changed=W.TimedCall("safety scan",W.PollCombatSafety)
     return status=="ok" and changed
 end
-function W.Refresh(force,trigger)
-    if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then counters.mapDeferrals=counters.mapDeferrals+1;W.MapRefreshPending=true;return end
-    if W.IsCombatActive() then W.CombatRefreshPending=true;return end
-    if trigger=="combat-ended" then W.CombatRefreshPending=nil end
-    local started=debugprofilestop and debugprofilestop()
-    W.ActiveRefreshTrigger=trigger or (force and "manual" or "refresh")
-    W.LastAttemptTime=W.Now()
-    render("experience",W.SampleExperience)
-    local state,route,queue,detail;local captured=false
-    local ok,errorText=pcall(function()
-        counters.captures=counters.captures+1
-        local status,result=W.TimedCall("character capture",W.ReadCharacter)
-        if status~="ok" then error(result) end
-        state=result;captured=true
-        local previous=W.Decision
-        local noisy=trigger=="QUEST_LOG_UPDATE" or trigger=="maintenance" or trigger=="XP_REVIEW"
-        if not force and noisy and previous and previous.state.key==state.key and previous.state.signature==state.signature and W.Now()-(W.LastRefreshTime or 0)<60 and not W.LastError then return end
-        W.PlanExecutions=(W.PlanExecutions or 0)+1;W.LastRefreshTime=W.Now()
-        local planStatus
-        planStatus,route,queue,detail=W.TimedCall("route planner",W.PlanRoute,state,force,{previous=previous and previous.route,commitment=previous and previous.commitment,previousMapID=previous and previous.state.mapID,releasePlan=trigger=="manual-replan"})
-        if planStatus~="ok" then error(route) end
-        assert(type(route)=="table" and type(queue)=="table","Invalid planner result")
-    end)
-    if ok and not route then W.ActiveRefreshTrigger=nil;return end
-    if not ok then
-        route=nil;queue=nil;detail=nil
-        W.LastError=tostring(errorText)
-        state=state or W.Copy(W.State) or {key=W.GetCharacterKey(),name="Adventurer",className="Unknown",raceName="Unknown",zone="Unknown area",level=1,now=W.Now(),activeQuests={},completed={},completedCount=0,freeSlots=0,profile=W.GetProfile(),questLogReady=false,historyReady=false}
-        -- Preserve only a step revalidated against the fresh live quest log.
-        local prior=W.Decision and W.Decision.route
-        local q=captured and state.questLogReady and prior and state.activeByID and state.activeByID[prior.questID]
-        if q and not q.failed and not (state.combatSafety and state.combatSafety.alert) and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
-            local status,steps=W.Call(W.ActiveSteps,q,state)
-            if status=="ok" then for _,step in ipairs(steps) do if step.key==prior.key then route=step;route.ownerKey=state.key;break end end end
-        end
-        if route then queue={};detail={clearPin=false,candidates={},commitment=W.Decision.commitment,recovering=true}
-        else route={kind="wait",key="error",title="Waiting for reliable quest data",instruction="The current update could not be completed. Trailwarden will retry; /tw debug contains the details.",reason=W.LastError,ownerKey=state.key};queue={};detail={candidates={},clearPin=false} end
-    elseif W.LastError then W.RecoveredError=W.LastError;W.LastError=nil end
+local function publish(state,route,queue,detail,force,trigger,started)
     local decision={trigger=trigger or (force and "manual" or "refresh"),id=(W.Decision and W.Decision.id or 0)+1,state=state,route=W.Copy(route),queue=W.Copy(queue),detail=detail or {},commitment=detail and detail.commitment}
     -- Publish one completed decision; every visible output consumes this version.
     W.Decision=decision;W.State=decision.state;W.CurrentRoute=decision.route;W.Queue=decision.queue
@@ -101,7 +66,61 @@ function W.Refresh(force,trigger)
     if started then W.LastPlanMilliseconds=debugprofilestop()-started end
     W.ActiveRefreshTrigger=nil
 end
+function W.Refresh(force,trigger)
+    if W.CancelPlanning then W.CancelPlanning() end
+    if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then counters.mapDeferrals=counters.mapDeferrals+1;W.MapRefreshPending=true;return end
+    if W.IsCombatActive() then W.CombatRefreshPending=true;return end
+    if trigger=="combat-ended" then W.CombatRefreshPending=nil end
+    W.EnsureProvider()
+    local started=debugprofilestop and debugprofilestop()
+    W.ActiveRefreshTrigger=trigger or (force and "manual" or "refresh")
+    W.LastAttemptTime=W.Now()
+    render("experience",W.SampleExperience)
+    local state,route,queue,detail;local captured=false;local scheduled=false
+    local ok,errorText=pcall(function()
+        counters.captures=counters.captures+1
+        local status,result=W.TimedCall("character capture",W.ReadCharacter)
+        if status~="ok" then error(result) end
+        state=result;captured=true
+        local previous=W.Decision
+        local noisy=trigger=="QUEST_LOG_UPDATE" or trigger=="maintenance" or trigger=="XP_REVIEW"
+        if not force and noisy and previous and previous.state.key==state.key and previous.state.signature==state.signature and W.Now()-(W.LastRefreshTime or 0)<60 and not W.LastError then return end
+        W.PlanExecutions=(W.PlanExecutions or 0)+1;W.LastRefreshTime=W.Now()
+        if W.ShouldScheduleSelection and W.ShouldScheduleSelection(force,trigger) then
+            local status,input=W.TimedCall("planning input",W.PreparePlanInput,state,force,{previous=previous and previous.route,commitment=previous and previous.commitment,previousMapID=previous and previous.state.mapID,releasePlan=trigger=="manual-replan"})
+            if status~="ok" then error(input) end
+            scheduled=true
+            W.ScheduleSelection(input,function(r,q,d)
+                if W.LastError then W.RecoveredError=W.LastError;W.LastError=nil end
+                publish(state,r,q,d,force,trigger,started)
+            end,function(err) W.LastError=tostring(err);W.Refresh(true,"async-recovery") end)
+            W.ActiveRefreshTrigger=nil;return
+        end
+        local planStatus
+        planStatus,route,queue,detail=W.TimedCall("route planner",W.PlanRoute,state,force,{previous=previous and previous.route,commitment=previous and previous.commitment,previousMapID=previous and previous.state.mapID,releasePlan=trigger=="manual-replan"})
+        if planStatus~="ok" then error(route) end
+        assert(type(route)=="table" and type(queue)=="table","Invalid planner result")
+    end)
+    if scheduled then return end
+    if ok and not route then W.ActiveRefreshTrigger=nil;return end
+    if not ok then
+        route=nil;queue=nil;detail=nil
+        W.LastError=tostring(errorText)
+        state=state or W.Copy(W.State) or {key=W.GetCharacterKey(),name="Adventurer",className="Unknown",raceName="Unknown",zone="Unknown area",level=1,now=W.Now(),activeQuests={},completed={},completedCount=0,freeSlots=0,profile=W.GetProfile(),questLogReady=false,historyReady=false}
+        -- Preserve only a step revalidated against the fresh live quest log.
+        local prior=W.Decision and W.Decision.route
+        local q=captured and state.questLogReady and prior and state.activeByID and state.activeByID[prior.questID]
+        if q and not q.failed and not (state.combatSafety and state.combatSafety.alert) and not state.dead and not state.profile.paused and prior.ownerKey==state.key then
+            local status,steps=W.Call(W.ActiveSteps,q,state)
+            if status=="ok" then for _,step in ipairs(steps) do if step.key==prior.key then route=step;route.ownerKey=state.key;break end end end
+        end
+        if route then queue={};detail={clearPin=false,candidates={},commitment=W.Decision.commitment,recovering=true}
+        else route={kind="wait",key="error",title="Waiting for reliable quest data",instruction="The current update could not be completed. Trailwarden will retry; /tw debug contains the details.",reason=W.LastError,ownerKey=state.key};queue={};detail={candidates={},clearPin=false} end
+    elseif W.LastError then W.RecoveredError=W.LastError;W.LastError=nil end
+    publish(state,route,queue,detail,force,trigger,started)
+end
 local function schedule(force,event)
+    if W.CancelPlanning then W.CancelPlanning() end
     if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then W.MapRefreshPending=true;return end
     if W.IsCombatActive() then W.CombatRefreshPending=true;return end
     if event then pendingEvents[event]=true end
@@ -125,7 +144,7 @@ frame:SetScript("OnEvent",function(_,event,...)
     end
     if event=="PLAYER_LOGIN" then
         hookMap()
-        W.SetCombatUI(liveCombat())
+        W.EnsureProvider();W.SetCombatUI(liveCombat())
         W.ResetExperience();pollSafety();W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Trailwarden "..W.Version.."|r / Your character's route is ready. |cffffc366/tw|r opens the guide; |cffffc366/tw help|r lists controls.")
@@ -217,6 +236,7 @@ frame:SetScript("OnUpdate",function(_,dt)
     end
     if planElapsed>=2 then
         planElapsed=0
+        if W.ProviderRebuildNeeded then W.BuildQuestCatalog(true);return end
         if W.State then
             local current,previous=W.PlayerPoint(),W.State.player
             local area=W.Safe(W.ReadWorkArea,current)

@@ -18,4 +18,6 @@ verify = workflow.find('sha256sum --check --strict')
 extract = workflow.find(f'unzip -q {provider_archive}')
 if download < 0 or verify < download or extract < verify or provider_digest not in workflow or provider_archive not in workflow:
     raise SystemExit('The pinned QuestieDB Forever 1.0.14 archive must pass its SHA-256 check before extraction.')
+if 'tools/generate_catalog_index.py' not in workflow or '--check' not in workflow:
+    raise SystemExit('The generated provider zone index must be checked against the verified provider.')
 print('Installation matrix metadata: QuestieDB required; Questie and OpenMap optional.')

@@ -9,8 +9,9 @@ function CreateVector2D(x,y) return {GetXY=function() return x,y end} end
 C_Map={GetMapInfo=function() return {mapType=3} end,GetWorldPosFromMapPos=function(_,v) worldReads=worldReads+1;local x,y=v:GetXY();return 0,CreateVector2D(x*6000,y*4000) end}
 LibQuestieDB={Quest={GetAllIds=function() return ids end,Get=function(id,key)
  if key=='name' then return 'Quest '..id elseif key=='startedBy' then return {{id}} else return 1 end
-end},Npc={Get=function(id,key) if key=='spawns' then return {[1]=coords} elseif key=='name' then return 'NPC '..id end end},Support={Get=function() return {private={areaIdToUiMapId={[1]=1431}}} end}}
-dofile('Trailwarden/Common.lua');dofile('Trailwarden/Data.lua')
+end},Npc={Get=function(id,key) if key=='spawns' then local copy={};for i,c in ipairs(coords) do copy[i]={c[1],c[2]} end;return {[1]=copy} elseif key=='name' then return 'NPC '..id end end},Support={Get=function() return {private={areaIdToUiMapId={[1]=1431}}} end}}
+LibQuestieDB.RequireContract=function() return true end
+dofile('Trailwarden/Common.lua');dofile('Trailwarden/Data.lua');dofile('Trailwarden/Provider.lua')
 dofile(os.getenv('TRAILWARDEN_DATABASE_FILE') or 'Trailwarden/Database.lua')
 local W=Trailwarden
 collectgarbage('collect');local before=collectgarbage('count');local start=os.clock()

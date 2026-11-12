@@ -82,6 +82,7 @@ local function updateWorkFocus(state)
     state.workFocus=W.Copy(workFocus)
 end
 function W.ReadCharacter()
+    if W.EnsureProvider then W.EnsureProvider() end
     local p=W.GetProfile();validateContents(p)
     local className,classToken=W.Safe(UnitClass,"player")
     local raceName,raceToken,raceID=W.Safe(UnitRace,"player")

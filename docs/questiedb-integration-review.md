@@ -1,5 +1,7 @@
 # QuestieDB: konkret læring for Trailwarden
 
+Implementeret i v1.8.4: se [leverance og verificering](questiedb-implementation-1.8.4.md). Nedenstående analyse er bevaret som historisk grundlag.
+
 Analyse: 12. november 2026. Dette er en kildekodeanalyse og implementeringsplan; ingen runtimeændringer eller dependency-opgradering er udført som del af analysen.
 
 ## Grundlag og afgrænsning

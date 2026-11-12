@@ -257,6 +257,7 @@ local function forecastCandidates(out,state)
 end
 -- Candidate collection is the only routing layer that reads provider APIs.
 function W.CollectCandidates(state)
+    if W.ProviderError then return {candidates={},deferred={},gates={},ready=false,databaseStatus=W.ProviderError} end
     local out,deferred,gates={},{},{}
     local transitionStatus
     if state.questLogReady then
@@ -318,14 +319,16 @@ local function clusterCounts(all,w)
         local bucket=index[scope][key] or {};index[scope][key]=bucket;bucket[#bucket+1]=c
     end
     if radius>0 and radius<100000 then
-        for _,c in ipairs(all) do local p=c.point;if p then
+        for _,c in ipairs(all) do W.YieldPlanning();local p=c.point;if p then
             if W.IsFinite(p.wx) and W.IsFinite(p.wy) then add(world,p.continent,p.wx,p.wy,c) end
             if W.IsFinite(p.x) and W.IsFinite(p.y) then add(maps,p.mapID,p.x*20000,p.y*20000,c) end
         end end
     end
     for _,c in ipairs(all) do
+        W.YieldPlanning()
         local count,seen,checked=0,{},{}
         local function consider(other)
+            W.YieldPlanning()
             if not checked[other] then
                 checked[other]=true
                 if other.questID~=c.questID and other.point and not seen[other.questID] and W.TravelCost(c.point,other.point)<radius then count=count+1;seen[other.questID]=true end
@@ -436,6 +439,7 @@ function W.SelectRoute(input)
     local candidates,levelDeferred={},{};local previous=input.previous
     local copied={}
     for _,raw in ipairs(input.meta.candidates) do
+        W.YieldPlanning()
         local c=W.Copy(raw,copied)
         local skipped=state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID]
         local risk=c.combatRisk
@@ -466,6 +470,7 @@ function W.SelectRoute(input)
     local projections={}
     local scoreEvaluations=0
     for _,c in ipairs(candidates) do
+        W.YieldPlanning()
         c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan,clusters,distances,projections);scoreEvaluations=scoreEvaluations+1
         c.activityRank=c.kind=="escort" and 0 or 1
         local focus=not input.releasePlan and state.workFocus
@@ -536,6 +541,7 @@ function W.SelectRoute(input)
         local remainingProjections={}
         local nextStep,nextScore,nextBlocked,nextRank
         for _,c in ipairs(remaining) do
+                W.YieldPlanning()
                 -- Build the remaining list and its cluster counts once per leg.
                 local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan,remainingClusters,remainingDistances,remainingProjections);scoreEvaluations=scoreEvaluations+1
                 local rank=c.zoneRank
@@ -552,15 +558,15 @@ function W.SelectRoute(input)
     end
     return best,withDeferred(queue),detail
 end
-function W.PlanRoute(state,force,context)
+function W.PreparePlanInput(state,force,context)
     context=context or {previous=W.CurrentRoute}
     if state.profile.paused or state.dead then
         local input={state=W.Copy(state),meta={candidates={},deferred={},gates={},ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data"},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
-        local route,queue,detail=W.SelectRoute(input);detail.input=input;detail.candidateCount=0;detail.scoreEvaluations=0;return route,queue,detail
+        return input
     end
     if state.combatSafety and state.combatSafety.alert then
         local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
-        local route,queue,detail=W.SelectRoute(input);detail.input=input;return route,queue,detail
+        return input
     end
     W.BeginDataCapture()
     local ok,meta=pcall(W.CollectCandidates,state)
@@ -568,8 +574,11 @@ function W.PlanRoute(state,force,context)
     if not ok then error(meta) end
     meta.facts=facts
     local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
-    local route,queue,detail=W.SelectRoute(input)
-    detail.input=input
+    return input
+end
+function W.PlanRoute(state,force,context)
+    local input=W.PreparePlanInput(state,force,context)
+    local route,queue,detail=W.SelectRoute(input);detail.input=input
     return route,queue,detail
 end
 function W.PinStep(step) if step and not step.safetyHeld then local p=W.GetProfile();if step.levelDeferred then p.deferredLevels[step.questID]=nil end;p.pinned=step.key;W.Refresh(true) end end

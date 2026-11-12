@@ -1,6 +1,6 @@
 # Live feedback: map, combat and quest navigation
 
-Development branch from main at ba98bf6. No PR or release requested yet.
+Development branch from main at ba98bf6. The iterations below are historical. The user has now authorized final QA, PR and merge as 1.8.4; see [completed provider work](questiedb-implementation-1.8.4.md) and [release notes](release-notes-1.8.4.md).
 
 ## Changes
 

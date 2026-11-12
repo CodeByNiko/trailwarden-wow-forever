@@ -9,6 +9,8 @@ commands=[
  ['tools/run_lua.py','tests/scenarios.lua'],
  ['tools/run_lua.py','tests/engine.lua'],
  ['tools/run_lua.py','tests/provider_contract.lua'],
+ ['tools/run_lua.py','tests/provider_lifecycle.lua'],
+ ['tools/run_lua.py','tests/scheduler.lua'],
  ['tools/run_lua.py','tests/experience.lua'],
  ['tools/run_lua.py','tests/safety.lua'],
  ['tools/run_lua.py','tests/travel.lua'],

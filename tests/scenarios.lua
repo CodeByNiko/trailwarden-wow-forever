@@ -143,7 +143,7 @@ local qmodule={IsGroupQuest=function(id) return id==13 or id==19 end,IsPvPQuest=
  IsDailyQuest=function() return false end,IsWeeklyQuest=function() return false end,
  IsDoable=function(id) if id==39 then return nil end for _,q in ipairs(log) do if q.id==id then return false end end return true end}
 QuestieLoader={ImportModule=function(_,name) if name=="QuestieDB" then return qmodule end end}
-for _,file in ipairs({"Common","Locale","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Core","Commands"}) do dofile("Trailwarden/"..file..".lua") end
+for _,file in ipairs({"Common","Locale","Data","Provider","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Scheduler","Core","Commands"}) do dofile("Trailwarden/"..file..".lua") end
 local W=Trailwarden
 local passed=0
 function methods:StartMoving() self.moves=(self.moves or 0)+1 end
@@ -249,9 +249,9 @@ check("QuestieDB-only installation holds unclassified pickups as unknown",unknow
 check("QuestieDB-only policy explains the missing classification",unknownGate.reason:find("Questie",1,true)~=nil)
 qmodule.IsGroupQuest=groupClassifier;check("Questie installation applies group classification",not W.IsQuestAvailable(13,gs))
 log={{id=777,title="New high-level quest",level=45,wp={1431,.5,.5},rows={{type="event",text="New content"}}}};gs=scan();plan();local clientStep=W.ActiveSteps(gs.activeQuests[1],gs)[1];check("accepted quests retain client waypoint beyond pickup comfort",clientStep~=nil)
-W.GetProfile().pinned=clientStep.key;W.Refresh(true);local waypointDecision=W.Decision.id;local waypointX=W.CurrentRoute.x;log[1].wp={1431,.8,.5};W.Refresh(false,"QUEST_LOG_UPDATE")
+W.GetProfile().pinned=clientStep.key;W.Refresh(true);local waypointDecision=W.Decision.id;local waypointX=W.CurrentRoute.x;log[1].wp={1431,.8,.5};W.Refresh(false,"QUEST_LOG_UPDATE");drain()
 check("client waypoint-only changes invalidate the quest signature",W.Decision.id==waypointDecision+1 and W.CurrentRoute.x==.8 and W.CurrentRoute.x~=waypointX)
-waypointDecision=W.Decision.id;W.Refresh(false,"QUEST_LOG_UPDATE")
+waypointDecision=W.Decision.id;W.Refresh(false,"QUEST_LOG_UPDATE");drain()
 check("unchanged waypoint events remain throttled",W.Decision.id==waypointDecision)
 -- A working area remains stable until its objective changes.
 ne();log={{id=32,title="Two creatures",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false},{type="monster",objectiveID=302,text="Webwood spider",finished=false}}}}
@@ -351,7 +351,7 @@ QuestieLoader.ImportModule=moduleAPI
 -- Idle work is throttled, while movement/events still update the route.
 ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature",finished=false}}}};W.Refresh(true)
 local executions=W.PlanExecutions
-for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2) end
+for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain() end
 check("standing still avoids repeated full planning",W.PlanExecutions==executions)
 local experienceEvent=W.ExperienceEvent;local xpEventCalls=0
 W.ExperienceEvent=function(...) xpEventCalls=xpEventCalls+1;return experienceEvent(...) end
@@ -362,8 +362,8 @@ check("target and nameplate events do not invoke XP accounting",xpEventCalls==0)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player")
 check("XP events still invoke XP accounting",xpEventCalls==1)
 W.ExperienceEvent=experienceEvent
-epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
-epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
+epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain();check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
+epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain();check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
 W.GetProfile().panelHidden=false;W.GetProfile().navigatorHidden=false;W.UpdateNavigator()
 local combatPlans=W.PlanExecutions
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_DISABLED")
@@ -373,7 +373,7 @@ W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");W.EventFrame.scrip
 local pollCombat,navCombat=W.PollCombatSafety,W.UpdateNavigation;local polls,navigations=0,0
 W.PollCombatSafety=function(...) polls=polls+1;return pollCombat(...) end
 W.UpdateNavigation=function(...) navigations=navigations+1;return navCombat(...) end
-epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2)
+epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain()
 check("combat defers replanning and skips periodic navigation and nameplate scans",W.PlanExecutions==combatPlans and polls==0 and navigations==0)
 W.PollCombatSafety=pollCombat;W.UpdateNavigation=navCombat
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_ENABLED")
@@ -381,10 +381,10 @@ check("combat exit restores preferred windows and refreshes once",not W.CombatAc
 log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+4)
 local combatAPI=InCombatLockdown
 InCombatLockdown=function() return 1 end
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
 check("numeric combat API hides panel without a regen event",W.CombatActive and not W.MainFrame.shown and W.NavigatorFrame.shown)
 InCombatLockdown=function() return 0 end
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
 check("numeric zero exits combat and restores panel",not W.CombatActive and W.MainFrame.shown)
 InCombatLockdown=combatAPI
 local scan=W.PollCombatSafety;local scans=0
@@ -394,54 +394,54 @@ for i=1,100 do
     W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_REMOVED","nameplate"..i)
 end
 check("nameplate bursts do not cause population rescans",scans==0)
-W.EventFrame.scripts.OnUpdate(W.EventFrame,1)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,1);drain()
 check("nameplate changes share one periodic safety scan",scans==1)
 W.PollCombatSafety=scan
 local mapFrame=WorldMapFrame;WorldMapFrame=region("frame",nil,"TestWorldMap")
 local plansBeforeMap=W.PlanExecutions
 local readCharacter=W.ReadCharacter;local captures=0
 W.ReadCharacter=function(...) captures=captures+1;return readCharacter(...) end
-for i=1,20 do W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.1) end
+for i=1,20 do W.Refresh(false,"QUEST_LOG_UPDATE");drain();W.EventFrame.scripts.OnUpdate(W.EventFrame,.1);drain() end
 check("open map defers quest captures and planning",captures==0 and W.PlanExecutions==plansBeforeMap)
-WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
+WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain();drain()
 check("closing map does not immediately capture quest history",captures==0)
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain();drain()
 check("closing map coalesces deferred quest captures",captures==1)
 captures=0
 for i=1,20 do
-    WorldMapFrame:Show();W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
-    WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+    WorldMapFrame:Show();W.Refresh(false,"QUEST_LOG_UPDATE");drain();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
+    WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
 end
 drain()
 check("rapid toggles keep captures blocked until the map settles",captures==0)
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain();drain()
 check("rapid repeated map toggles share one deferred quest capture",captures==1)
 local stormPoll=W.PollCombatSafety;local stormScans=0
 W.PollCombatSafety=function(...) stormScans=stormScans+1;return stormPoll(...) end
 local initialNavigation=W.WorkCounters.navigation
 captures=0
 for i=1,100 do
-    WorldMapFrame:Show();W.EventFrame.scripts.OnUpdate(W.EventFrame,.02)
+    WorldMapFrame:Show();W.EventFrame.scripts.OnUpdate(W.EventFrame,.02);drain()
     W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE")
     for j=1,40 do W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_ADDED","nameplate"..j);W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_REMOVED","nameplate"..j) end
-    WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.02)
+    WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.02);drain()
     W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_TARGET_CHANGED");drain()
 end
 check("100 M-toggle cycles and 8000 nameplate events perform no heavy work between toggles",captures==0 and stormScans==0 and W.WorkCounters.navigation==initialNavigation)
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain();drain()
 check("event storm catches up once after the final map closure",captures==1 and stormScans<=2)
 W.PollCombatSafety=stormPoll
 WorldMapFrame={scripts={},IsShown=function() return false end,HookScript=function(self,event,fn) self.scripts[event]=fn end}
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
 captures=0
 WorldMapFrame.scripts.OnShow();WorldMapFrame.scripts.OnHide()
-W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
+W.Refresh(false,"QUEST_LOG_UPDATE");drain();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain();drain()
 check("show-hide hooks between update frames still block heavy capture",captures==0 and W.MapQuietRemaining>0)
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain();drain()
 check("between-frame map toggle catches up after settling",captures==1)
 local capturedBeforePerf=captures
 local perfSummary=W.PerformanceSummary(true)
-check("performance report identifies test build without capturing character",perfSummary:find("spikes-3",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
+check("performance report identifies test build without capturing character",perfSummary:find("1.8.4",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
 W.ReadCharacter=readCharacter;WorldMapFrame=mapFrame
 local questFrame,showPanel,selectQuest=QuestLogFrame,ShowUIPanel,QuestLog_SetSelection
 local selected,opened
@@ -620,14 +620,14 @@ W.ReadAccess=accessReader;W.UpdateNavigation()
 check("navigation recovers for the same decision without a quest event",not W.Decision.navigationError and W.CurrentRoute.key==W.Decision.route.key and W.Navigation.decisionID==W.Decision.id)
 local expectedRecoveryTitle=W.CurrentRoute.questName or W.CurrentRoute.title
 W.ReadAccess=function() error("synthetic OnUpdate access failure") end
-W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
 local unavailableTitle,skipDisabled=false,false
 for _,n in ipairs(nodes) do
  if n.kind=="font" and n.text=="Navigation unavailable" then unavailableTitle=true end
  if n.kind=="font" and n.text=="Skip 15 min" and n.parent.enabled==false then skipDisabled=true end
 end
 check("OnUpdate navigation failure fully renders error title and disables stale skip",unavailableTitle and skipDisabled)
-W.ReadAccess=accessReader;W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+W.ReadAccess=accessReader;W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
 local restoredTitle,skipEnabled=false,false
 for _,n in ipairs(nodes) do
  if n.kind=="font" and n.text==expectedRecoveryTitle then restoredTitle=true end
@@ -816,7 +816,7 @@ local rewardAPI=W.QuestRewardEstimate
 W.QuestRewardEstimate=function(id,state) if id==2 then return 500,"Questie adjusted reward" end return rewardAPI(id,state) end
 epoch=epoch+46;W.Refresh(false,"forecast-regression")
 local builds=W.ForecastBuilds or 0;local oldWork=W.CurrentRoute.economy.workSeconds
-for i=1,3 do log[1].rows[1].numFulfilled=i;W.Refresh(false,"QUEST_LOG_UPDATE") end
+for i=1,3 do log[1].rows[1].numFulfilled=i;W.Refresh(false,"QUEST_LOG_UPDATE");drain() end
 check("partial progress rebuilds stale forecast quantities immediately",(W.ForecastBuilds or 0)==builds+2 and W.CurrentRoute.questID==2 and W.CurrentRoute.economy.workSeconds<oldWork and W.CurrentRoute.remaining==1)
 builds=W.ForecastBuilds;local hits=W.ForecastCacheHits or 0;W.Refresh(false,"forecast-regression")
 check("unchanged progress still reuses forecast models",W.ForecastBuilds==builds and (W.ForecastCacheHits or 0)==hits+1)
@@ -880,7 +880,7 @@ W.GetProfile().offers={};W.Refresh(true)
 check("observed indoor cave context reaches the planner",W.State.workArea and W.State.workArea.id=="banethil")
 check("cave object source wins over a nearer outdoor source",W.CurrentRoute.questID==4200 and W.CurrentRoute.point.x>=.44)
 check("selected cave collection does not tell the player to leave",W.Navigation.travel.mode=="cave-interior")
-log[1].rows[2].numFulfilled=1;log[1].rows[2].finished=true;W.Refresh(false,"QUEST_LOG_UPDATE")
+log[1].rows[2].numFulfilled=1;log[1].rows[2].finished=true;W.Refresh(false,"QUEST_LOG_UPDATE");drain()
 local foundEscort=false;for _,o in ipairs(W.Decision.detail.opportunities) do if o.questID==99053 and o.activity=="escort" then foundEscort=true end end
 check("new Forever escort appears as a nearby opportunity before acceptance",foundEscort)
 check("escort exit pickup waits for unfinished cave collection",W.CurrentRoute.questID==4200)
@@ -900,10 +900,10 @@ check("active escort does not recommend running ahead to an endpoint",W.Navigati
 -- Failed quests must invalidate the noisy-event throttle without waiting a minute.
 local escortIndex=#log
 local beforeFailure=W.Decision.id
-log[escortIndex].complete=-1;W.Refresh(false,"QUEST_LOG_UPDATE")
+log[escortIndex].complete=-1;W.Refresh(false,"QUEST_LOG_UPDATE");drain()
 check("failed escort immediately releases guidance on quest-log update",W.CurrentRoute.kind~="escort" and W.Decision.id>beforeFailure)
 check("failed escort has no direct actionable steps",#W.ActiveSteps(W.State.activeByID[99053],W.State)==0)
-log[escortIndex].complete=false;W.Refresh(false,"QUEST_LOG_UPDATE")
+log[escortIndex].complete=false;W.Refresh(false,"QUEST_LOG_UPDATE");drain()
 check("restarted escort immediately becomes actionable again",W.CurrentRoute.kind=="escort")
 local failedPlanner=W.PlanRoute
 W.PlanRoute=function() error("synthetic failure at escort failure") end
@@ -915,7 +915,7 @@ check("completed escort releases escort activity",W.CurrentRoute.kind~="escort")
 -- The general progress guideline also works without a named cave record.
 W.CaveAccess={};GetSubZoneText=function() return "Unmapped underground area" end
 log[1].complete=false;log[1].rows[1].finished=false;log[1].rows[1].numRequired=2;log[1].rows[1].numFulfilled=0;W.Refresh(true)
-log[1].rows[1].numFulfilled=1;W.Refresh(false,"QUEST_LOG_UPDATE")
+log[1].rows[1].numFulfilled=1;W.Refresh(false,"QUEST_LOG_UPDATE");drain()
 check("unmapped interiors get a live context without quest-specific cave IDs",W.State.workArea.kind=="interior" and W.State.workFocus.questID==4200)
 check("partial collection stays active in an unmapped underground area",W.CurrentRoute.questID==4200)
 local priorItem=items[4200];items[4200]={name="Black Feather Quill"};W.Refresh(true)

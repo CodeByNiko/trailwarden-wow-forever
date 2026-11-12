@@ -4,17 +4,11 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
-## Current release: 1.8.3
+## Current release: 1.8.4
 
-The 1.8.0 feature set is delivered together as one release. The 1.8.2 update hides Trailwarden's windows and map pins during combat, then restores the saved visibility preferences afterward. It also pauses frequent navigation rendering and periodic nameplate scans during combat, and performs one route refresh when combat ends. The 1.8 series improves route reliability, objective matching, navigation recovery, cave handling, and a clearer guide that remains above ordinary addon panels. Version 1.8.3 reduces repeated navigation, safety and experience work. Recent fixes include:
+Version 1.8.4 focuses on map, combat and memory performance. The main guide hides during combat while the arrow retains lightweight guidance. Rapid map toggles coalesce into one update after the map settles. Click an active quest card or planned row to open its exact quest-log entry; shift-click a planned row to focus it.
 
-- Keep local quest guidance intact when a cave access point is refreshed with invalid coordinates.
-- Refresh the complete guide when navigation errors start or recover, and prioritize required cross-continent travel over local cave directions.
-- Match the strongest live objective name, preserve its client-provided wording, and keep uncertain XP projections out of reliable route comparisons.
-- Verify the pinned QuestieDB provider archive with its official SHA-256 before extraction.
-- Expand provider smoke checks to cover runtime modules, diagnostics, slash commands, and unexpected output errors.
-- Keep the guide visually distinct from overlapping addon panels, with clearer header controls and brighter hover feedback. The settings action uses the standard in-game options gear icon.
-- Keep the objective status line readable at common UI scales without cutting off “Above range”.
+Provider reads and replay capture have explicit budgets. A verified QuestieDB Forever 1.0.14 zone index avoids decoding starter spawns worldwide during normal startup, with a runtime fallback for different or corrected data. Automatic route selection runs in cancellable timer slices. `/tw perf` displays workload/provider counters and timings; `/tw perfreset` starts a fresh measurement window. Restart WoW after updating. Live FPS and memory effects depend on the client and addon set.
 
 See the [release notes](https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs) for all changes.
 
