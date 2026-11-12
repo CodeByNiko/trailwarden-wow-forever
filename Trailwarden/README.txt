@@ -1,4 +1,4 @@
-TRAILWARDEN 1.7.5 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.22 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -7,13 +7,22 @@ Renamed from Wayfinder in 1.7.2. Commands: /tw and /trailwarden.
 For existing settings, exit WoW and follow:
 https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md
 
-1.7.5 immediately releases failed quests and tolerates unknown-position
+Current 1.8 improvements include safer dynamic cave access, complete guide
+refresh after navigation errors, live objective-name and wording accuracy,
+conservative XP comparisons, and transport guidance that takes priority over
+local cave directions. Provider CI verifies the pinned QuestieDB archive by
+SHA-256 and exercises runtime modules, diagnostics, and slash commands.
+See the release notes for full details:
+https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs
+
+
+Earlier 1.7.5 behavior: failed quests and tolerates unknown-position
 markers when map metadata is unavailable. QuestieDB is required on CurseForge.
 
-1.7.4 improves readability, content-sized layout, objective progress,
+Earlier 1.7.4 improved readability, content-sized layout, objective progress,
 collapsed guidance, navigator captions and aligned preferences.
 
-1.7.1 keeps accepted local collection ahead of distant quest objectives,
+Earlier 1.7.1 kept accepted local collection ahead of distant quest objectives,
 even when an outside XP estimate is higher. Recent actual quest progress
 protects work beyond named caves. Nearby eligible offers remain visible;
 escort offers wait for local collection, then precede departure. Once accepted,

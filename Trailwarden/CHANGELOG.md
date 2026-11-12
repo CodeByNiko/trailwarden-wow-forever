@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.22
+- Update bundled Markdown and plain-text readmes to describe current 1.8 improvements rather than presenting version 1.7.5 as current.
+- Check packaged readme release labels during release-consistency validation.
+
 ## 1.8.21
 - Verify the official QuestieDB Forever 1.0.14 provider ZIP against its published SHA-256 digest before extraction.
 - Guard the install-matrix workflow against removing or reordering the archive verification.
