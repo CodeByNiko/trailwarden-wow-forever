@@ -60,6 +60,20 @@ for subject in ('nightelf','dwarf','settings','empty','compact','cave'):
             arrow=Image.open(root/'Trailwarden/Media/Arrow.tga').convert('RGBA').resize((w,h))
             arrow=arrow.rotate(math.degrees(node.get('rotation',0)),resample=Image.Resampling.BICUBIC)
             image.alpha_composite(arrow,(x,y))
+        if node['texture'].endswith('UI-OptionsButton'):
+            # The game provides this gear texture. Draw a simple stand-in in
+            # previews because the Blizzard texture is not part of the repo.
+            import math as _math
+            cx,cy=x+w/2,y+h/2;radius=min(w,h)*.34
+            for tooth in range(8):
+                angle=tooth*_math.pi/4
+                ux,uy=_math.cos(angle),_math.sin(angle);vx,vy=-uy,ux
+                points=[]
+                for along,across in ((-1,-1),(1,-1),(1,1),(-1,1)):
+                    points.append((cx+ux*(radius+along*1.1)+vx*across*1.0,cy+uy*(radius+along*1.1)+vy*across*1.0))
+                draw.polygon(points,fill=(100,219,217,255))
+            draw.ellipse((cx-radius,cy-radius,cx+radius,cy+radius),fill=(100,219,217,255))
+            draw.ellipse((cx-1.5,cy-1.5,cx+1.5,cy+1.5),fill=(11,18,26,255))
     draw=ImageDraw.Draw(image)
     draw.text((28,730),'Development render from actual frame calls · synthetic quest data',font=ImageFont.truetype(font_path,11),fill='#8398a5')
     draw.text((28,749),'Fonts and textures may appear slightly different in the game client.',font=ImageFont.truetype(font_path,11),fill='#8398a5')
