@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.24
+- Give the objective status caption more horizontal space and reduce its font slightly so “Above range” remains visible beside progress.
+- Add a regression check for the full high-level objective status label.
+
 ## 1.8.23
 - Raise the guide and navigator above ordinary addon panels and make them top-level so they do not disappear behind overlapping addon windows.
 - Replace compact header icons with readable settings, collapse, and close controls; add hover feedback and brief tooltips.
