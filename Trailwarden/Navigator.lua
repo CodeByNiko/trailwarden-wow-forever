@@ -52,7 +52,8 @@ local function readNavigation(route,previous)
         if status=="ok" then travel=result;W.AccessError=nil else travel={mode="error",navRoute={kind="wait"},label="Access data unavailable"};W.AccessError=tostring(result) end
     end
     local n=W.ComputeNavigation(travel.navRoute,player,W.Safe(GetPlayerFacing),previous)
-    travel.instruction=travel.instruction or W.ManualTransportHint(copy,player)
+    local transitHint=W.ManualTransportHint(copy,player)
+    if transitHint then travel.instruction=transitHint end
     n.travel=travel;n.navRoute=travel.navRoute
     if travel.mode=="cave-approach" then
         if n.arrived then n.label="Enter "..travel.caveName elseif n.bearing then n.label="Following cave entrance" end

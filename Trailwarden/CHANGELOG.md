@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.20
+- Give manual cross-continent transit guidance priority over local cave-entrance directions until the player reaches the destination continent.
+- Keep the navigation state explicit that a transport connection is needed.
+
 ## 1.8.19
 - Load Locale, Diagnostics, and Commands in the fresh provider-integration addon namespace using the runtime TOC order.
 - Assert diagnostics, slash-command registration, and absence of runtime output errors before reporting provider smoke success.

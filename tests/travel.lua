@@ -80,6 +80,11 @@ check("ambiguous POI links stay manual instead of choosing an entrance",W.ReadAc
 local distant= W.Copy(route);distant.point=W.Copy(route.point);distant.point.continent=0;distant.point.mapID=1411
 local transportHint=W.ManualTransportHint(distant,player)
 check("cross-continent target names its destination and requires manual transit",transportHint and transportHint:find("Durotar",1,true) and transportHint:find("does not guess",1,true))
+local distantPlayer=W.Copy(player);distantPlayer.continent=0
+local savedPlayerPoint=W.PlayerPoint;W.PlayerPoint=function() return distantPlayer end
+local caveTransit=W.NavigationInfo(dynamicRoute)
+check("manual continent transit guidance takes priority over cave entry instructions",caveTransit.label=="Travel connection needed" and caveTransit.travel.instruction:find("Use the in-game transport map",1,true) and not caveTransit.travel.instruction:find("Head to the Skull Rock entrance",1,true))
+W.PlayerPoint=savedPlayerPoint
 C_AreaPoiInfo=nil
 local n=W.UpdateNavigation()
 check("entrance fallback is built into Trailwarden",n.navRoute.kind=="entrance")
