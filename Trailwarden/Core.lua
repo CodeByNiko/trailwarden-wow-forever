@@ -45,6 +45,7 @@ function W.Refresh(force,trigger)
     if detail and detail.clearPin then W.GetProfile().pinned=nil;state.profile.pinned=nil end
     if state.questLogReady then W.LastGoodState=W.Copy(state) end
     render("navigation",W.UpdateNavigation)
+    W.NavigationPanelRefresh=nil -- The complete panel render below consumes any transition.
     render("waypoint",W.SyncWaypoint,decision.route,force)
     local panelOK=render("panel",W.UpdateUI)
     if not panelOK and W.MainFrame then W.MainFrame:Hide() end
@@ -62,40 +63,6 @@ local function schedule(force,event)
         W.Refresh(force,table.concat(events,","))
     end
     if C_Timer then C_Timer.After(.5,update) else update() end
-end
-function W.Diagnostics()
-    local s=W.State or W.ReadCharacter();local r=W.CurrentRoute or {};local n=W.Navigation or {}
-    local lines={"Trailwarden "..W.Version,"Decision: "..tostring(W.Decision and W.Decision.id).." / navigation "..tostring(n.decisionID).." / map "..tostring(W.WaypointDecisionID),
-        "Character: "..s.name.." / "..s.raceName.." "..s.className.." / level "..s.level,
-        "Zone: "..s.zone.." / map "..tostring(s.mapID),"Quest log ready: "..tostring(s.questLogReady).." / history ready: "..tostring(s.historyReady),
-        "Quest log: "..#s.activeQuests.." active / "..s.completedCount.." completed / revision "..tostring(s.revision),
-        "Catalog: "..tostring(W.CatalogState).." / "..tostring(W.CatalogCount or 0).." quests / "..tostring(W.DatabaseStatus),"Catalog error: "..tostring(W.CatalogError or "none"),
-        "Step: "..tostring(r.key).." / "..tostring(r.title),"Target: "..tostring(r.target).." / "..tostring(r.mapID).." / "..tostring(r.x)..", "..tostring(r.y),
-        "Map pins: "..tostring(W.OverlayStatus),"Planner work area: "..tostring(s.workArea and s.workArea.id).." / region "..tostring(s.regionMapID),
-        "Access: "..tostring(n.travel and n.travel.mode).." / cave "..tostring(n.travel and n.travel.caveID).." / source "..tostring(n.travel and n.travel.entry and n.travel.entry.accessSource).." / error "..tostring(W.AccessError or "none"),
-        "Navigation: "..(n.label or "none").." / distance "..tostring(n.distance),"Last plan: "..string.format("%.2f",W.LastPlanMilliseconds or 0).." ms / event "..tostring(W.LastEvent),
-        "Last error: "..tostring(W.LastError or "none"),"Event error: "..tostring(W.EventError or "none"),"Recovered error: "..tostring(W.RecoveredError or "none"),"Map waypoint: "..tostring(W.WaypointStatus),"Local replay: /tw trace (last 20 decisions)","Deferred / unmapped:"}
-    for _,issue in ipairs(s.readIssues or {}) do lines[#lines+1]="Read issue: "..issue end
-    for _,q in ipairs(W.Unmapped or {}) do lines[#lines+1]=q.id.." / "..q.title.." / "..q.reason end
-    local e=W.SafeExperienceStats()
-    lines[#lines+1]="XP: "..W.FormatXP(e.totalXP).." / rolling "..W.FormatXP(e.rate).." per hour / next level "..W.FormatETA(e.eta)
-    lines[#lines+1]="XP sources: "..e.kills.." rewarded kills / "..e.turnins.." turn-ins / "..e.questXP.." event quest XP"
-    lines[#lines+1]="XP pace: "..string.format("%.1f",e.moveSpeed).." yards/sec / "..string.format("%.1f",e.killSeconds).." seconds/kill"
-    lines[#lines+1]="XP quest model: "..(r.economy and W.FormatXP(r.economy.xpPerHour) or "unknown").." / "..(r.economy and r.economy.confidence or "unknown")
-    lines[#lines+1]="Region plan: "..tostring(W.Decision and W.Decision.commitment and W.Decision.commitment.mapID)
-    lines[#lines+1]="Forecast error: "..tostring(W.ForecastError or "none").." / learning error: "..tostring(W.LearningError or "none")
-    lines[#lines+1]="Combat target cap: +"..W.CombatLevelMargin.." / risk revision "..tostring(s.combatSafety and s.combatSafety.revision)
-    lines[#lines+1]="Planning: "..tostring(W.PlanExecutions).." selections / "..tostring(W.ForecastBuilds or 0).." forecasts / "..tostring(W.ForecastCacheHits or 0).." cached forecasts"
-    for id,message in pairs(W.TargetErrors or {}) do lines[#lines+1]="Target "..id..": "..message end
-    lines[#lines+1]="Active quest objectives:"
-    for _,q in ipairs(s.activeQuests) do
-        lines[#lines+1]=q.id.." / "..q.title.." / complete="..tostring(q.isComplete).." / objectives ready="..tostring(q.objectivesReady)
-        for _,o in ipairs(q.objectives) do lines[#lines+1]="  "..tostring(o.type).." / "..tostring(o.id).." / "..o.text.." / "..tostring(o.fulfilled).."/"..tostring(o.required).." / done="..tostring(o.finished) end
-    end
-    lines[#lines+1]="Output/data errors:"
-    for key,value in pairs(W.OutputErrors or {}) do lines[#lines+1]=key..": "..value end
-    for key,value in pairs(W.DataIssues or {}) do lines[#lines+1]=key..": "..value end
-    return table.concat(lines,"\n")
 end
 for _,event in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
@@ -137,7 +104,15 @@ frame:SetScript("OnUpdate",function(_,dt)
         if W.State then render("route overlay",W.UpdateRouteOverlay) end
         if W.Safe(W.PollCombatSafety) then W.Refresh(false,"combat-safety") end
     end
-    if navElapsed>=.1 then navElapsed=0;if W.State then render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator);render("live panel",W.UpdateLiveUI) end end
+    if navElapsed>=.1 then
+        navElapsed=0
+        if W.State then
+            render("navigation",W.UpdateNavigation);render("navigator",W.UpdateNavigator)
+            if W.NavigationPanelRefresh then
+                W.NavigationPanelRefresh=nil;render("navigation transition panel",W.UpdateUI)
+            else render("live panel",W.UpdateLiveUI) end
+        end
+    end
     if planElapsed>=2 then
         planElapsed=0
         if W.State then
@@ -151,30 +126,3 @@ frame:SetScript("OnUpdate",function(_,dt)
         end
     end
 end)
-SLASH_TRAILWARDEN1="/trailwarden";SLASH_TRAILWARDEN2="/tw"
-SlashCmdList.TRAILWARDEN=function(message)
-    local cmd=string.lower((message or ""):match("^%s*(.-)%s*$"));local p=W.GetProfile()
-    local scale=cmd:match("^scale%s+(%d+)$");local arrowScale=cmd:match("^arrowscale%s+(%d+)$")
-    if scale or arrowScale then W.SetDisplayScale(scale and "uiScale" or "navigatorScale",tonumber(scale or arrowScale)/100);return end
-    if cmd=="" then W.ToggleUI()
-    elseif cmd=="arrow" then W.ToggleNavigator()
-    elseif cmd=="routepins" then p.routeOverlay=not p.routeOverlay;W.ClearRouteOverlay();W.UpdateRouteOverlay()
-    elseif cmd=="settings" then W.ToggleSettings()
-    elseif cmd=="lock" then p.locked=not p.locked;W.Refresh(true)
-    elseif cmd=="refresh" then p.pinned=nil;W.Refresh(true,"manual-replan")
-    elseif cmd=="rebuild" then W.BuildQuestCatalog(true)
-    elseif cmd=="skip" then W.SkipCurrent()
-    elseif cmd=="later" then W.DeferCurrent()
-    elseif cmd=="undo" then W.UndoSkip()
-    elseif cmd=="pause" then p.paused=true;W.Refresh(true)
-    elseif cmd=="resume" then p.paused=false;p.pinned=nil;W.Refresh(true)
-    elseif cmd=="group" then p.includeGroup=not p.includeGroup;W.Refresh(true)
-    elseif cmd=="auto" then p.mapSync=not p.mapSync;W.Refresh(true)
-    elseif cmd=="reset" then p.panelPoint=nil;p.navigatorPoint=nil;W.ApplyPositions()
-    elseif cmd=="debug" then W.ShowDiagnostics()
-    elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
-    elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
-    elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, trace, xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
-end
-

@@ -1,5 +1,5 @@
 local W=Trailwarden
-local defaults={routeOverlay=true,xpRouting=true,includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false}
+local defaults={routeOverlay=true,xpRouting=true,includeGroup=false,maxLevelAbove=2,navigatorHidden=false,mapSync=true,panelHidden=false,collapsed=false,uiScale=.9,navigatorScale=1,queueRows=2,paused=false,locked=false,language="auto"}
 local function validID(id) return W.IsFinite(id) and id>0 and id%1==0 end
 local function cleanPosition(pos)
     if type(pos)~="table" or type(pos.point)~="string" or type(pos.relativePoint)~="string" or not W.IsFinite(pos.x) or not W.IsFinite(pos.y) then return nil end
@@ -33,6 +33,7 @@ function W.GetProfile()
         TrailwardenDB.profiles[key]=p
     end
     for k,v in pairs(defaults) do if type(p[k])~=type(v) then p[k]=v end end
+    if p.language~="auto" and p.language~="en" and p.language~="da" then p.language="auto" end
     if p.displayVersion~=2 then
         if p.uiScale==1 then p.uiScale=.9 end
         p.displayVersion=2
@@ -127,7 +128,10 @@ function W.ReadCharacter()
             end
             local m,x,y=W.Safe(ql.GetNextWaypoint,id);q.waypoint=W.Point(m,x,y)
             if q.waypoint then q.waypoint.source="Client waypoint" end
-            local fingerprint={tostring(id),tostring(q.isComplete),tostring(q.failed),tostring(q.objectivesReady)}
+            local fingerprint={tostring(id),tostring(q.isComplete),tostring(q.failed),tostring(q.objectivesReady),
+                tostring(q.waypoint and q.waypoint.mapID or ""),
+                q.waypoint and string.format("%.5f",q.waypoint.x) or "",
+                q.waypoint and string.format("%.5f",q.waypoint.y) or ""}
             for _,o in ipairs(q.objectives) do fingerprint[#fingerprint+1]=table.concat({tostring(o.type),tostring(o.objectiveType),tostring(o.id),tostring(o.fulfilled),tostring(o.required),tostring(o.finished)},":") end
             q.fingerprint=table.concat(fingerprint,"/")
             state.activeQuests[#state.activeQuests+1]=q;state.activeByID[id]=q

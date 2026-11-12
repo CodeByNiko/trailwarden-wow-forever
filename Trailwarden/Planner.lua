@@ -9,7 +9,7 @@ local function makeStep(kind,q,point,target,suffix,source,objectiveText)
     elseif kind=="item" then instruction="Use "..target.." in your bags to begin this quest."
     else instruction=objectiveText or ("Work around "..target.." until the quest objective updates.") end
     return {kind=kind,key=W.StepKey(kind,q.id,suffix),questID=q.id,questName=name,title=(labels[kind] or "")..name,point=point,
-        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,combatRisk=point and point.combatRisk,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)..":"..tostring(point and point.combatRisk and point.combatRisk.signature or "noncombat")}
+        mapID=point and point.mapID,x=point and point.x,y=point and point.y,target=target,instruction=instruction,source=source or "QuestieDB",level=q.level or W.Q(q.id,"questLevel"),fingerprint=q.fingerprint,combatRisk=point and point.combatRisk,classQuest=(W.Q(q.id,"requiredClasses") or 0)>0,targetRevision=(point and point.source or source or "database")..":"..tostring(point and point.observedAt or W.PublishedCatalogGeneration or 0)..":"..tostring(point and point.combatRisk and point.combatRisk.signature or "noncombat")..((source or point and point.source)=="Client waypoint" and (":"..tostring(q.waypoint and q.waypoint.mapID or "")..":"..tostring(q.waypoint and q.waypoint.x or "")..":"..tostring(q.waypoint and q.waypoint.y or "")) or "")}
 end
 local function nearestObjective(points,state)
     if state.workArea and W.MatchCave then
@@ -29,34 +29,44 @@ local function relationPoint(q,field,kind,state)
     return (kind=="pickup" and nearestObjective(points,state) or W.NearestPoint(points,state.player,state.mapID)),"QuestieDB"
 end
 local typeName={[1]="monster",[2]="object",[3]="item"}
-local function objectiveFinished(q,group,index,entry,entries)
+local function matchObjectiveRows(q,group,entries)
     local kind=typeName[group]
     local entityKind=group==1 and "Npc" or group==2 and "Object" or "Item"
     local typed={}
     for _,row in ipairs(q.objectives) do if row.type==kind then typed[#typed+1]=row end end
-    local assigned,used={},{}
+    local matched,used={},{}
+    local function validEntityID(value) return type(value)=="number" and W.IsFinite(value) and value>0 and value%1==0 end
+    -- The client's objective ID is useful only inside the matching objective
+    -- type. Duplicate IDs on either side are not authoritative.
     for rowIndex,row in ipairs(typed) do
+        if validEntityID(row.id) then
+            local candidateIndex,candidateCount=nil,0
+            for i,candidate in ipairs(entries) do if validEntityID(candidate[1]) and candidate[1]==row.id then candidateIndex=i;candidateCount=candidateCount+1 end end
+            local rowCount=0;for _,other in ipairs(typed) do if other.id==row.id then rowCount=rowCount+1 end end
+            if candidateCount==1 and rowCount==1 then matched[candidateIndex]=row;used[rowIndex]=true end
+        end
+    end
+    -- Fall back to text only when it identifies one remaining provider entity
+    -- unambiguously. Never infer completion from provider/list order.
+    local proposals={}
+    for rowIndex,row in ipairs(typed) do if not used[rowIndex] and type(row.text)=="string" then
         local winner,length,tied=nil,0,false
         for i,candidate in ipairs(entries) do
             local name=W.DBGet(entityKind,candidate[1],"name")
-            if name and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
+            if type(name)=="string" and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
                 if #name>length then winner,length,tied=i,#name,false elseif #name==length then tied=true end
             end
         end
-        if winner and not tied and not assigned[winner] then assigned[winner]=row;used[rowIndex]=true end
+        if winner and not tied then proposals[rowIndex]=winner end
+    end end
+    local proposalCounts={};for _,candidateIndex in pairs(proposals) do proposalCounts[candidateIndex]=(proposalCounts[candidateIndex] or 0)+1 end
+    for rowIndex,candidateIndex in pairs(proposals) do
+        if proposalCounts[candidateIndex]==1 and not matched[candidateIndex] then matched[candidateIndex]=typed[rowIndex] end
     end
-    if #typed==#entries then
-        local missingEntries,missingRows={},{}
-        for i=1,#entries do if not assigned[i] then missingEntries[#missingEntries+1]=i end end
-        for i,row in ipairs(typed) do if not used[i] then missingRows[#missingRows+1]=row end end
-        if #missingEntries==1 and #missingRows==1 then assigned[missingEntries[1]]=missingRows[1]
-        elseif #missingEntries==#entries then
-            -- If no names are available, retain the provider's type-local order.
-            for i,row in ipairs(typed) do assigned[i]=row end
-        end
-    end
-    local row=assigned[index]
-    return row and row.finished or false,row and row.text,row
+    -- A sole live row and sole provider entity form a unique pair even when
+    -- the client omits objective IDs and localized text omits the entity name.
+    if #typed==1 and #entries==1 and not matched[1] then matched[1]=typed[1] end
+    return matched
 end
 local function entityObjectivePoints(kind,id,state,blocked,combat)
     if kind=="Npc" and combat~=false then return W.CombatPoints(id,state,blocked) end
@@ -111,9 +121,12 @@ function W.ActiveSteps(q,state)
     local objectives=W.Q(q.id,"objectives") or {}
     for group=1,3 do
         local entries=objectives[group] or {}
+        local liveByEntry=matchObjectiveRows(q,group,entries)
         for i,entry in ipairs(entries) do
-            local finished,text,live=objectiveFinished(q,group,i,entry,entries)
-            if not finished then
+            local live=liveByEntry[i];local text=live and live.text
+            if not live then
+                blocked[#blocked+1]={status="unknown",reason="Live objective could not be matched safely to its provider target"}
+            elseif not live.finished then
                 local riskStart=#blocked
                 local kind=group==1 and "Npc" or "Object"
                 local points=group==3 and itemPoints(entry[1],state,blocked) or entityObjectivePoints(kind,entry[1],state,blocked)
@@ -239,6 +252,7 @@ end
 -- Candidate collection is the only routing layer that reads provider APIs.
 function W.CollectCandidates(state)
     local out,deferred,gates={},{},{}
+    local transitionStatus
     if state.questLogReady then
         for _,q in ipairs(state.activeQuests) do
             local allowed,why=W.QuestPolicy(q.id,state,true)
@@ -264,9 +278,12 @@ function W.CollectCandidates(state)
         local localActions=0
         for _,c in ipairs(out) do if c.mapID==state.mapID or c.kind=="item" then localActions=localActions+1 end end
         if (localActions==0 or state.experience and state.experience.enabled) and state.freeSlots>0 and W.CatalogReady then
-            local zone=W.Zones[state.mapID];local maps={}
-            for _,id in ipairs(zone and zone.next or {}) do maps[id]=true end
+            local zoneID=state.regionMapID or state.mapID
+            local zone=W.Zones[zoneID];local maps={}
+            if zone then for _,id in ipairs(zone.next or {}) do if W.Zones[id] then maps[id]=true else transitionStatus="missing-edge-target" end end
+            else transitionStatus="unmapped-zone" end
             if next(maps)==nil then for id,z in pairs(W.Zones) do if zone and z.region==zone.region and z.min<=state.level and z.max>=state.level then maps[id]=true end end end
+            if next(maps)==nil and not transitionStatus then transitionStatus="no-supported-neighbor" elseif next(maps)~=nil then transitionStatus=nil end
             local ordered={};for id in pairs(maps) do ordered[#ordered+1]=id end;table.sort(ordered)
             for _,id in ipairs(ordered) do if id~=state.mapID then appendPickups(out,id,state,gates) end end
         end
@@ -281,14 +298,29 @@ function W.CollectCandidates(state)
         end
     end
     if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state) end
-    return {candidates=out,deferred=deferred,gates=gates,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
+    local policyUnknown=false;for _,gate in pairs(gates) do if gate.status=="unknown" and gate.source=="policy" then policyUnknown=true;break end end
+    return {candidates=out,deferred=deferred,gates=gates,policyUnknown=policyUnknown,transitionStatus=transitionStatus,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
 W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
 local function planningMap(c) return c.regionMapID or c.mapID end
-local function score(c,state,all,origin,w,releaseArea)
+local function clusterCounts(all,w)
+    local counts={}
+    for _,candidate in ipairs(all) do
+        local count,seen=0,{}
+        if candidate.point then
+            for _,other in ipairs(all) do
+                if other.questID~=candidate.questID and other.point and not seen[other.questID] and W.TravelCost(candidate.point,other.point)<w.clusterRadius then
+                    count=count+1;seen[other.questID]=true
+                end
+            end
+        end
+        counts[candidate.key]=count
+    end
+    return counts
+end
+local function score(c,state,all,origin,w,releaseArea,clusters)
     local d=c.kind=="item" and 0 or W.TravelCost(origin,c.point)
-    local cluster=0;local seen={}
-    if c.point then for _,other in ipairs(all) do if other.questID~=c.questID and other.point and W.TravelCost(c.point,other.point)<w.clusterRadius and not seen[other.questID] then cluster=cluster+1;seen[other.questID]=true end end end
+    local cluster=clusters and clusters[c.key] or 0
     local action=0
     if c.kind=="turnin" then
         local proximity=math.max(0,math.min(1,(w.turninFadeRadius-d)/(w.turninFadeRadius-w.turninFullRadius)))
@@ -323,13 +355,10 @@ local function score(c,state,all,origin,w,releaseArea)
     parts.efficiency=0
     if state.experience and state.experience.enabled and c.economyModel then
         local projected=W.ProjectQuestXP(c.economyModel,origin,state.experience)
-        if projected then
-            local certainty=projected.confidence=="medium" and 1 or .6
-            local baseline=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
-            -- Full-cycle XP already includes travel/work. Do not charge distance
-            -- a second time: rank known cycles by conservative XP return instead.
-            parts.efficiency=-baseline-(w.xpBias or 1000)*(projected.xpPerHour/math.max(1,state.experience.referenceRate or 6000))*certainty
-        end
+        local baseline=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
+        -- Full-cycle XP already includes travel/work. Do not charge distance
+        -- a second time; the helper also fails closed for low-confidence models.
+        parts.efficiency=W.XPRouteEfficiency(projected,state.experience,baseline,w.xpBias or 1000)
     end
     local value=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching+parts.efficiency
     return value,parts,cluster,blocked
@@ -339,6 +368,8 @@ local function fallback(input)
     local title,text="Finding your next quest"
     if not s.questLogReady then title="Waiting for your quest log";text="The live quest log is not ready. Trailwarden will retry without guessing your progress."
     elseif not m.ready then text=m.databaseStatus
+    elseif m.policyUnknown then title="Quest review needed";text="Questie is optional. Without its quest policy module, Trailwarden holds new database quest pickups whose PvP, raid or group type cannot be confirmed. Install Questie or use it to review new quests; accepted quests remain usable."
+    elseif m.transitionStatus=="unmapped-zone" or m.transitionStatus=="no-supported-neighbor" or m.transitionStatus=="missing-edge-target" then title="Local quests exhausted";text="No supported neighboring zone is configured for this area. Existing accepted quests remain available; use the map or Questie to choose another zone, then refresh Trailwarden."
     elseif not s.historyReady then text="Waiting for completed quest history. Active quests remain usable; database pickups wait for confirmation."
     elseif s.freeSlots==0 then text="Your quest log is full. Turn in a quest, or use Questie to review quests you no longer want."
     elseif #m.deferred>0 then text="Some active quests have unavailable targets or are outside your comfort settings. Use Questie or /tw debug for details."
@@ -386,8 +417,10 @@ function W.SelectRoute(input)
     if preferred and not hasZone(preferred) then preferred=nil end
     if not input.releasePlan and not preferred and hasZone(region) then preferred=region end
     -- Score only actionable candidates: skipped quests must not hold a batch open.
+    local clusters=clusterCounts(candidates,w)
+    local scoreEvaluations=0
     for _,c in ipairs(candidates) do
-        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan)
+        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan,clusters);scoreEvaluations=scoreEvaluations+1
         c.activityRank=c.kind=="escort" and 0 or 1
         local focus=not input.releasePlan and state.workFocus
         c.workFocusRank=c.reviewWork and 0 or focus and c.kind=="objective" and c.questID==focus.questID and c.point and (W.TravelCost(state.player,c.point)<=w.workAreaRadius or state.workArea and c.workAreaID==state.workArea.id) and 0 or 1
@@ -420,7 +453,7 @@ function W.SelectRoute(input)
     table.sort(levelDeferred,function(a,b) if a.resumeLevel~=b.resumeLevel then return a.resumeLevel<b.resumeLevel end return a.key<b.key end)
     local uniqueDeferred={};local seenDeferred={}
     for _,c in ipairs(levelDeferred) do if not seenDeferred[c.questID] then uniqueDeferred[#uniqueDeferred+1]=c;seenDeferred[c.questID]=true end end
-    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates,levelDeferred=uniqueDeferred,opportunities={}}
+    local detail={clearPin=pinned~=nil and not foundPin,candidates=candidates,levelDeferred=uniqueDeferred,opportunities={},candidateCount=#candidates,scoreEvaluations=scoreEvaluations,queuePreviewShortened=#candidates>128}
     for _,c in ipairs(candidates) do
         if c.kind=="pickup" and c.point and (state.workArea and c.workAreaID==state.workArea.id or W.TravelCost(state.player,c.point)<=120) then
             detail.opportunities[#detail.opportunities+1]={questID=c.questID,name=c.questName,activity=c.activity,target=c.target}
@@ -449,21 +482,22 @@ function W.SelectRoute(input)
         return waiting,withDeferred({}),detail
     end
     local queue={};local used={[best.key]=true};local from=best.point or state.player
-    for _=1,4 do
+    local queueDepth=detail.queuePreviewShortened and 1 or 4
+    for _=1,queueDepth do
+        local remaining={};for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
+        local remainingClusters=clusterCounts(remaining,w)
         local nextStep,nextScore,nextBlocked,nextRank
-        for _,c in ipairs(candidates) do
-            if not used[c.key] then
-                -- Each queued leg is evaluated from the preceding step, not the player's original position.
-                local remaining={}
-                for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
-                local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan)
+        for _,c in ipairs(remaining) do
+                -- Build the remaining list and its cluster counts once per leg.
+                local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan,remainingClusters);scoreEvaluations=scoreEvaluations+1
                 local rank=c.zoneRank
                 if not nextStep or nextBlocked and not blocked or blocked==nextBlocked and (rank<nextRank or rank==nextRank and (value<nextScore or value==nextScore and c.key<nextStep.key)) then nextStep,nextScore,nextBlocked,nextRank=c,value,blocked,rank end
-            end
         end
         if not nextStep then break end
         queue[#queue+1]=nextStep;used[nextStep.key]=true;from=nextStep.point or from
     end
+    detail.scoreEvaluations=scoreEvaluations
+    if detail.queuePreviewShortened then best.reason=best.reason.." The next-step preview is shortened to keep planning responsive." end
     if W.ChooseGrindBreak and best.kind~="escort" and not (best.kind=="objective" and (state.workArea or state.workFocus and state.workFocus.questID==best.questID)) then
         local chosen=W.ChooseGrindBreak(best,state,previous,detail)
         if chosen~=best then table.insert(queue,1,best);while #queue>4 do table.remove(queue) end;best=chosen end
@@ -472,6 +506,10 @@ function W.SelectRoute(input)
 end
 function W.PlanRoute(state,force,context)
     context=context or {previous=W.CurrentRoute}
+    if state.profile.paused or state.dead then
+        local input={state=W.Copy(state),meta={candidates={},deferred={},gates={},ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data"},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
+        local route,queue,detail=W.SelectRoute(input);detail.input=input;detail.candidateCount=0;detail.scoreEvaluations=0;return route,queue,detail
+    end
     if state.combatSafety and state.combatSafety.alert then
         local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
         local route,queue,detail=W.SelectRoute(input);detail.input=input;return route,queue,detail

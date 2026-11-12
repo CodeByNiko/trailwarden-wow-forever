@@ -1,5 +1,5 @@
 local W=Trailwarden
-local C={bg={0.025,0.043,0.065,0.97},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},line={0.15,0.25,0.31,1},text={0.94,0.96,0.97},muted={0.70,0.77,0.81},cyan={0.39,0.86,0.85},gold={0.98,0.79,0.47},green={0.53,0.88,0.68}}
+local C={bg={0.025,0.043,0.065,0.985},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},hover={0.10,0.17,0.21,1},line={0.15,0.25,0.31,1},text={0.94,0.96,0.97},muted={0.70,0.77,0.81},cyan={0.39,0.86,0.85},gold={0.98,0.79,0.47},green={0.53,0.88,0.68}}
 W.Colors=C
 function W.Font(parent,size,color)
     local f=parent:CreateFontString(nil,"OVERLAY","GameFontNormal")
@@ -15,8 +15,8 @@ function W.Button(parent,label,width,onClick)
     b:SetScript("OnClick",onClick)
     b:SetScript("OnDisable",function(self) self.label:SetTextColor(unpack(C.muted)) end)
     b:SetScript("OnEnable",function(self) self.label:SetTextColor(unpack(C.text)) end)
-    b:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan)) end)
-    b:SetScript("OnLeave",function(self) self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
+    b:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan)) end)
+    b:SetScript("OnLeave",function(self) self:SetBackdropColor(unpack(C.raised));self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
     return b
 end
 function W.Tooltip(owner,title,lines)
@@ -119,7 +119,7 @@ function W.CreateUI()
     if frame then return end
     local p=W.GetProfile()
     frame=CreateFrame("Frame","TrailwardenMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
-    frame:SetSize(324,456);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
+    frame:SetSize(324,456);frame:SetFrameStrata("HIGH");frame:SetToplevel(true);frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
     local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(322,46);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
@@ -127,16 +127,20 @@ function W.CreateUI()
     atText(head,"TRAILWARDEN",13,C.text,15,7,126,18)
     fields.subtitle=atText(head,"",11,C.muted,15,27,290,14);fields.subtitle:SetWordWrap(true)
     fields.summaryDistance=atText(head,"",11,C.gold,305,27,0,14);fields.summaryDistance:SetJustifyH("RIGHT");fields.summaryDistance:SetWordWrap(false)
-    fields.mode=atText(head,"",10,C.cyan,144,10,93,13);fields.mode:SetJustifyH("RIGHT")
+    fields.mode=atText(head,"",10,C.cyan,140,10,75,13);fields.mode:SetJustifyH("RIGHT")
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(322,1)
-    local close=W.Button(head,"×",20,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(20)
-    fields.fold=W.Button(head,"−",20,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-32,-8);fields.fold:SetHeight(20)
-    local config=W.Button(head,"⋯",22,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-56,-8);config:SetHeight(20)
+    local close=W.Button(head,"X",24,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(22)
+    fields.fold=W.Button(head,"-",24,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-40,-8);fields.fold:SetHeight(22)
+    local config=W.Button(head,"",24,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-72,-8);config:SetHeight(22);config.label:Hide()
+    config.icon=config:CreateTexture(nil,"ARTWORK");config.icon:SetTexture("Interface\\Buttons\\UI-OptionsButton");config.icon:SetVertexColor(unpack(C.cyan));config.icon:SetSize(14,14);config.icon:SetPoint("CENTER")
+    config:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Display settings",{"Adjust the guide size, preview rows, and other display preferences."}) end)
+    fields.fold:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Collapse or expand",{W.GetProfile().collapsed and "Show the current step and planned route." or "Keep only the compact current-step header visible."}) end)
+    close:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.gold));W.Tooltip(self,"Hide Trailwarden",{"Use /tw to show the guide again."}) end)
     local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-60);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
-    fields.action=atText(card,"",10,C.gold,12,10,190,14);fields.action:SetWordWrap(false)
+    fields.action=atText(card,"",9,C.gold,12,10,202,14);fields.action:SetWordWrap(false)
     fields.title=atText(card,"",16,C.text,12,30,268,40);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
     fields.target=atText(card,"",12,C.cyan,12,61,268,16);fields.target:SetWordWrap(true);fields.target:SetJustifyV("TOP")
-    fields.progress=atText(card,"",10,C.text,210,10,70,14);fields.progress:SetJustifyH("RIGHT");fields.progress:SetWordWrap(false)
+    fields.progress=atText(card,"",10,C.text,220,10,60,14);fields.progress:SetJustifyH("RIGHT");fields.progress:SetWordWrap(false)
     fields.progressTrack=CreateFrame("Frame",nil,card,"BackdropTemplate");fields.progressTrack:SetSize(268,3);W.Backdrop(fields.progressTrack,C.line)
     fields.progressFill=fields.progressTrack:CreateTexture(nil,"ARTWORK");fields.progressFill:SetPoint("TOPLEFT");fields.progressFill:SetSize(1,3);fields.progressFill:SetColorTexture(unpack(C.cyan))
     fields.instruction=atText(card,"",12,C.text,12,96,268,30);fields.instruction:SetJustifyV("TOP");fields.instruction:SetWordWrap(true)
@@ -144,7 +148,16 @@ function W.CreateUI()
         local r=W.CurrentRoute or {};local z=W.Zones[W.State and W.State.mapID]
         local point=r.point
         local location=point and W.IsFinite(point.x) and W.IsFinite(point.y) and string.format("%s · %.1f, %.1f",W.MapName(point.mapID),point.x*100,point.y*100) or ""
-        W.Tooltip(self,r.title or "Why this step?",{r.instruction or "",W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction or "",r.reason or "",location,z and z.hint or "",fields.statusText or "","Source: "..(r.source or "Live character state"),"Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log.","The arrow is direction only. Cyan pins mark known cave entrances; gold pins mark objectives. A marker is not a walking path.","Click a planned step to focus it. The plan updates as your quests change."})
+        local lines={r.instruction or ""}
+        for _,line in ipairs(W.TargetExplanation and W.TargetExplanation() or {r.reason or ""}) do lines[#lines+1]=line end
+        lines[#lines+1]=W.Navigation and W.Navigation.travel and W.Navigation.travel.instruction or ""
+        lines[#lines+1]=location;lines[#lines+1]=z and z.hint or "";lines[#lines+1]=fields.statusText or ""
+        lines[#lines+1]="Source: "..(r.source or "Live character state")
+        lines[#lines+1]="Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log."
+        lines[#lines+1]=W.L("marker_help");lines[#lines+1]=W.L("marker_path_warning")
+        lines[#lines+1]="Use /tw feedback for a reviewable summary without character names, quest names, or coordinates. Nothing is sent automatically."
+        lines[#lines+1]="Click a planned step to focus it. The plan updates as your quests change."
+        W.Tooltip(self,r.title or "Why this target?",lines)
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     local strip=CreateFrame("Frame",nil,card,"BackdropTemplate");fields.strip=strip;strip:SetSize(290,34);W.Backdrop(strip,C.raised)
@@ -177,7 +190,7 @@ function W.CreateUI()
             "Measured XP/h includes kills, quests and exploration. Travel and ordinary downtime count; pause/AFK do not.",
             "Session: "..W.FormatXP(e.totalXP).." XP / "..W.FormatXP(e.sessionRate).." XP/h. Rolling window: "..math.floor(e.windowSeconds/60).." min.",
             "Rewarded kills: "..e.kills.." / turn-ins: "..e.turnins..". Next-level time appears after five active minutes and uses the measured rolling rate.",
-            m and ("Quest cycle: ~"..W.FormatXP(m.xpPerHour).." XP/h · "..W.FormatDistance(m.travelDistance).." direct travel · "..W.FormatETA(m.seconds).." estimated. "..(m.confidence or "unknown").." confidence; "..(m.source or "Observed kills")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
+            m and ("Quest cycle: ~"..W.FormatXP(m.xpPerHour).." XP/h · "..W.FormatDistance(m.travelDistance).." direct travel · "..W.FormatETA(m.seconds).." estimated. "..(m.confidence or "unknown").." confidence; "..(m.source or "Observed kills")..(m.confidence~="medium" and ". Low-confidence estimates do not influence route selection." or "")) or "Quest XP/time data is incomplete; normal quest routing remains available.",
             "Quest projections include remaining work, travel and reward collection. New unaccepted quest quantities may be uncertain.",
             "Grind comparison: "..W.FormatXP(e.grind and e.grind.rate).." XP/h from verified local kills.",
             "The current region and unfinished objective stay committed; XP changes do not send you back and forth between zones.",
@@ -220,13 +233,14 @@ function W.CreateUI()
     local back=W.Button(settings,"Back to your route",292,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-510)
     head:EnableMouseWheel(true)
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
-    head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
+    head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; the gear opens display settings."}) end)
     head:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     W.ApplyPositions();layout();if p.panelHidden then frame:Hide() end
 end
 function W.UpdateUI()
     if not frame then W.CreateUI() end
     local state=W.State;if not state then return end
+    W.ActionLabels={escort=W.L("action_escort"),grind=W.L("action_grind"),pickup=W.L("action_pickup"),objective=W.L("action_objective"),turnin=W.L("action_turnin"),deliver=W.L("action_deliver"),item=W.L("action_item"),travel=W.L("action_travel"),wait=W.L("action_wait")}
     frame.renderDecisionID=W.Decision and W.Decision.id or 0
     local p=state.profile;local r=W.CurrentRoute or {}
     fields.mode:SetWordWrap(false);fields.mode:SetText(p.paused and "PAUSED" or p.pinned and "FOCUSED" or "AUTO")

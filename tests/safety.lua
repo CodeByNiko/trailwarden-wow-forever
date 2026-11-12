@@ -34,7 +34,7 @@ local quests={
 local numeric={questLevel=true,requiredClasses=true,requiredRaces=true,rank=true,minLevel=true,maxLevel=true}
 local function db(data) return {Get=function(id,key) local r=data[id];if not r then return nil end if r[key]~=nil then return r[key] end if numeric[key] then return 0 end if key=="objectives" or key=="startedBy" or key=="finishedBy" then return {} end end} end
 LibQuestieDB={Npc=db(npcs),Item=db(items),Quest=db(quests),Support={Get=function() return {private={areaIdToUiMapId="return {[10]=1431}"}} end}}
-for _,name in ipairs({"Common","Data","Database","Safety","Experience","Planner","Replay"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","Database","Safety","Experience","Planner","Replay"}) do dofile("Trailwarden/"..name..".lua") end
 local W=Trailwarden;local profiles={};local passed=0
 function W.GetCharacterKey() return guid end
 function W.GetProfile() profiles[guid]=profiles[guid] or {locations={},includeGroup=false,maxLevelAbove=2,skipped={},deferredLevels={}};return profiles[guid] end

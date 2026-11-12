@@ -16,6 +16,7 @@ from lupa.lua51 import LuaRuntime
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('provider', type=Path)
+parser.add_argument('--expected-version', help='Fail if the provider TOC version differs from this pinned release.')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 provider = args.provider.resolve()
@@ -29,6 +30,9 @@ for line in (provider / 'QuestieDB_Forever.toc').read_bytes().splitlines():
         metadata[key] = value.strip()
     elif line.strip() and not line.startswith(b'#'):
         files.append(line.decode().replace('\\', '/'))
+version = metadata.get(b'Version', b'').decode()
+if args.expected_version and version != args.expected_version:
+    raise SystemExit(f'Expected QuestieDB {args.expected_version}, found {version or "unknown"}')
 
 
 def to_lua(value):
@@ -79,7 +83,7 @@ lua.execute((root / 'tests/scenarios.lua').read_bytes())
 lua.execute(b'''
 LibQuestieDB=actualProvider;QuestDB=LibQuestieDB.Quest;NpcDB=LibQuestieDB.Npc
 ItemDB=LibQuestieDB.Item;ObjectDB=LibQuestieDB.Object
-QuestieLoader=nil;Trailwarden=nil;TrailwardenDB=nil;C_Timer=nil
+QuestieLoader=nil;Trailwarden=nil;TrailwardenDB=nil;C_Timer=nil;SlashCmdList={}
 UnitGUID=function(unit) if unit=="player" then return "Player-Provider-Smoke" end end
 UnitName=function() return "Provider test" end
 UnitClass=function() return "Warrior","WARRIOR",1 end
@@ -101,13 +105,21 @@ C_QuestLog.GetQuestObjectives=function() return objectiveRows end
 C_QuestLog.IsComplete=function() return false end
 C_QuestLog.GetAllCompletedQuestIDs=function() return {} end
 C_QuestLog.GetNextWaypoint=function() end
-for _,name in ipairs({"Common","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Core"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Core","Commands"}) do dofile("Trailwarden/"..name..".lua") end
 local refresh=Trailwarden.Refresh;Trailwarden.Refresh=nil;Trailwarden.BuildQuestCatalog();Trailwarden.Refresh=refresh
 assert(Trailwarden.CatalogReady,Trailwarden.CatalogError)
 assert(Trailwarden.CatalogCount==#LibQuestieDB.Quest.GetAllIds())
 Trailwarden.Refresh(true,"provider-smoke")
 assert(not Trailwarden.LastError,Trailwarden.LastError)
 assert(not Trailwarden.ForecastError,Trailwarden.ForecastError)
+assert(type(Trailwarden.Diagnostics)=="function","Diagnostics module was not loaded into the fresh addon namespace")
+assert(type(Trailwarden.TargetExplanation)=="function","Target explanation module was not loaded into the fresh addon namespace")
+assert(type(SlashCmdList.TRAILWARDEN)=="function","Slash commands were not registered in the fresh addon namespace")
+assert(Trailwarden.Diagnostics():find("Trailwarden",1,true),"Fresh-namespace diagnostics did not render")
+local commandOK,commandError=pcall(SlashCmdList.TRAILWARDEN,"debug")
+assert(commandOK,"Fresh-namespace debug command failed: "..tostring(commandError))
+assert(Trailwarden.DiagnosticsFrame and Trailwarden.DiagnosticsFrame.edit:GetText():find("Trailwarden",1,true),"Debug command did not render fresh-namespace diagnostics")
+assert(next(Trailwarden.OutputErrors or {})==nil,"Output errors after initial refresh: "..Trailwarden.Diagnostics())
 local accepted
 for _,c in ipairs(Trailwarden.Decision.detail.candidates) do
  if c.questID==456 and c.kind=="objective" then accepted=c;break end
@@ -116,7 +128,8 @@ assert(accepted and accepted.combatRisk.status=="allowed","Accepted quest requir
 Trailwarden.PinStep(accepted)
 assert(Trailwarden.CurrentRoute.questID==456 and Trailwarden.CurrentRoute.kind=="objective")
 assert(not Trailwarden.LastError and not Trailwarden.ForecastError)
+assert(next(Trailwarden.OutputErrors or {})==nil,"Output errors after pinning the provider objective: "..Trailwarden.Diagnostics())
 ''')
-print('QuestieDB', metadata[b'Version'].decode(), '/ contract', namespace[b'contractVersion'])
+print('QuestieDB', version, '/ contract', namespace[b'contractVersion'])
 print('Complete catalog:', globals_.Trailwarden[b'CatalogCount'], 'quests; accepted objective and forecasts passed')
 print('Provider reads are real; client APIs, position and objective counts are synthetic.')

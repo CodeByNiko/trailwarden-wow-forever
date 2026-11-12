@@ -30,6 +30,14 @@ function W.ComputeNavigation(route,player,facing,previous)
     if not W.IsFinite(facing) then return {distance=d,arrivalKey=key,label="Facing unavailable"} end
     return {distance=d,bearing=bearing,facing=facing,arrivalKey=key,label=point.mapID~=player.mapID and "Travel via roads / transit" or "Following your step"}
 end
+function W.ManualTransportHint(route,player)
+    local point=route and route.point
+    if not point or not player or not point.continent or not player.continent or point.continent==player.continent then return nil end
+    local mapID=W.QuestRegion and W.QuestRegion(point.mapID) or point.mapID
+    local zone=W.Zones and W.Zones[mapID]
+    local destination=zone and zone.name or "the destination continent"
+    return "Use the in-game transport map to reach "..destination..". Trailwarden does not guess boat or flight connections; use /tw refresh after arrival."
+end
 local function readNavigation(route,previous)
     local copy=route and W.Copy(route)
     if copy and copy.point then
@@ -44,6 +52,8 @@ local function readNavigation(route,previous)
         if status=="ok" then travel=result;W.AccessError=nil else travel={mode="error",navRoute={kind="wait"},label="Access data unavailable"};W.AccessError=tostring(result) end
     end
     local n=W.ComputeNavigation(travel.navRoute,player,W.Safe(GetPlayerFacing),previous)
+    local transitHint=W.ManualTransportHint(copy,player)
+    if transitHint then travel.instruction=transitHint end
     n.travel=travel;n.navRoute=travel.navRoute
     if travel.mode=="cave-approach" then
         if n.arrived then n.label="Enter "..travel.caveName elseif n.bearing then n.label="Following cave entrance" end
@@ -59,7 +69,29 @@ function W.NavigationInfo(route)
 end
 function W.UpdateNavigation()
     local decision=W.Decision
-    local n=readNavigation(decision and decision.route or W.CurrentRoute,W.Navigation)
+    local wasUnavailable=W.NavigationError~=nil or decision and decision.navigationError~=nil
+    local status,n=W.Call(readNavigation,decision and decision.route or W.CurrentRoute,W.Navigation)
+    if status~="ok" or n.travel and n.travel.mode=="error" then
+        local message=status~="ok" and tostring(n) or n.travel.label or "Access data unavailable"
+        local id=decision and decision.id or 0
+        W.Navigation={decisionID=id,label="Navigation unavailable",travel={mode="error",label="Navigation unavailable"}}
+        W.NavigationError=message
+        if not wasUnavailable then W.NavigationPanelRefresh=true end
+        if decision then
+            decision.navigationError=message
+            W.CurrentRoute={kind="wait",key="navigation-error",title="Navigation unavailable",instruction="The current target could not be mapped safely. Trailwarden is retrying; no old map marker or waypoint is being kept.",reason=message,ownerKey=decision.state and decision.state.key}
+            W.Queue={}
+        end
+        W.WaypointDecisionID=id
+        if W.ClearRouteOverlay then W.ClearRouteOverlay() end
+        if W.ReleaseWaypoint then W.ReleaseWaypoint();W.WaypointStatus="Navigation unavailable" end
+        return W.Navigation
+    end
+    W.NavigationError=nil
+    if wasUnavailable then W.NavigationPanelRefresh=true end
+    if decision and decision.navigationError then
+        decision.navigationError=nil;W.CurrentRoute=decision.route;W.Queue=decision.queue or {}
+    end
     n.decisionID=decision and decision.id or 0;W.Navigation=n
     if W.SyncWaypoint then W.SyncWaypoint(decision and decision.route or W.CurrentRoute,false) end
     return n
@@ -68,7 +100,7 @@ function W.CreateNavigator()
     if frame then return end
     local C=W.Colors
     frame=CreateFrame("Frame","TrailwardenNavigatorFrame",UIParent,"BackdropTemplate");W.NavigatorFrame=frame
-    frame:SetSize(174,122);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
+    frame:SetSize(174,122);frame:SetFrameStrata("HIGH");frame:SetToplevel(true);frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart",function(self) if not W.GetProfile().locked then self:StartMoving() end end)
     frame:SetScript("OnDragStop",function(self) self:StopMovingOrSizing();local a,_,b,x,y=self:GetPoint(1);W.GetProfile().navigatorPoint={point=a,relativePoint=b,x=x,y=y} end)
     arrow=frame:CreateTexture(nil,"ARTWORK");arrow:SetTexture("Interface\\AddOns\\Trailwarden\\Media\\Arrow.tga");arrow:SetSize(56,56);arrow:SetPoint("TOP",0,-1)
@@ -132,7 +164,8 @@ end
 function W.SyncWaypoint(route,force)
     W.WaypointDecisionID=W.Decision and W.Decision.id or 0
     local n=W.Navigation
-    if n and n.decisionID==W.WaypointDecisionID and (not route or route==W.CurrentRoute or W.Decision and route==W.Decision.route) then
+    if W.Decision then
+        if not n or n.decisionID~=W.Decision.id then W.ReleaseWaypoint();W.WaypointStatus="Synchronizing route";return end
         route=n.navRoute
     end
     if not W.GetProfile().mapSync then W.ReleaseWaypoint();W.WaypointStatus="Map sync off";return end

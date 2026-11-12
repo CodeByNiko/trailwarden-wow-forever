@@ -4,12 +4,16 @@ import subprocess
 import sys
 root=Path(__file__).resolve().parents[1]
 commands=[
+ ['tools/check_install_matrix.py'],
+ ['tools/check_release_consistency.py'],
  ['tools/run_lua.py','tests/scenarios.lua'],
  ['tools/run_lua.py','tests/engine.lua'],
  ['tools/run_lua.py','tests/provider_contract.lua'],
  ['tools/run_lua.py','tests/experience.lua'],
  ['tools/run_lua.py','tests/safety.lua'],
  ['tools/run_lua.py','tests/travel.lua'],
+ ['tools/run_lua.py','tests/localization.lua'],
+ ['tools/run_lua.py','tests/feedback.lua'],
  ['tools/replay.py','tests/journey-replay.json'],
  ['tools/replay.py','tests/replay-export.json'],
  ['tools/replay.py','tests/experience-replay.json'],

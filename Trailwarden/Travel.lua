@@ -7,6 +7,52 @@ W.CaveAccess={
  {id="shadowthread",poiID=908,name="Shadowthread Cave",mapID=1438,interiorMaps={[58]=true},continent=1,bounds={10715,660,11035,1140},entrance={10756.2,921.301}},
  {id="banethil",poiID=911,name="Ban'ethil Barrow Den",mapID=1438,interiorMaps={[60]=true,[61]=true},continent=1,bounds={9678.3,1355,9931.7,1735},entrance={9864.17,1557.41}},
 }
+local discoveredCaves={}
+-- Discover additional entrances only when the game links a surface Area POI to
+-- the exact interior UiMapID. No proximity guess or nearest-POI fallback.
+local function discoverCave(mapID)
+    if not W.IsFinite(mapID) or W.Zones and W.Zones[mapID] then return nil end
+    local cached=discoveredCaves[mapID]
+    if cached and W.Now()-cached.at<60 then return cached.cave end
+    local info=C_Map and W.Safe(C_Map.GetMapInfo,mapID)
+    local parent=info and info.parentMapID
+    if not parent or not W.Zones or not W.Zones[parent] then return nil end
+    local ids=C_AreaPoiInfo and W.Safe(C_AreaPoiInfo.GetAreaPOIForMap,parent)
+    local candidates={}
+    if type(ids)=="table" then
+        for _,poiID in ipairs(ids) do
+            local poi=W.Safe(C_AreaPoiInfo.GetAreaPOIInfo,parent,poiID)
+            if type(poi)=="table" and poi.linkedUiMapID==mapID and poi.position then
+                local x,y=W.Safe(poi.position.GetXY,poi.position);local point=x and y and W.Point(parent,x,y)
+                if point then candidates[#candidates+1]={poi=poi,point=point,poiID=poiID} end
+            end
+        end
+    end
+    local selected
+    if #candidates==1 then selected=candidates[1]
+    elseif #candidates>1 and type(info.name)=="string" then
+        for _,candidate in ipairs(candidates) do if candidate.poi.name==info.name then
+            if selected then selected=nil;break end
+            selected=candidate
+        end end
+    end
+    local cave
+    if selected then
+        local name=type(selected.poi.name)=="string" and selected.poi.name~="" and selected.poi.name or info.name
+        cave={id="area-poi:"..tostring(selected.poiID)..":"..tostring(mapID),poiID=selected.poiID,name=name,mapID=parent,continent=selected.point.continent,
+            interiorMaps={[mapID]=true},dynamic=true,entrancePoint=selected.point}
+    end
+    discoveredCaves[mapID]={at=W.Now(),cave=cave}
+    return cave
+end
+local function accessRecords(player,route)
+    local records=W.Copy(W.CaveAccess);local seen={}
+    for _,cave in ipairs(records) do for mapID in pairs(cave.interiorMaps) do seen[mapID]=true end end
+    local playerMap=player and player.mapID;local routeMap=route and route.mapID
+    if playerMap and not seen[playerMap] then local cave=discoverCave(playerMap);if cave then records[#records+1]=cave;seen[playerMap]=true end end
+    if routeMap and not seen[routeMap] then local cave=discoverCave(routeMap);if cave then records[#records+1]=cave;seen[routeMap]=true end end
+    return records
+end
 function W.PointFromWorld(mapID,continent,wx,wy)
     local base=W.Point(mapID,0,0)
     if not base or base.continent~=continent or not base.ex or not W.IsFinite(wx) or not W.IsFinite(wy) then return nil end
@@ -17,13 +63,16 @@ function W.PointFromWorld(mapID,continent,wx,wy)
 end
 local function inBounds(p,cave)
     local b=cave.bounds
-    return p and p.continent==cave.continent and W.IsFinite(p.wx) and W.IsFinite(p.wy) and p.wx>=b[1] and p.wx<=b[3] and p.wy>=b[2] and p.wy<=b[4]
+    return type(b)=="table" and W.IsFinite(b[1]) and W.IsFinite(b[2]) and W.IsFinite(b[3]) and W.IsFinite(b[4]) and
+        p and p.continent==cave.continent and W.IsFinite(p.wx) and W.IsFinite(p.wy) and p.wx>=b[1] and p.wx<=b[3] and p.wy>=b[2] and p.wy<=b[4]
 end
 function W.MatchCave(route)
     if not route or not route.point then return end
     for _,cave in ipairs(W.CaveAccess) do
         if cave.interiorMaps[route.mapID] or route.mapID==cave.mapID and (inBounds(route.point,cave) or cave.npcs and cave.npcs[route.point.entityID]) then return cave end
     end
+    local discovered=discoverCave(route.mapID)
+    if discovered and discovered.interiorMaps[route.mapID] then return discovered end
 end
 -- Capture only observed location evidence; 2D proximity cannot establish entry.
 function W.CaveForPlayer(player,facts,records)
@@ -33,9 +82,9 @@ function W.CaveForPlayer(player,facts,records)
         if cave.interiorMaps[player.mapID] or facts.indoors and type(names[cave.id])=="string" and facts.subzone==names[cave.id] then return cave end
     end
 end
-local function locationFacts()
+local function locationFacts(records)
     local facts={indoors=W.Safe(IsIndoors)==true,subzone=W.Safe(GetSubZoneText),names={},entrances={}}
-    for _,cave in ipairs(W.CaveAccess) do
+    for _,cave in ipairs(records or W.CaveAccess) do
         for map in pairs(cave.interiorMaps) do
             local info=C_Map and W.Safe(C_Map.GetMapInfo,map)
             if info and type(info.name)=="string" and info.name~="" then facts.names[cave.id]=info.name;break end
@@ -56,7 +105,7 @@ function W.QuestRegion(mapID)
     return original
 end
 function W.ReadWorkArea(player)
-    local cave=W.CaveForPlayer(player,locationFacts())
+    local records=accessRecords(player,nil);local cave=W.CaveForPlayer(player,locationFacts(records),records)
     if cave then return {id=cave.id,name=cave.name,mapID=cave.mapID,kind="cave"} end
     local indoors=W.Safe(IsIndoors)==true;local subzone=W.Safe(GetSubZoneText)
     if player and indoors and type(subzone)=="string" and subzone~="" then
@@ -88,20 +137,21 @@ function W.ResolveAccess(route,player,facts,records)
 end
 function W.ReadAccess(route,player)
     if not route or not route.point then return W.ResolveAccess(route,player,{}) end
-    local facts=locationFacts()
-    for _,cave in ipairs(W.CaveAccess) do
+    local records=accessRecords(player,route);local facts=locationFacts(records)
+    for _,cave in ipairs(records) do
+        if cave.dynamic and cave.entrancePoint then facts.entrances[cave.id]=cave.entrancePoint end
         local poi=C_AreaPoiInfo and W.Safe(C_AreaPoiInfo.GetAreaPOIInfo,cave.mapID,cave.poiID)
-        local point
+        local point=cave.dynamic and cave.entrancePoint or nil
         if type(poi)=="table" and poi.position and (poi.name==facts.names[cave.id] or cave.interiorMaps[poi.linkedUiMapID]) then
-            local x,y=W.Safe(poi.position.GetXY,poi.position);point=W.Point(cave.mapID,x,y)
-            if point then point.accessSource="Live entrance POI" end
+            local x,y=W.Safe(poi.position.GetXY,poi.position);local livePoint=x and y and W.Point(cave.mapID,x,y)
+            if livePoint then point=livePoint;point.accessSource="Live entrance POI" end
         end
-        if not point then
+        if not point and cave.entrance then
             point=W.PointFromWorld(cave.mapID,cave.continent,cave.entrance[1],cave.entrance[2])
             if not point and cave.fallback then point=W.Point(cave.mapID,cave.fallback[1],cave.fallback[2]) end
             if point then point.accessSource="Reference entrance" end
         end
         facts.entrances[cave.id]=point
     end
-    return W.ResolveAccess(route,player,facts)
+    return W.ResolveAccess(route,player,facts,records)
 end

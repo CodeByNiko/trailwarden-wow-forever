@@ -10,7 +10,7 @@ function UnitGUID() return guid end
 function UnitIsAFK() return afk end
 function GetUnitSpeed() return speed end
 function GetMaxPlayerLevel() return 60 end
-for _,name in ipairs({"Common","Data","Experience","Planner","Replay"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","Experience","Planner","Replay"}) do dofile("Trailwarden/"..name..".lua") end
 local W=Trailwarden;local passed=0
 local profiles={}
 function W.GetCharacterKey() return guid end
@@ -63,6 +63,16 @@ state.level=32;check("provider base reward falls with grey quest level",near(W.Q
 W.Import=function() return {GetQuestLogRewardXP=function(self,id) assert(type(self)=="table" and id==90001);return 3000 end} end
 check("consumer reward uses documented colon contract",W.QuestRewardEstimate(90001,state)==3000)
 W.Import=function() return nil end
+reset();state.level=22;W.State=state;W.CurrentRoute={questID=90001,economy={rewardXP=3000,xpPerHour=8000,seconds=120}}
+W.ExperienceEvent("QUEST_TURNED_IN",90001,3300)
+local calibration=W.ExperienceStats().calibration
+check("turn-in reward records a same-level observed estimate",W.QuestRewardEstimate(90001,state)==3300 and calibration and calibration.actualXP==3300)
+check("XP estimate difference is measured and exposed",calibration.percentError==65 and calibration.absoluteError==1300)
+local lowConfidence={rewardXP=2000,pickup=point(100),receiver=point(0),goals={{point=point(500),seconds=100,killXP=500}},confidence="low",interactionSeconds=40}
+local lowProjection=W.ProjectQuestXP(lowConfidence,point(0),{moveSpeed=10})
+local pace={enabled=true,referenceRate=6000};check("low-confidence XP projection has no route-ranking effect",W.XPRouteEfficiency(lowProjection,pace,200)==0)
+lowProjection.confidence="medium";check("medium-confidence projection can rank a route",W.XPRouteEfficiency(lowProjection,pace,200)<0)
+reset()
 local model={rewardXP=2000,pickup=point(100),receiver=point(0),goals={{point=point(500),seconds=100,killXP=500}},confidence="low",interactionSeconds=40}
 local projected=W.ProjectQuestXP(model,point(0),{moveSpeed=10})
 check("unaccepted cycle includes pickup work and return",near(projected.travelSeconds,120) and near(projected.seconds,260) and projected.rewardXP==2000 and projected.killXP==500)
@@ -121,6 +131,21 @@ W.PrepareQuestEconomies({a},state);check("base reward with unknown bonuses remai
 W.Import=function(name) if name=="QuestXP" then return {GetQuestLogRewardXP=function(self,id) return rewards[id] and rewards[id][2] or 0 end} end end
 state.experience.killTrusted=3;state.experience.killXP=100
 W.PrepareQuestEconomies({a},state);check("observed progress plus adjusted reward upgrades confidence",a.economy.confidence=="medium")
+local rewardEstimator=W.QuestRewardEstimate
+local uncertainReward=1
+W.QuestRewardEstimate=function(id)
+ if id==90001 then return 2000,"Questie adjusted reward" end
+ return uncertainReward,"Uncertain provider reward"
+end
+state.experience.enabled=true;state.experience.referenceRate=nil
+local lowA=step(90002,100,"pickup");local lowB=step(90004,200,"pickup")
+W.PrepareQuestEconomies({a,lowA,lowB},state)
+local stableReference=state.experience.referenceRate
+local stableEfficiency=W.XPRouteEfficiency(a.economy,state.experience,0,1000)
+uncertainReward=10000
+W.PrepareQuestEconomies({a,lowA,lowB},state)
+check("low-confidence reward changes cannot distort reference XP normalization",stableReference and near(state.experience.referenceRate,stableReference) and stableEfficiency==W.XPRouteEfficiency(a.economy,state.experience,0,1000) and lowA.economy.confidence=="low" and lowB.economy.confidence=="low")
+W.QuestRewardEstimate=rewardEstimator
 local before=a.economy.rewardXP
 state.activeByID[90003]={objectives={}};local ready=step(90003,0,"turnin")
 W.PrepareQuestEconomies({a,ready},state);check("shared hand-in hub counts each quest reward once",a.economy.rewardXP==before+500 and #a.economyModel.questIDs==2)
@@ -148,8 +173,12 @@ check("ETA formatting rounds conservatively",W.FormatETA(61)=="2m" and W.FormatE
 local unavailable=UnitXP;UnitXP=function() return nil end;W.SampleExperience();check("unavailable XP API remains explicit",not W.ExperienceStats().available);UnitXP=unavailable
 -- Rank accepted and unaccepted full cycles without client calls in selection.
 W.ActiveSteps=function(q) return {step(q.id,500)} end
+W.DBGet=function() return "Known synthetic target" end
+W.ExperienceStats();local learnedScores=W.GetProfile().xpLearning.quests
+learnedScores[90001]={seen=now,goals={{type="monster",entityID=1,required=3,secondsPerUnit=20,samples=3}}}
+learnedScores[90002]={seen=now,goals={{type="monster",entityID=1,required=3,secondsPerUnit=20,samples=3}}}
 local good=step(90001,100,"pickup");local poor=step(90002,100,"pickup")
-state.profile=W.Copy(W.GetProfile());state.activeByID={};state.activeQuests={};state.now=now;state.experience=W.ExperienceStats()
+state.profile=W.Copy(W.GetProfile());state.activeByID={};state.activeQuests={};state.now=now;state.experience=W.ExperienceStats();state.experience.killTrusted=3;state.experience.killXP=100
 W.PrepareQuestEconomies({poor,good},state)
 local routeInput={state=state,meta={candidates={poor,good},deferred={},ready=true},force=true,weights=W.Copy(W.RouteWeights)}
 local chosen,queue,d=W.SelectRoute(routeInput)

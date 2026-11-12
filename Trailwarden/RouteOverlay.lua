@@ -12,13 +12,14 @@ function W.ClearRouteOverlay()
     shownSignature=nil
 end
 local function icon(parent)
-    local f=CreateFrame("Frame",nil,parent);f:SetSize(13,13)
-    local edge=f:CreateTexture(nil,"BACKGROUND");edge:SetSize(13,13);edge:SetPoint("CENTER");edge:SetTexture("Interface\\Buttons\\WHITE8X8");edge:SetVertexColor(.03,.06,.08,.95)
-    local t=f:CreateTexture(nil,"ARTWORK");t:SetSize(9,9);t:SetPoint("CENTER")
+    local f=CreateFrame("Frame",nil,parent);f:SetSize(18,18)
+    local edge=f:CreateTexture(nil,"BACKGROUND");edge:SetSize(18,18);edge:SetPoint("CENTER");edge:SetTexture("Interface\\Buttons\\WHITE8X8");edge:SetVertexColor(.03,.06,.08,.98)
+    local t=f:CreateTexture(nil,"ARTWORK");t:SetSize(14,14);t:SetPoint("CENTER")
     t:SetTexture("Interface\\Buttons\\WHITE8X8")
     f.pinTexture=t
+    local marker=f:CreateFontString(nil,"OVERLAY");marker:SetFont("Fonts\\FRIZQT__.TTF",10,"OUTLINE");marker:SetPoint("CENTER",f,"CENTER",0,0);marker:SetTextColor(1,1,1,1);f.pinMarker=marker
     f:EnableMouse(true)
-    f:SetScript("OnEnter",function(self) W.Tooltip(self,self.pinLabel,{"Access/destination marker, not a verified walking line.","Known entrances are cyan; objectives are gold. Use OpenMap to inspect the terrain."}) end)
+    f:SetScript("OnEnter",function(self) W.Tooltip(self,self.pinLabel,{W.L("marker_path_warning"),W.L("marker_help"),"Use OpenMap to inspect the terrain."}) end)
     f:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     return f
 end
@@ -28,12 +29,15 @@ function W.UpdateRouteOverlay()
         menuRegistered=status=="ok"
     end
     local n=W.Navigation;local travel=n and n.travel;local lib=pins()
+    if W.Decision and (not n or n.decisionID~=W.Decision.id or W.Decision.navigationError) then
+        W.ClearRouteOverlay();W.OverlayStatus="Synchronizing route";return
+    end
     if not lib or W.GetProfile().routeOverlay==false or not travel or not travel.goal then
         W.ClearRouteOverlay();W.OverlayStatus=not lib and "Map pins unavailable / Questie map library not loaded" or "Map pins inactive";return
     end
     local points={}
-    if travel.entry then points[#points+1]={point=travel.entry,label=(travel.caveName or "Cave").." entrance",color={.3,.9,1}} end
-    points[#points+1]={point=travel.goal,label="Quest objective / not walking path",color={1,.78,.3}}
+    if travel.entry then points[#points+1]={point=travel.entry,label=(travel.caveName or W.L("marker_entrance_name")).." "..W.L("marker_entrance_suffix"),marker=W.L("marker_entrance"),color={.3,.9,1}} end
+    points[#points+1]={point=travel.goal,label=W.L("marker_objective_name").." / "..W.L("marker_not_path"),marker=W.L("marker_objective"),color={1,.78,.3}}
     local parts={}
     for _,p in ipairs(points) do parts[#parts+1]=p.label..":"..p.point.mapID..":"..p.point.x..":"..p.point.y end
     local signature=table.concat(parts,"|")
@@ -42,7 +46,7 @@ function W.UpdateRouteOverlay()
     for i,p in ipairs(points) do
         local pair=pool[i]
         if not pair then pair={mini=icon(Minimap or UIParent),world=icon(UIParent)};pool[i]=pair end
-        for _,f in pairs(pair) do f.pinLabel=p.label;f.pinTexture:SetVertexColor(unpack(p.color)) end
+        for _,f in pairs(pair) do f.pinLabel=p.label;f.pinTexture:SetVertexColor(unpack(p.color));f.pinMarker:SetText(p.marker) end
         local point=p.point
         local ms,mr=W.Call(lib.AddMinimapIconMap,lib,owner,pair.mini,point.mapID,point.x,point.y,true,true)
         local ws,wr=W.Call(lib.AddWorldMapIconMap,lib,owner,pair.world,point.mapID,point.x,point.y,nil)

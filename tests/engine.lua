@@ -1,6 +1,6 @@
 -- No client/provider/profile API is installed in this process.
 unpack=unpack or table.unpack;math.atan2=math.atan2 or function(y,x) return math.atan(y,x) end
-for _,name in ipairs({"Common","Data","Experience","Planner","Replay","Navigator"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","Experience","Planner","Replay","Navigator"}) do dofile("Trailwarden/"..name..".lua") end
 local W=Trailwarden
 W.Q=function() error("Selector read provider data") end
 W.GetProfile=function() error("Selector read a mutable profile") end
@@ -49,12 +49,20 @@ end
 check("candidate enumeration order does not change route or queue",identical)
 local leg=input({step("objective",400,.8,.5),step("objective",401,.81,.5),step("objective",402,.2,.5)},.1,.5);leg.state.profile.pinned="objective:400"
 local first,nextSteps=W.SelectRoute(leg);check("queue evaluates from preceding leg",first.questID==400 and nextSteps[1].questID==401)
+local many={};for i=1,129 do many[i]=step("objective",10000+i,.1+(i%10)*.02,.1+math.floor(i/10)*.02) end
+local large=input(many);large.state.profile.pinned=many[1].key
+local largeRoute,largeQueue,largeDetail=W.SelectRoute(large)
+check("large candidate sets preserve the best route and shorten only the preview",largeRoute.key==many[1].key and largeDetail.candidateCount==129 and largeDetail.queuePreviewShortened and #largeQueue==1)
+check("planner score evaluation count is recorded",largeDetail.scoreEvaluations>129)
 local pinned=input({a,b});pinned.state.profile.pinned="no-longer-valid"
 local _,_,detail=W.SelectRoute(pinned);check("expired focus is returned as an effect, not written into input",detail.clearPin and pinned.state.profile.pinned=="no-longer-valid")
 local skipped=input({a,b});skipped.state.profile.skipped["quest:100"]=1000
 check("temporary skip excludes quest",W.SelectRoute(skipped).questID==101)
 skipped.state.now=1001;check("expired skip no longer excludes quest",W.SelectRoute(skipped).questID==100)
 local waiting=input({a});waiting.state.questLogReady=false;check("unready log never produces an action",W.SelectRoute(waiting).kind=="wait")
+local unsupportedZone=input({});unsupportedZone.meta.transitionStatus="unmapped-zone"
+local unsupportedRoute=W.SelectRoute(unsupportedZone)
+check("unsupported zone transition is explained instead of silently stopping",unsupportedRoute.title=="Local quests exhausted" and unsupportedRoute.instruction:find("No supported neighboring zone",1,true)~=nil)
 waiting.state.questLogReady=true;waiting.state.profile.paused=true;check("pause is deterministic",W.SelectRoute(waiting).key=="paused")
 waiting.state.profile.paused=false;waiting.state.dead=true;check("death is deterministic",W.SelectRoute(waiting).key=="dead")
 local sc=input({ready,a});local result=W.SelectRoute(sc);local parts=result.scoreParts

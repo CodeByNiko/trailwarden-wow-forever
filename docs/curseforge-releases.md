@@ -12,7 +12,8 @@ token or the complete webhook URL to this public repository.
 
 Only tag a verified commit from main. Tags containing `beta` produce beta files;
 plain version tags produce release files. Keep public testing builds in the beta
-channel, for example `v1.7.5-beta.1`. The addon TOC version remains `1.7.5`.
+channel, for example `v<major>.<minor>.<patch>-beta.1`. The addon TOC version
+remains `<major>.<minor>.<patch>`.
 Do not move or reuse an already published tag.
 
 The GitHub release workflow defaults to `v<TOC version>-beta` tags and GitHub
@@ -51,7 +52,7 @@ References:
 - https://support.curseforge.com/support/solutions/articles/9000197281
 - https://support.curseforge.com/support/solutions/articles/9000203228
 
-Optional real-provider check (developer dependencies only): install `lupa` and
-`cbor2`, extract the official QuestieDB Forever ZIP, then run
-`python3 tools/check_provider.py /path/to/QuestieDB`. It checks actual provider
-code/data with synthetic client APIs; it does not replace in-game testing.
+The pull-request workflow checks the real QuestieDB Forever 1.0.14 release with
+synthetic client APIs. See [the installation matrix](installation-matrix.md)
+and complete [the in-game smoke log](client-smoke-template.md) for each
+release candidate. The provider integration does not replace live-client testing.

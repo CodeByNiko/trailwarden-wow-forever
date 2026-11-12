@@ -2,6 +2,8 @@
 from pathlib import Path
 import os
 import re
+import subprocess
+import sys
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 root = Path(__file__).resolve().parents[1]
@@ -11,6 +13,7 @@ match = re.search(r'^## Version: (\d+\.\d+\.\d+)$', toc, re.M)
 if not match:
     raise SystemExit('Unreleased development version: finish release prerequisites before packaging.')
 version = match.group(1)
+subprocess.run([sys.executable, str(root / 'tools' / 'check_release_consistency.py')], cwd=root, check=True)
 for entry in toc.splitlines():
     entry = entry.strip()
     if entry and not entry.startswith('#') and not (addon / entry).is_file():

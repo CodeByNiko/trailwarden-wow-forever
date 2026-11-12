@@ -203,17 +203,34 @@ function W.BuildQuestCatalog(force,attempt)
 end
 function W.QuestPolicy(id,state,active)
     local q=W.Import("QuestieDB")
-    local function yes(method)
-        local status,value=W.Call(q and q[method],id);W.RecordFact("QuestiePolicy",id,method,value,status);return value==true and status=="ok"
+    local function classification(method)
+        local status,value=W.Call(q and q[method],id);W.RecordFact("QuestiePolicy",id,method,value,status)
+        if status=="ok" and type(value)=="boolean" then return value end
     end
-    if yes("IsPvPQuest") or yes("IsRaidQuest") then return false,"PvP / raid" end
-    if not state.profile.includeGroup and (yes("IsDungeonQuest") or yes("IsGroupQuest")) then return false,"Group quest" end
+    local pvp,raid,dungeon,group=classification("IsPvPQuest"),classification("IsRaidQuest"),classification("IsDungeonQuest"),classification("IsGroupQuest")
+    if pvp==true or raid==true then return false,"PvP / raid" end
+    if not state.profile.includeGroup and (dungeon==true or group==true) then return false,"Group quest" end
+    if pvp==nil or raid==nil or dungeon==nil or group==nil then
+        local reason="Quest type classification unavailable without Questie's optional quest policy module"
+        state.policyIssues=state.policyIssues or {};state.policyIssues[reason]=true
+        -- Work the player has already accepted remains available, but never
+        -- advertise an unclassified database pickup as safe.
+        if active then return true,reason.."; accepted quests remain usable" end
+        return nil,reason
+    end
     local level=W.Q(id,"questLevel") or 0
     if level<=0 and active and state.activeByID[id] then level=state.activeByID[id].level or 0 end
     -- Comfort limits new pickups, not work the player has already accepted.
     if not active and level>state.level+state.profile.maxLevelAbove then return false,"Above comfort level" end
     if active then return true end
-    if yes("IsRepeatable") or yes("IsDailyQuest") or yes("IsWeeklyQuest") or (W.Q(id,"specialFlags") or 0)%2==1 then return false,"Repeatable" end
+    local repeatable,daily,weekly=classification("IsRepeatable"),classification("IsDailyQuest"),classification("IsWeeklyQuest")
+    local flags=W.Q(id,"specialFlags") or 0
+    if repeatable==true or daily==true or weekly==true or flags%2==1 then return false,"Repeatable" end
+    if repeatable==nil or daily==nil or weekly==nil then
+        local reason="Quest repeatability classification unavailable without Questie's optional quest policy module"
+        state.policyIssues=state.policyIssues or {};state.policyIssues[reason]=true
+        return nil,reason
+    end
     return true
 end
 local function verdict(status,reason,source) return {status=status,reason=reason,source=source} end
@@ -240,7 +257,9 @@ function W.QuestEligibility(id,state)
         if status~="ok" or not W.IsFinite(count) then return verdict("unknown","Required item count unavailable","inventory") end
         if count<1 then return verdict("blocked","Required source item missing","inventory") end
     end
-    local policy,why=W.QuestPolicy(id,state,false);if not policy then return verdict("blocked",why,"policy") end
+    local policy,why=W.QuestPolicy(id,state,false)
+    if policy==nil then return verdict("unknown",why,"policy") end
+    if not policy then return verdict("blocked",why,"policy") end
     local seen=state.profile.offers[id]
     local fresh=seen and seen.revision==state.revision and state.now-seen.seen>=0 and state.now-seen.seen<300
     local starters=W.Q(id,"startedBy") or {}
