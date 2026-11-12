@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 19554)
+Total output lines: 833
+
 -- Deterministic game/client doubles; no live gameplay claims.
 unpack=unpack or table.unpack;loadstring=loadstring or load;math.atan2=math.atan2 or function(y,x) return math.atan(y,x) end
 local player={guid="Player-NE",name="Raelorn",class="WARRIOR",className="Warrior",race=4,raceName="Night Elf",map=1438,x=.56,y=.6,level=7}
@@ -40,7 +43,9 @@ function methods:RegisterEvent(e) self.events=self.events or {};self.events[e]=t
 function methods:CreateFontString(name) return region("font",self,name) end
 function methods:CreateTexture(name) return region("texture",self,name) end
 function methods:SetScrollChild(v) self.scrollChild=v end
-for _,m in ipairs({"EnableMouseWheel","SetFrameStrata","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
+for _,m in ipairs({"EnableMouseWheel","SetFrameStrata","SetToplevel","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
+function methods:SetFrameStrata(value) self.strata=value end
+function methods:SetToplevel(value) self.toplevel=value end
 function methods:SetJustifyH(value) self.justifyH=value end
 function methods:SetJustifyV(value) self.justifyV=value end
 function methods:SetWordWrap(value) self.wordWrap=value end
@@ -267,6 +272,17 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
 check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h<500)
+check("guide and navigator stay above ordinary addon panels",W.MainFrame.strata=="HIGH" and W.MainFrame.toplevel==true and W.NavigatorFrame.strata=="HIGH" and W.NavigatorFrame.toplevel==true)
+check("guide background stays nearly opaque for readability",W.MainFrame.bgColor and W.MainFrame.bgColor[4]>=.98)
+local header,headerButtons
+for _,node in ipairs(nodes) do
+ if node.parent==W.MainFrame and node.h==46 then header=node end
+end
+headerButtons={}
+for _,node in ipairs(nodes) do
+ if node.kind=="Button" and node.parent==header then headerButtons[node.label.text]=node end
+end
+check("header actions use clear supported labels and usable hit areas",headerButtons.SET and headerButtons.SET.w==32 and headerButtons["-"] and headerButtons["-"].w==24 and headerButtons.X and headerButtons.X.w==24)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 local savedRoute,savedDecision=W.CurrentRoute,W.Decision
@@ -365,81 +381,7 @@ check("long current titles keep two readable lines",titleNode and titleNode.font
 W.CurrentRoute=originalRoute;W.UpdateUI()
 do
  local oldError,oldUnmapped,oldDetail=W.CatalogError,W.Unmapped,W.Decision.detail
- local oldQueue,oldCount=W.Queue,W.GetProfile().queueRows
- W.CatalogError="synthetic catalog fault";W.Unmapped={{safety=true,reason="Enemy above cap"}}
- W.Decision.detail={opportunities={{name="A nearby escort",activity="escort"}}}
- W.Queue={};for i=1,4 do W.Queue[i]=W.Copy(W.CurrentRoute) end
- W.GetProfile().queueRows=4;W.UpdateUI()
- local warning,xpBox
- for _,n in ipairs(nodes) do
-  if n.kind=="font" and n.text:find("Quest data needs attention",1,true) then warning=n end
-  if n.kind=="font" and n.text=="YOUR XP / HOUR" then xpBox=n.parent end
- end
- check("nearby offers preserve catalog and combat warnings",warning and warning.text:find("combat objective",1,true) and warning.text:find("nearby",1,true))
- local xpTop=-xpBox.points[1][3];local clear=true
- for _,n in ipairs(nodes) do
-  if n.step and visible(n) then
-   local top=-n.points[1][3]
-   if top< -warning.points[1][3]+warning.h+20 or top+n.h>xpTop-8 then clear=false end
-  end
- end
- check("warnings preview and XP occupy separate vertical space",clear)
- W.GetProfile().queueRows=0;W.UpdateUI()
- check("warnings remain visible when the preview is disabled",visible(warning) and -xpBox.points[1][3]>=-warning.points[1][3]+warning.h)
- W.CatalogError=oldError;W.Unmapped=oldUnmapped;W.Decision.detail=oldDetail;W.Queue=oldQueue;W.GetProfile().queueRows=oldCount;W.UpdateUI()
- local statsAPI=W.SafeExperienceStats
- local sample={available=true,maximum=1000,windowSeconds=299,rate=12000,eta=210}
- W.SafeExperienceStats=function() return sample end
- local rate,eta
- for _,n in ipairs(nodes) do if n.parent==xpBox and n.kind=="font" then local pnt=n.points[1];if pnt[3]==-21 then if pnt[2]==10 then rate=n else eta=n end end end end
- W.UpdateLiveUI();check("both rate and ETA wait until five active minutes",rate.text=="Learning..." and eta.text=="Building sample")
- sample.windowSeconds=300;W.UpdateLiveUI();check("stable sample displays measured rate and finite ETA",rate.text=="12,000" and eta.text=="~4m")
- sample.rate=0;sample.eta=nil;W.UpdateLiveUI();check("stable zero rate has no fabricated ETA",rate.text=="0" and eta.text=="--")
- sample.paused=true;W.UpdateLiveUI();check("paused sample hides rate and ETA",rate.text=="Paused" and eta.text=="--")
- sample.paused=false;sample.maximum=0;W.UpdateLiveUI();check("level cap has no next-level ETA",rate.text=="Level cap" and eta.text=="--")
- W.SafeExperienceStats=statsAPI;W.UpdateLiveUI()
- local tooltipAPI=GameTooltip;local tooltipLines={}
- GameTooltip={SetOwner=function() end,SetText=function() end,AddLine=function(_,text) tooltipLines[#tooltipLines+1]=text end,Show=function() end}
- W.Tooltip(W.MainFrame,"Test",{[1]="First",[3]="Details after an unavailable line"})
- check("optional tooltip gaps do not discard later guidance",#tooltipLines==2 and tooltipLines[2]=="Details after an unavailable line")
- GameTooltip=tooltipAPI
- local nav=W.Navigation;local profile=W.GetProfile();local hidden=profile.navigatorHidden
- profile.navigatorHidden=false
- W.Navigation={decisionID=W.Decision.id-1,bearing=1,facing=0,arrived=true,distance=20};W.UpdateNavigator()
- local staleHidden,syncShown=true,false
- for _,n in ipairs(nodes) do if n.parent==W.NavigatorFrame then
-  if (n.texture or ""):find("Arrow.tga",1,true) or n.text=="IN AREA" then if visible(n) then staleHidden=false end end
-  if n.text=="Synchronizing route" and visible(n) then syncShown=true end
- end end
- check("navigator clears stale bearing and arrival after a new decision",staleHidden and syncShown)
- W.Navigation=nav;profile.navigatorHidden=hidden;W.UpdateNavigator()
-end
-
--- 1.2 foundation regressions; these were demonstrated during the audit.
-ne();player.guid="Player-Foundation";player.name="Foundation";log={};complete={};W.CurrentRoute=nil
-quests[1001]={name="Offer ending after turn-in",questLevel=7,startedBy={{201}},availableUntilCompleted=24}
-W.ObserveQuest(1001,quests[1001].name,"pickup");s=W.ScanCharacter();check("fresh offer initially eligible",W.IsQuestAvailable(1001,s))
-W.RememberTurnIn(24);s=W.ScanCharacter();local gate=W.QuestEligibility(1001,s)
-check("confirmed turn-in overrides old live offer",gate.status=="blocked" and gate.reason=="Availability ended by turn-in")
-quests[1002]={name="Disabled offer",questLevel=7,startedBy={{201}},disabledByQuest=26}
-W.ObserveQuest(1002,quests[1002].name,"pickup");log={{id=26,title="Blocking quest"}};s=W.ScanCharacter()
-check("active blocking quest overrides old offer",W.QuestEligibility(1002,s).status=="blocked")
-quests[1003]={name="Live race exception",questLevel=7,requiredRaces=4,startedBy={{201}}}
-log={};W.ObserveQuest(1003,quests[1003].name,"pickup");s=W.ScanCharacter();check("fresh observation can resolve a static race discrepancy",W.IsQuestAvailable(1003,s))
-log={{id=2,title="Warrior training"}};s=W.ScanCharacter();check("progression change invalidates a previous offer exception",not W.IsQuestAvailable(1003,s))
-local oldHistory=C_QuestLog.GetAllCompletedQuestIDs;C_QuestLog.GetAllCompletedQuestIDs=function() error("History loading") end
-log={};s=W.ScanCharacter();check("unavailable history stays unknown despite cached completions",not s.historyReady and W.QuestEligibility(36,s).status=="unknown")
-C_QuestLog.GetAllCompletedQuestIDs=oldHistory
-local oldInfo=C_QuestLog.GetInfo;log={{id=2,title="Warrior training"}};C_QuestLog.GetInfo=function() return nil end
-W.Refresh(true);check("incomplete log waits without producing actionable guidance",W.CurrentRoute.kind=="wait" and not W.State.questLogReady and not W.CurrentRoute.point)
-C_QuestLog.GetInfo=oldInfo
-local oldObjectives=C_QuestLog.GetQuestObjectives;C_QuestLog.GetQuestObjectives=function() return nil end
-s=W.ScanCharacter();check("unknown objective state is not treated as a delivery",not s.activeQuests[1].objectivesReady and #W.ActiveSteps(s.activeQuests[1],s)==0)
-C_QuestLog.GetQuestObjectives=oldObjectives
-s=W.ScanCharacter();local savedProfile=W.GetProfile();savedProfile.completed[777]=true;savedProfile.paused=not s.profile.paused
-check("captured state does not alias mutable saved progression",not s.completed[777] and s.profile.paused~=savedProfile.paused)
-savedProfile.paused=false
-savedProfile.skipped="bad";savedProfile.offers=42;savedProfile.locations=false;savedProfile.gossip="bad";savedProfile.panelPoint={point="BAD",relativePoint="CENTER",x=0,y=0}
+ …1554 tokens truncated…ip="bad";savedProfile.panelPoint={point="BAD",relativePoint="CENTER",x=0,y=0}
 savedProfile=W.GetProfile();check("nested saved containers and invalid anchors recover",type(savedProfile.skipped)=="table" and type(savedProfile.offers)=="table" and type(savedProfile.locations)=="table" and type(savedProfile.gossip)=="table" and savedProfile.panelPoint==nil)
 quests[1004]={name="Receiver corrected",questLevel=7,finishedBy={{201}}}
 savedProfile.locations["turnin:1004"]={mapID=1431,x=.1,y=.1,units="normalized",name="Old receiver",entityID=201,entityKind="Npc",seen=epoch-1000000,provider=W.ProviderIdentity()}

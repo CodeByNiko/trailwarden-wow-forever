@@ -4,15 +4,16 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
-## Current release: 1.8.22
+## Current release: 1.8.23
 
-The current 1.8 series improves route reliability, objective matching, navigation recovery, and cave handling. Recent fixes include:
+The current 1.8 series improves route reliability, objective matching, navigation recovery, cave handling, and a clearer guide that remains above ordinary addon panels. Recent fixes include:
 
 - Keep local quest guidance intact when a cave access point is refreshed with invalid coordinates.
 - Refresh the complete guide when navigation errors start or recover, and prioritize required cross-continent travel over local cave directions.
 - Match the strongest live objective name, preserve its client-provided wording, and keep uncertain XP projections out of reliable route comparisons.
 - Verify the pinned QuestieDB provider archive with its official SHA-256 before extraction.
 - Expand provider smoke checks to cover runtime modules, diagnostics, slash commands, and unexpected output errors.
+- Keep the guide visually distinct from overlapping addon panels, with clearer header controls and brighter hover feedback.
 
 See the [release notes](https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs) for all changes.
 

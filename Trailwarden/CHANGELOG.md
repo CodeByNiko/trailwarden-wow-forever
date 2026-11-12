@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.23
+- Raise the guide and navigator above ordinary addon panels and make them top-level so they do not disappear behind overlapping addon windows.
+- Replace compact header icons with readable settings, collapse, and close controls; add hover feedback and brief tooltips.
+- Increase panel background opacity slightly to keep text clear over busy game scenes.
+
 ## 1.8.22
 - Update bundled Markdown and plain-text readmes to describe current 1.8 improvements rather than presenting version 1.7.5 as current.
 - Check packaged readme release labels during release-consistency validation.
