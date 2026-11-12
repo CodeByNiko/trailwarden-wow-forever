@@ -2,6 +2,20 @@ local W=Trailwarden
 local frame=CreateFrame("Frame");W.EventFrame=frame
 local pending=false
 local pendingEvents={}
+W.CombatActive=false
+function W.IsCombatActive()
+    if W.CombatActive then return true end
+    return W.Safe(InCombatLockdown)==true or W.Safe(UnitAffectingCombat,"player")==true
+end
+function W.SetCombatUI(active)
+    W.CombatActive=active==true
+    if W.MainFrame then
+        if W.CombatActive then W.MainFrame:Hide()
+        else W.MainFrame:SetShown(not W.GetProfile().panelHidden) end
+    end
+    if W.NavigatorFrame then W.NavigatorFrame:SetShown(not W.CombatActive and not W.GetProfile().navigatorHidden) end
+    if W.CombatActive and W.ClearRouteOverlay then W.ClearRouteOverlay();W.OverlayStatus="Map pins hidden during combat" end
+end
 local function render(name,fn,...)
     local status,message=W.Call(fn,...)
     W.OutputErrors=W.OutputErrors or {}
@@ -9,6 +23,8 @@ local function render(name,fn,...)
     return status=="ok"
 end
 function W.Refresh(force,trigger)
+    if W.IsCombatActive() and trigger~="combat-ended" then W.CombatRefreshPending=true;return end
+    if trigger=="combat-ended" then W.CombatRefreshPending=nil end
     local started=debugprofilestop and debugprofilestop()
     W.LastAttemptTime=W.Now()
     render("experience",W.SampleExperience)
@@ -49,13 +65,14 @@ function W.Refresh(force,trigger)
     render("waypoint",W.SyncWaypoint,decision.route,force)
     local panelOK=render("panel",W.UpdateUI)
     if not panelOK and W.MainFrame then W.MainFrame:Hide() end
-    if panelOK and W.MainFrame and not W.GetProfile().panelHidden then W.MainFrame:Show() end
+    if panelOK and W.MainFrame then W.MainFrame:SetShown(not W.GetProfile().panelHidden and not W.IsCombatActive()) end
     render("navigator",W.UpdateNavigator)
     render("route overlay",W.UpdateRouteOverlay)
     render("replay",W.RecordDecision,decision)
     if started then W.LastPlanMilliseconds=debugprofilestop()-started end
 end
 local function schedule(force,event)
+    if W.IsCombatActive() then W.CombatRefreshPending=true;return end
     if event then pendingEvents[event]=true end
     if pending then return end;pending=true
     local function update()
@@ -64,10 +81,17 @@ local function schedule(force,event)
     end
     if C_Timer then C_Timer.After(.5,update) else update() end
 end
-for _,event in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
+for _,event in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","PLAYER_REGEN_DISABLED","PLAYER_REGEN_ENABLED","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
     W.LastEvent=event
+    if event=="PLAYER_REGEN_DISABLED" then W.SetCombatUI(true);return end
+    if event=="PLAYER_REGEN_ENABLED" then
+        W.SetCombatUI(false)
+        if W.CombatRefreshPending then W.Refresh(false,"combat-ended") end
+        return
+    end
     if event=="PLAYER_LOGIN" then
+        W.SetCombatUI(W.Safe(UnitAffectingCombat,"player")==true or W.Safe(InCombatLockdown)==true)
         W.ResetExperience();W.Safe(W.PollCombatSafety);W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Trailwarden "..W.Version.."|r / Your character's route is ready. |cffffc366/tw|r opens the guide; |cffffc366/tw help|r lists controls.")
@@ -99,6 +123,11 @@ end)
 local navElapsed,planElapsed,xpElapsed=0,0,0
 frame:SetScript("OnUpdate",function(_,dt)
     navElapsed=navElapsed+dt;planElapsed=planElapsed+dt;xpElapsed=xpElapsed+dt
+    if W.CombatActive then
+        navElapsed=0;planElapsed=0
+        if xpElapsed>=1 then xpElapsed=0;render("experience",W.SampleExperience) end
+        return
+    end
     if xpElapsed>=1 then
         xpElapsed=0;render("experience",W.SampleExperience)
         if W.State then render("route overlay",W.UpdateRouteOverlay) end

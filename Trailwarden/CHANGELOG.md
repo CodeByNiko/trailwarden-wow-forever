@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.2
+- Hide the guide, navigator, and route map pins during combat; restore the user's visibility preferences after combat.
+- Suspend frequent navigation/UI updates and periodic nameplate safety scans during combat, while keeping lightweight XP sampling and event-based safety observations.
+- Coalesce route-affecting changes into a single refresh after combat.
+
 ## 1.8.1
 - Polish the CurseForge project description and synchronize the bundled documentation with the 1.8 feature set, including language choices, privacy-conscious feedback, manual travel guidance, and beta limits.
 

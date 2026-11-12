@@ -4,9 +4,9 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
-## Current release: 1.8.1
+## Current release: 1.8.2
 
-The 1.8.0 feature set is delivered together as one release. This 1.8.1 follow-up aligns the project description and packaged documentation with current language, feedback, navigation, and beta-scope behavior. The 1.8 series improves route reliability, objective matching, navigation recovery, cave handling, and a clearer guide that remains above ordinary addon panels. Recent fixes include:
+The 1.8.0 feature set is delivered together as one release. This 1.8.2 follow-up hides Trailwarden's windows and map pins during combat, then restores the saved visibility preferences afterward. It also pauses frequent navigation rendering and periodic nameplate scans during combat, and performs one route refresh when combat ends. The 1.8 series improves route reliability, objective matching, navigation recovery, cave handling, and a clearer guide that remains above ordinary addon panels. Recent fixes include:
 
 - Keep local quest guidance intact when a cave access point is refreshed with invalid coordinates.
 - Refresh the complete guide when navigation errors start or recover, and prioritize required cross-continent travel over local cave directions.

@@ -119,8 +119,8 @@ function W.CreateNavigator()
 end
 function W.UpdateNavigator()
     if not frame then return end
-    local p=W.GetProfile();frame:SetShown(not p.navigatorHidden);frame:EnableMouse(not p.locked)
-    if p.navigatorHidden then return end
+    local p=W.GetProfile();local combat=W.IsCombatActive and W.IsCombatActive();frame:SetShown(not p.navigatorHidden and not combat);frame:EnableMouse(not p.locked)
+    if p.navigatorHidden or combat then return end
     local r=W.CurrentRoute
     W.FitCaption(title,r and (r.questName or r.title) or "Preparing your route")
     local n=W.Navigation or {label="Preparing navigation"}
