@@ -1,4 +1,4 @@
-TRAILWARDEN 1.8.25 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.0 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.

@@ -4,7 +4,7 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
-## Current release: 1.8.25
+## Current release: 1.8.0
 
 The current 1.8 series improves route reliability, objective matching, navigation recovery, cave handling, and a clearer guide that remains above ordinary addon panels. Recent fixes include:
 
