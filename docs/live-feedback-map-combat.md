@@ -15,3 +15,14 @@ Development branch from main at ba98bf6. No PR or release requested yet.
 Automated coverage includes numeric combat flags without regen events, guide/arrow visibility, deferred combat work, nameplate bursts, rapid map toggles, inactive map-marker cleanup and exact quest-log selection. Full release checks pass locally.
 
 The code exposes repeated work consistent with the reported symptoms, but the user's FPS drops have not been reproduced in a live WoW client. Confirm combat hiding, arrow behavior, quest selection and repeated map toggles with the affected addon set and view distance before release. The branch retains version 1.8.3 pending further feedback and release preparation.
+
+## Second map-performance iteration: map-quiet-2
+
+- Map show/hide hooks restart a 0.75-second quiet period, including toggles between update frames. Polling remains as a fallback. During repeated map toggles, defer quest capture, full navigation, safety scanning and waypoint/map-pin updates until the map stays closed.
+- Gate immediate target safety scans and combat-exit capture during this quiet period as well. Preserve deferred changes for one catch-up update after settling.
+- Prune saved profile caches before deep-copying replay input instead of copying and then discarding them.
+- `/tw perfreset` resets local event/work counters; `/tw perf` displays them without capturing the character or starting a new route plan. The output identifies this test build as `map-quiet-2`.
+
+The full suite passes, including 100 map cycles mixed with 8,000 nameplate events: zero quest captures, full navigation updates and safety scans between toggles, with one deferred quest capture after the final close. This is a deterministic workload check, not a reproduction of the reported 15% live CPU reading or an FPS measurement.
+
+Live comparison: install the new test package and restart WoW; run `/tw perfreset`, reproduce the rapid M toggles, wait two seconds after the last close and run `/tw perf`. Record the displayed counters and CPU reading together. Repeat with the reported view-distance setting. No PR or release has been made.

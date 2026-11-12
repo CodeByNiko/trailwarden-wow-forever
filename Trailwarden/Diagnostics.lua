@@ -55,3 +55,10 @@ function W.Diagnostics()
     for key,value in pairs(W.DataIssues or {}) do lines[#lines+1]=key..": "..value end
     return table.concat(lines,"\n")
 end
+function W.PerformanceSummary(reset)
+    local c=W.WorkCounters or {};local events={}
+    for event,count in pairs(c.events or {}) do events[#events+1]=event.."="..count end;table.sort(events)
+    local summary="Trailwarden branch map-quiet-2 / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map changes="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
+    if reset then for key in pairs(c) do c[key]=key=="events" and {} or 0 end end
+    return summary
+end

@@ -2,10 +2,24 @@ local W=Trailwarden
 local frame=CreateFrame("Frame");W.EventFrame=frame
 local pending=false
 local pendingEvents={}
+W.WorkCounters={events={},captures=0,navigation=0,safety=0,mapChanges=0,mapDeferrals=0}
+local counters=W.WorkCounters
 W.CombatActive=false
 local function combatFlag(value) return value==true or value==1 end
 local function liveCombat() return combatFlag(W.Safe(InCombatLockdown)) or combatFlag(W.Safe(UnitAffectingCombat,"player")) end
 function W.IsWorldMapOpen() return WorldMapFrame and combatFlag(W.Safe(WorldMapFrame.IsShown,WorldMapFrame)) or false end
+W.MapQuietRemaining=0
+function W.NoteMapInteraction()
+    W.MapQuietRemaining=.75;counters.mapChanges=counters.mapChanges+1
+end
+local hookedMap
+local function hookMap()
+    if WorldMapFrame and WorldMapFrame~=hookedMap and type(WorldMapFrame.HookScript)=="function" then
+        WorldMapFrame:HookScript("OnShow",W.NoteMapInteraction)
+        WorldMapFrame:HookScript("OnHide",W.NoteMapInteraction)
+        hookedMap=WorldMapFrame
+    end
+end
 function W.IsCombatActive()
     if W.CombatActive then return true end
     return liveCombat()
@@ -20,21 +34,22 @@ function W.SetCombatUI(active)
     if W.CombatActive and W.ClearRouteOverlay then W.ClearRouteOverlay();W.OverlayStatus="Map pins hidden during combat" end
 end
 local function render(name,fn,...)
+    if name=="navigation" then counters.navigation=counters.navigation+1 end
     local status,message=W.Call(fn,...)
     W.OutputErrors=W.OutputErrors or {}
     if status~="ok" then W.OutputErrors[name]=tostring(message or status) else W.OutputErrors[name]=nil end
     return status=="ok"
 end
 function W.Refresh(force,trigger)
-    if W.IsWorldMapOpen() then W.MapRefreshPending=true;return end
-    if W.IsCombatActive() and trigger~="combat-ended" then W.CombatRefreshPending=true;return end
+    if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then counters.mapDeferrals=counters.mapDeferrals+1;W.MapRefreshPending=true;return end
+    if W.IsCombatActive() then W.CombatRefreshPending=true;return end
     if trigger=="combat-ended" then W.CombatRefreshPending=nil end
     local started=debugprofilestop and debugprofilestop()
     W.LastAttemptTime=W.Now()
     render("experience",W.SampleExperience)
     local state,route,queue,detail;local captured=false
     local ok,errorText=pcall(function()
-        state=W.ReadCharacter();captured=true
+        counters.captures=counters.captures+1;state=W.ReadCharacter();captured=true
         local previous=W.Decision
         local noisy=trigger=="QUEST_LOG_UPDATE" or trigger=="maintenance" or trigger=="XP_REVIEW"
         if not force and noisy and previous and previous.state.key==state.key and previous.state.signature==state.signature and W.Now()-(W.LastRefreshTime or 0)<60 and not W.LastError then return end
@@ -76,6 +91,7 @@ function W.Refresh(force,trigger)
     if started then W.LastPlanMilliseconds=debugprofilestop()-started end
 end
 local function schedule(force,event)
+    if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then W.MapRefreshPending=true;return end
     if W.IsCombatActive() then W.CombatRefreshPending=true;return end
     if event then pendingEvents[event]=true end
     if pending then return end;pending=true
@@ -87,14 +103,17 @@ local function schedule(force,event)
 end
 for _,event in ipairs({"ADDON_LOADED","PLAYER_LOGIN","PLAYER_ENTERING_WORLD","PLAYER_REGEN_DISABLED","PLAYER_REGEN_ENABLED","QUEST_LOG_UPDATE","QUEST_ACCEPTED","QUEST_REMOVED","QUEST_TURNED_IN","QUEST_COMPLETE","QUEST_DETAIL","QUEST_GREETING","GOSSIP_SHOW","PLAYER_LEVEL_UP","ZONE_CHANGED_NEW_AREA","ZONE_CHANGED","ZONE_CHANGED_INDOORS","PLAYER_ALIVE","PLAYER_UNGHOST","BAG_UPDATE_DELAYED","UPDATE_FACTION","SKILL_LINES_CHANGED","QUEST_QUERY_COMPLETE","PLAYER_XP_UPDATE","CHAT_MSG_COMBAT_XP_GAIN","PLAYER_FLAGS_CHANGED","PLAYER_TARGET_CHANGED","UPDATE_MOUSEOVER_UNIT","NAME_PLATE_UNIT_ADDED","NAME_PLATE_UNIT_REMOVED"}) do pcall(frame.RegisterEvent,frame,event) end
 frame:SetScript("OnEvent",function(_,event,...)
+    counters.events[event]=(counters.events[event] or 0)+1
     W.LastEvent=event
     if event=="PLAYER_REGEN_DISABLED" then W.SetCombatUI(true);return end
     if event=="PLAYER_REGEN_ENABLED" then
         W.SetCombatUI(false)
-        W.Safe(W.PollCombatSafety);W.Refresh(false,"combat-ended")
+        if not W.IsWorldMapOpen() and W.MapQuietRemaining==0 then counters.safety=counters.safety+1;W.Safe(W.PollCombatSafety) end
+        W.Refresh(false,"combat-ended")
         return
     end
     if event=="PLAYER_LOGIN" then
+        hookMap()
         W.SetCombatUI(liveCombat())
         W.ResetExperience();W.Safe(W.PollCombatSafety);W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
@@ -115,7 +134,9 @@ frame:SetScript("OnEvent",function(_,event,...)
         W.TrackCombatUnit(event,args[1])
         -- Nameplate bursts are sampled once by periodic maintenance. Never scan
         -- the entire visible population for every add/remove during a fight.
-        if W.IsCombatActive() or event~="PLAYER_TARGET_CHANGED" then W.CombatRefreshPending=true;return end
+        if W.IsCombatActive() then W.CombatRefreshPending=true;return end
+        if event~="PLAYER_TARGET_CHANGED" or W.IsWorldMapOpen() or W.MapQuietRemaining>0 then return end
+        counters.safety=counters.safety+1
         local changed=W.Safe(W.PollCombatSafety)
         if changed then W.Refresh(false,"combat-safety") end
         return
@@ -138,25 +159,30 @@ frame:SetScript("OnUpdate",function(_,dt)
     combatElapsed=combatElapsed+dt
     if combatElapsed>=.1 then
         combatElapsed=0
+        hookMap()
         local active=liveCombat()
         if active~=W.CombatActive and (type(InCombatLockdown)=="function" or type(UnitAffectingCombat)=="function") then
             W.SetCombatUI(active)
-            if not active then W.Safe(W.PollCombatSafety);W.Refresh(false,"combat-ended") end
+            if not active then
+                if not W.IsWorldMapOpen() and W.MapQuietRemaining==0 then counters.safety=counters.safety+1;W.Safe(W.PollCombatSafety) end
+                W.Refresh(false,"combat-ended")
+            end
         end
     end
     navElapsed=navElapsed+dt;planElapsed=planElapsed+dt;xpElapsed=xpElapsed+dt
     local mapOpen=W.IsWorldMapOpen()
-    if mapWasOpen and not mapOpen and W.MapRefreshPending then
-        W.MapRefreshPending=nil;schedule(false,"QUEST_LOG_UPDATE")
-    end
+    local mapChanged=mapWasOpen~=mapOpen
+    if mapChanged then W.NoteMapInteraction() end
     mapWasOpen=mapOpen
+    if not mapOpen and not mapChanged then W.MapQuietRemaining=math.max(0,W.MapQuietRemaining-dt) end
+    if not mapOpen and W.MapQuietRemaining==0 and W.MapRefreshPending then W.MapRefreshPending=nil;schedule(false,"QUEST_LOG_UPDATE") end
     if W.CombatActive then
         planElapsed=0
         if navElapsed>=.1 then navElapsed=0;render("combat navigator",W.UpdateCombatNavigator) end
         if xpElapsed>=1 then xpElapsed=0;render("experience",W.SampleExperience) end
         return
     end
-    if mapOpen then
+    if mapOpen or W.MapQuietRemaining>0 then
         -- Keep existing map pins stable while the map library is changing its
         -- canvas. Defer quest snapshots and access/waypoint work until closed.
         planElapsed=0
@@ -166,6 +192,7 @@ frame:SetScript("OnUpdate",function(_,dt)
     if xpElapsed>=1 then
         xpElapsed=0;render("experience",W.SampleExperience)
         if W.State then render("route overlay",W.UpdateRouteOverlay) end
+        counters.safety=counters.safety+1
         if W.Safe(W.PollCombatSafety) then W.Refresh(false,"combat-safety") end
     end
     if navElapsed>=.1 then

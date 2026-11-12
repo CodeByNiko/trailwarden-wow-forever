@@ -404,6 +404,8 @@ W.ReadCharacter=function(...) captures=captures+1;return readCharacter(...) end
 for i=1,20 do W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.1) end
 check("open map defers quest captures and planning",captures==0 and W.PlanExecutions==plansBeforeMap)
 WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
+check("closing map does not immediately capture quest history",captures==0)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
 check("closing map coalesces deferred quest captures",captures==1)
 captures=0
 for i=1,20 do
@@ -411,7 +413,35 @@ for i=1,20 do
     WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
 end
 drain()
+check("rapid toggles keep captures blocked until the map settles",captures==0)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
 check("rapid repeated map toggles share one deferred quest capture",captures==1)
+local stormPoll=W.PollCombatSafety;local stormScans=0
+W.PollCombatSafety=function(...) stormScans=stormScans+1;return stormPoll(...) end
+local initialNavigation=W.WorkCounters.navigation
+captures=0
+for i=1,100 do
+    WorldMapFrame:Show();W.EventFrame.scripts.OnUpdate(W.EventFrame,.02)
+    W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE")
+    for j=1,40 do W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_ADDED","nameplate"..j);W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_REMOVED","nameplate"..j) end
+    WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.02)
+    W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_TARGET_CHANGED");drain()
+end
+check("100 M-toggle cycles and 8000 nameplate events perform no heavy work between toggles",captures==0 and stormScans==0 and W.WorkCounters.navigation==initialNavigation)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
+check("event storm catches up once after the final map closure",captures==1 and stormScans<=2)
+W.PollCombatSafety=stormPoll
+WorldMapFrame={scripts={},IsShown=function() return false end,HookScript=function(self,event,fn) self.scripts[event]=fn end}
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+captures=0
+WorldMapFrame.scripts.OnShow();WorldMapFrame.scripts.OnHide()
+W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
+check("show-hide hooks between update frames still block heavy capture",captures==0 and W.MapQuietRemaining>0)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
+check("between-frame map toggle catches up after settling",captures==1)
+local capturedBeforePerf=captures
+local perfSummary=W.PerformanceSummary(true)
+check("performance report identifies test build without capturing character",perfSummary:find("map-quiet-2",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
 W.ReadCharacter=readCharacter;WorldMapFrame=mapFrame
 local questFrame,showPanel,selectQuest=QuestLogFrame,ShowUIPanel,QuestLog_SetSelection
 local selected,opened
