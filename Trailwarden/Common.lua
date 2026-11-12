@@ -19,6 +19,10 @@ function W.Copy(value,seen)
     for k,v in pairs(value) do out[W.Copy(k,seen)]=W.Copy(v,seen) end
     return out
 end
+function W.ShallowCopy(value)
+    if type(value)~="table" then return value end
+    local out={};for k,v in pairs(value) do out[k]=v end;return out
+end
 function W.ProviderIdentity()
     local api=C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
     local _,build=W.Safe(GetBuildInfo)

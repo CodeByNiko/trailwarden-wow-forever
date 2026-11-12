@@ -130,7 +130,7 @@ function W.ResolveAccess(route,player,facts,records)
     if destination then
         local point=entrance(destination)
         if not point then return {mode="access-unavailable",goal=route.point,navRoute={kind="wait",key="access:"..tostring(route.key)},label="Cave entrance data unavailable",instruction="Target inside "..destination.name..". Entrance position unavailable; inspect the cave map."} end
-        local nav=W.Copy(route);nav.point=point;nav.mapID=point.mapID;nav.x=point.x;nav.y=point.y;nav.kind="entrance";nav.key="entrance:"..destination.id
+        local nav=W.ShallowCopy(route);nav.point=point;nav.mapID=point.mapID;nav.x=point.x;nav.y=point.y;nav.kind="entrance";nav.key="entrance:"..destination.id
         return {mode="cave-approach",caveID=destination.id,caveName=destination.name,entry=point,goal=route.point,navRoute=nav,label="Find "..destination.name.." entrance",instruction="Head to the "..destination.name.." entrance, then enter the cave. Do not climb toward the objective marker."}
     end
     return {mode="direction",goal=route.point,navRoute=route,label="Direction only; terrain unverified"}

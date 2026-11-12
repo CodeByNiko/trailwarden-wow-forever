@@ -28,6 +28,30 @@ function W.Tooltip(owner,title,lines)
 end
 local frame,body,settings,settingsOpen,rows,settingRows
 local fields={}
+function W.OpenQuestLog(step)
+    local id=step and step.questID
+    if not W.IsFinite(id) or id<=0 then return false end
+    local function indexForQuest()
+        local index=C_QuestLog and W.Safe(C_QuestLog.GetLogIndexForQuestID,id) or W.Safe(GetQuestLogIndexByID,id)
+        if index and index>0 then return index end
+        if C_QuestLog and C_QuestLog.GetInfo then
+            for i=1,(W.Safe(C_QuestLog.GetNumQuestLogEntries) or 0) do
+                local info=W.Safe(C_QuestLog.GetInfo,i)
+                if info and not info.isHeader and info.questID==id then return i end
+            end
+        end
+    end
+    local index=indexForQuest()
+    if not index then print("|cff5dd4d6Trailwarden|r Accept this quest before opening it in your quest log.");return false end
+    if not QuestLogFrame or type(ShowUIPanel)~="function" then return false end
+    -- Expanding headers may change indices; resolve again after expansion/show.
+    W.Safe(ExpandQuestHeader,0);W.Safe(ShowUIPanel,QuestLogFrame)
+    index=indexForQuest();if not index then return false end
+    if type(QuestLog_SetSelection)=="function" then W.Safe(QuestLog_SetSelection,index)
+    elseif type(SelectQuestLogEntry)=="function" then W.Safe(SelectQuestLogEntry,index)
+    elseif C_QuestLog then W.Safe(C_QuestLog.SetSelectedQuest,id) end
+    W.Safe(QuestLog_Update);return true
+end
 local function atText(parent,text,size,color,x,y,width,height)
     local f=W.Font(parent,size,color);f:SetPoint("TOPLEFT",x,-y);f:SetSize(width,height);f:SetText(text);return f
 end
@@ -136,7 +160,8 @@ function W.CreateUI()
     config:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Display settings",{"Adjust the guide size, preview rows, and other display preferences."}) end)
     fields.fold:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Collapse or expand",{W.GetProfile().collapsed and "Show the current step and planned route." or "Keep only the compact current-step header visible."}) end)
     close:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.gold));W.Tooltip(self,"Hide Trailwarden",{"Use /tw to show the guide again."}) end)
-    local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-60);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
+    local card=CreateFrame("Button",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-60);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
+    card:SetScript("OnClick",function() W.OpenQuestLog(W.CurrentRoute) end)
     fields.action=atText(card,"",9,C.gold,12,10,202,14);fields.action:SetWordWrap(false)
     fields.title=atText(card,"",16,C.text,12,30,268,40);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
     fields.target=atText(card,"",12,C.cyan,12,61,268,16);fields.target:SetWordWrap(true);fields.target:SetJustifyV("TOP")
@@ -156,7 +181,7 @@ function W.CreateUI()
         lines[#lines+1]="Automatic combat targets: at most +2 enemy levels. Blocked objectives stay in your quest log."
         lines[#lines+1]=W.L("marker_help");lines[#lines+1]=W.L("marker_path_warning")
         lines[#lines+1]="Use /tw feedback for a reviewable summary without character names, quest names, or coordinates. Nothing is sent automatically."
-        lines[#lines+1]="Click a planned step to focus it. The plan updates as your quests change."
+        lines[#lines+1]="Click to open this quest in your quest log. Shift-click a planned step to focus it."
         W.Tooltip(self,r.title or "Why this target?",lines)
     end)
     card:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
@@ -172,8 +197,8 @@ function W.CreateUI()
         atText(row,string.format("%02d",i+1),10,C.muted,8,13,21,14)
         row.title=atText(row,"",12,C.text,34,4,246,16);row.title:SetWordWrap(true)
         row.detail=atText(row,"",10,C.muted,34,23,246,13);row.detail:SetWordWrap(true)
-        row:SetScript("OnClick",function(self) W.PinStep(self.step) end)
-        row:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan));if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.safetyHeld and "Automatic combat limits cannot be bypassed with manual focus." or self.step.levelDeferred and "Click to resume this deferred quest now." or "Click to focus this quest step."}) end end)
+        row:SetScript("OnClick",function(self) if W.Safe(IsShiftKeyDown) then W.PinStep(self.step) else W.OpenQuestLog(self.step) end end)
+        row:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan));if self.step then W.Tooltip(self,self.step.title,{self.step.instruction,self.step.reason,self.step.safetyHeld and "Automatic combat limits cannot be bypassed with manual focus." or self.step.levelDeferred and "Click to open quest log. Shift-click to resume this deferred quest." or "Click to open quest log. Shift-click to focus this step."}) end end)
         row:SetScript("OnLeave",function(self) self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
         rows[i]=row
     end

@@ -142,6 +142,9 @@ menu.set(false)
 check("OpenMap visibility toggle persists character preference",not profile.routeOverlay and menu.get()==false)
 profile.routeOverlay=true;W.Navigation={decisionID=W.Decision.id,travel={mode="none"}};W.UpdateRouteOverlay()
 check("no actionable route hides pooled icons",icons[1].hidden and icons[2].hidden)
+local removed=removedMini+removedWorld
+for i=1,100 do W.UpdateRouteOverlay();W.ClearRouteOverlay() end
+check("repeated inactive map updates do not churn library registrations",removedMini+removedWorld==removed)
 W.Decision={id=200};W.Navigation={decisionID=199,travel=a};W.UpdateRouteOverlay()
 check("stale decision map pins are cleared",icons[1].hidden and icons[2].hidden and W.OverlayStatus=="Synchronizing route")
 local priorInfo=C_Map.GetMapInfo;local priorZones=W.Zones

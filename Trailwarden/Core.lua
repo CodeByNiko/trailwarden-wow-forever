@@ -3,9 +3,12 @@ local frame=CreateFrame("Frame");W.EventFrame=frame
 local pending=false
 local pendingEvents={}
 W.CombatActive=false
+local function combatFlag(value) return value==true or value==1 end
+local function liveCombat() return combatFlag(W.Safe(InCombatLockdown)) or combatFlag(W.Safe(UnitAffectingCombat,"player")) end
+function W.IsWorldMapOpen() return WorldMapFrame and combatFlag(W.Safe(WorldMapFrame.IsShown,WorldMapFrame)) or false end
 function W.IsCombatActive()
     if W.CombatActive then return true end
-    return W.Safe(InCombatLockdown)==true or W.Safe(UnitAffectingCombat,"player")==true
+    return liveCombat()
 end
 function W.SetCombatUI(active)
     W.CombatActive=active==true
@@ -13,7 +16,7 @@ function W.SetCombatUI(active)
         if W.CombatActive then W.MainFrame:Hide()
         else W.MainFrame:SetShown(not W.GetProfile().panelHidden) end
     end
-    if W.NavigatorFrame then W.NavigatorFrame:SetShown(not W.CombatActive and not W.GetProfile().navigatorHidden) end
+    if W.NavigatorFrame then W.NavigatorFrame:SetShown(not W.GetProfile().navigatorHidden) end
     if W.CombatActive and W.ClearRouteOverlay then W.ClearRouteOverlay();W.OverlayStatus="Map pins hidden during combat" end
 end
 local function render(name,fn,...)
@@ -23,6 +26,7 @@ local function render(name,fn,...)
     return status=="ok"
 end
 function W.Refresh(force,trigger)
+    if W.IsWorldMapOpen() then W.MapRefreshPending=true;return end
     if W.IsCombatActive() and trigger~="combat-ended" then W.CombatRefreshPending=true;return end
     if trigger=="combat-ended" then W.CombatRefreshPending=nil end
     local started=debugprofilestop and debugprofilestop()
@@ -87,11 +91,11 @@ frame:SetScript("OnEvent",function(_,event,...)
     if event=="PLAYER_REGEN_DISABLED" then W.SetCombatUI(true);return end
     if event=="PLAYER_REGEN_ENABLED" then
         W.SetCombatUI(false)
-        if W.CombatRefreshPending then W.Refresh(false,"combat-ended") end
+        W.Safe(W.PollCombatSafety);W.Refresh(false,"combat-ended")
         return
     end
     if event=="PLAYER_LOGIN" then
-        W.SetCombatUI(W.Safe(UnitAffectingCombat,"player")==true or W.Safe(InCombatLockdown)==true)
+        W.SetCombatUI(liveCombat())
         W.ResetExperience();W.Safe(W.PollCombatSafety);W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Trailwarden "..W.Version.."|r / Your character's route is ready. |cffffc366/tw|r opens the guide; |cffffc366/tw help|r lists controls.")
@@ -108,7 +112,11 @@ frame:SetScript("OnEvent",function(_,event,...)
         render("XP event",W.ExperienceEvent,event,unpack(args))
     end
     if event=="PLAYER_TARGET_CHANGED" or event=="UPDATE_MOUSEOVER_UNIT" or event=="NAME_PLATE_UNIT_ADDED" or event=="NAME_PLATE_UNIT_REMOVED" then
-        W.TrackCombatUnit(event,args[1]);local changed=W.Safe(W.PollCombatSafety)
+        W.TrackCombatUnit(event,args[1])
+        -- Nameplate bursts are sampled once by periodic maintenance. Never scan
+        -- the entire visible population for every add/remove during a fight.
+        if W.IsCombatActive() or event~="PLAYER_TARGET_CHANGED" then W.CombatRefreshPending=true;return end
+        local changed=W.Safe(W.PollCombatSafety)
         if changed then W.Refresh(false,"combat-safety") end
         return
     end
@@ -124,11 +132,34 @@ frame:SetScript("OnEvent",function(_,event,...)
         if W.Now()-(W.LastRefreshTime or 0)>=60 and not W.Safe(InCombatLockdown) then schedule(false,"XP_REVIEW") end
     else schedule(false,event) end
 end)
-local navElapsed,planElapsed,xpElapsed=0,0,0
+local navElapsed,planElapsed,xpElapsed,combatElapsed=0,0,0,0
+local mapWasOpen=false
 frame:SetScript("OnUpdate",function(_,dt)
+    combatElapsed=combatElapsed+dt
+    if combatElapsed>=.1 then
+        combatElapsed=0
+        local active=liveCombat()
+        if active~=W.CombatActive and (type(InCombatLockdown)=="function" or type(UnitAffectingCombat)=="function") then
+            W.SetCombatUI(active)
+            if not active then W.Safe(W.PollCombatSafety);W.Refresh(false,"combat-ended") end
+        end
+    end
     navElapsed=navElapsed+dt;planElapsed=planElapsed+dt;xpElapsed=xpElapsed+dt
+    local mapOpen=W.IsWorldMapOpen()
+    if mapWasOpen and not mapOpen and W.MapRefreshPending then
+        W.MapRefreshPending=nil;schedule(false,"QUEST_LOG_UPDATE")
+    end
+    mapWasOpen=mapOpen
     if W.CombatActive then
-        navElapsed=0;planElapsed=0
+        planElapsed=0
+        if navElapsed>=.1 then navElapsed=0;render("combat navigator",W.UpdateCombatNavigator) end
+        if xpElapsed>=1 then xpElapsed=0;render("experience",W.SampleExperience) end
+        return
+    end
+    if mapOpen then
+        -- Keep existing map pins stable while the map library is changing its
+        -- canvas. Defer quest snapshots and access/waypoint work until closed.
+        planElapsed=0
         if xpElapsed>=1 then xpElapsed=0;render("experience",W.SampleExperience) end
         return
     end

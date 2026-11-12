@@ -367,7 +367,7 @@ epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,
 W.GetProfile().panelHidden=false;W.GetProfile().navigatorHidden=false;W.UpdateNavigator()
 local combatPlans=W.PlanExecutions
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_DISABLED")
-check("combat hides guide and navigator",W.CombatActive and not W.MainFrame.shown and not W.NavigatorFrame.shown)
+check("combat hides guide while retaining navigator",W.CombatActive and not W.MainFrame.shown and W.NavigatorFrame.shown)
 check("combat removes Trailwarden route map pins",W.OverlayStatus=="Map pins hidden during combat")
 W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnEvent(W.EventFrame,"CHAT_MSG_COMBAT_XP_GAIN","unparsed test");drain()
 local pollCombat,navCombat=W.PollCombatSafety,W.UpdateNavigation;local polls,navigations=0,0
@@ -379,6 +379,47 @@ W.PollCombatSafety=pollCombat;W.UpdateNavigation=navCombat
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_ENABLED")
 check("combat exit restores preferred windows and refreshes once",not W.CombatActive and W.MainFrame.shown and W.NavigatorFrame.shown and W.PlanExecutions==combatPlans+1)
 log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+4)
+local combatAPI=InCombatLockdown
+InCombatLockdown=function() return 1 end
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+check("numeric combat API hides panel without a regen event",W.CombatActive and not W.MainFrame.shown and W.NavigatorFrame.shown)
+InCombatLockdown=function() return 0 end
+W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+check("numeric zero exits combat and restores panel",not W.CombatActive and W.MainFrame.shown)
+InCombatLockdown=combatAPI
+local scan=W.PollCombatSafety;local scans=0
+W.PollCombatSafety=function(...) scans=scans+1;return scan(...) end
+for i=1,100 do
+    W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_ADDED","nameplate"..i)
+    W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_REMOVED","nameplate"..i)
+end
+check("nameplate bursts do not cause population rescans",scans==0)
+W.EventFrame.scripts.OnUpdate(W.EventFrame,1)
+check("nameplate changes share one periodic safety scan",scans==1)
+W.PollCombatSafety=scan
+local mapFrame=WorldMapFrame;WorldMapFrame=region("frame",nil,"TestWorldMap")
+local plansBeforeMap=W.PlanExecutions
+local readCharacter=W.ReadCharacter;local captures=0
+W.ReadCharacter=function(...) captures=captures+1;return readCharacter(...) end
+for i=1,20 do W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.1) end
+check("open map defers quest captures and planning",captures==0 and W.PlanExecutions==plansBeforeMap)
+WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
+check("closing map coalesces deferred quest captures",captures==1)
+captures=0
+for i=1,20 do
+    WorldMapFrame:Show();W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+    WorldMapFrame:Hide();W.EventFrame.scripts.OnUpdate(W.EventFrame,.11)
+end
+drain()
+check("rapid repeated map toggles share one deferred quest capture",captures==1)
+W.ReadCharacter=readCharacter;WorldMapFrame=mapFrame
+local questFrame,showPanel,selectQuest=QuestLogFrame,ShowUIPanel,QuestLog_SetSelection
+local selected,opened
+QuestLogFrame={};ShowUIPanel=function(f) opened=f end;QuestLog_SetSelection=function(i) selected=i end
+check("quest click opens exact active quest by live log index",W.OpenQuestLog({questID=2}) and selected==1 and opened==QuestLogFrame)
+selected=nil;opened=nil
+check("unaccepted quest click cannot open unrelated log entry",not W.OpenQuestLog({questID=999999}) and selected==nil and opened==nil)
+QuestLogFrame=questFrame;ShowUIPanel=showPanel;QuestLog_SetSelection=selectQuest
 W.PinStep(W.ActiveSteps(W.State.activeByID[2],W.State)[1])
 local planAPI=W.PlanRoute;W.PlanRoute=function() error("synthetic planner failure") end;W.Refresh(true)
 check("planning failure retains a freshly verified unfinished step",W.CurrentRoute.questID==2 and W.CurrentRoute.kind=="objective" and W.LastError~=nil)
