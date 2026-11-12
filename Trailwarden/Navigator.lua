@@ -100,7 +100,7 @@ function W.CreateNavigator()
     if frame then return end
     local C=W.Colors
     frame=CreateFrame("Frame","TrailwardenNavigatorFrame",UIParent,"BackdropTemplate");W.NavigatorFrame=frame
-    frame:SetSize(174,122);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
+    frame:SetSize(174,122);frame:SetFrameStrata("HIGH");frame:SetToplevel(true);frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart",function(self) if not W.GetProfile().locked then self:StartMoving() end end)
     frame:SetScript("OnDragStop",function(self) self:StopMovingOrSizing();local a,_,b,x,y=self:GetPoint(1);W.GetProfile().navigatorPoint={point=a,relativePoint=b,x=x,y=y} end)
     arrow=frame:CreateTexture(nil,"ARTWORK");arrow:SetTexture("Interface\\AddOns\\Trailwarden\\Media\\Arrow.tga");arrow:SetSize(56,56);arrow:SetPoint("TOP",0,-1)

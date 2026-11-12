@@ -1,5 +1,5 @@
 local W=Trailwarden
-local C={bg={0.025,0.043,0.065,0.97},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},line={0.15,0.25,0.31,1},text={0.94,0.96,0.97},muted={0.70,0.77,0.81},cyan={0.39,0.86,0.85},gold={0.98,0.79,0.47},green={0.53,0.88,0.68}}
+local C={bg={0.025,0.043,0.065,0.985},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},hover={0.10,0.17,0.21,1},line={0.15,0.25,0.31,1},text={0.94,0.96,0.97},muted={0.70,0.77,0.81},cyan={0.39,0.86,0.85},gold={0.98,0.79,0.47},green={0.53,0.88,0.68}}
 W.Colors=C
 function W.Font(parent,size,color)
     local f=parent:CreateFontString(nil,"OVERLAY","GameFontNormal")
@@ -15,8 +15,8 @@ function W.Button(parent,label,width,onClick)
     b:SetScript("OnClick",onClick)
     b:SetScript("OnDisable",function(self) self.label:SetTextColor(unpack(C.muted)) end)
     b:SetScript("OnEnable",function(self) self.label:SetTextColor(unpack(C.text)) end)
-    b:SetScript("OnEnter",function(self) self:SetBackdropBorderColor(unpack(C.cyan)) end)
-    b:SetScript("OnLeave",function(self) self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
+    b:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan)) end)
+    b:SetScript("OnLeave",function(self) self:SetBackdropColor(unpack(C.raised));self:SetBackdropBorderColor(unpack(C.line));if GameTooltip then GameTooltip:Hide() end end)
     return b
 end
 function W.Tooltip(owner,title,lines)
@@ -119,7 +119,7 @@ function W.CreateUI()
     if frame then return end
     local p=W.GetProfile()
     frame=CreateFrame("Frame","TrailwardenMainFrame",UIParent,"BackdropTemplate");W.MainFrame=frame
-    frame:SetSize(324,456);frame:SetFrameStrata("MEDIUM");frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
+    frame:SetSize(324,456);frame:SetFrameStrata("HIGH");frame:SetToplevel(true);frame:SetClampedToScreen(true);frame:SetMovable(true);frame:EnableMouse(true);W.Backdrop(frame)
     body=CreateFrame("Frame",nil,frame);body:SetAllPoints(frame)
     local head=CreateFrame("Frame",nil,frame);head:SetPoint("TOPLEFT",1,-1);head:SetSize(322,46);head:EnableMouse(true);head:RegisterForDrag("LeftButton")
     head:SetScript("OnDragStart",function() if not W.GetProfile().locked then frame:StartMoving() end end)
@@ -127,11 +127,14 @@ function W.CreateUI()
     atText(head,"TRAILWARDEN",13,C.text,15,7,126,18)
     fields.subtitle=atText(head,"",11,C.muted,15,27,290,14);fields.subtitle:SetWordWrap(true)
     fields.summaryDistance=atText(head,"",11,C.gold,305,27,0,14);fields.summaryDistance:SetJustifyH("RIGHT");fields.summaryDistance:SetWordWrap(false)
-    fields.mode=atText(head,"",10,C.cyan,144,10,93,13);fields.mode:SetJustifyH("RIGHT")
+    fields.mode=atText(head,"",10,C.cyan,140,10,75,13);fields.mode:SetJustifyH("RIGHT")
     local line=head:CreateTexture(nil,"ARTWORK");line:SetColorTexture(unpack(C.line));line:SetPoint("BOTTOMLEFT");line:SetSize(322,1)
-    local close=W.Button(head,"×",20,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(20)
-    fields.fold=W.Button(head,"−",20,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-32,-8);fields.fold:SetHeight(20)
-    local config=W.Button(head,"⋯",22,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-56,-8);config:SetHeight(20)
+    local close=W.Button(head,"X",24,function() W.GetProfile().panelHidden=true;frame:Hide() end);close:SetPoint("TOPRIGHT",-8,-8);close:SetHeight(22)
+    fields.fold=W.Button(head,"-",24,function() W.GetProfile().collapsed=not W.GetProfile().collapsed;layout() end);fields.fold:SetPoint("TOPRIGHT",-40,-8);fields.fold:SetHeight(22)
+    local config=W.Button(head,"SET",32,function() W.ToggleSettings() end);config:SetPoint("TOPRIGHT",-72,-8);config:SetHeight(22);config.label:SetFont("Fonts\\FRIZQT__.TTF",9,"")
+    config:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Display settings",{"Adjust the guide size, preview rows, and other display preferences."}) end)
+    fields.fold:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"Collapse or expand",{W.GetProfile().collapsed and "Show the current step and planned route." or "Keep only the compact current-step header visible."}) end)
+    close:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.gold));W.Tooltip(self,"Hide Trailwarden",{"Use /tw to show the guide again."}) end)
     local card=CreateFrame("Frame",nil,body,"BackdropTemplate");fields.card=card;card:SetPoint("TOPLEFT",16,-60);card:SetSize(292,142);W.Backdrop(card,C.card);card:EnableMouse(true)
     fields.action=atText(card,"",10,C.gold,12,10,190,14);fields.action:SetWordWrap(false)
     fields.title=atText(card,"",16,C.text,12,30,268,40);fields.title:SetJustifyV("TOP");fields.title:SetWordWrap(true)
@@ -229,7 +232,7 @@ function W.CreateUI()
     local back=W.Button(settings,"Back to your route",292,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-510)
     head:EnableMouseWheel(true)
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
-    head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; ... opens display settings."}) end)
+    head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; SET opens display settings."}) end)
     head:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
     W.ApplyPositions();layout();if p.panelHidden then frame:Hide() end
 end

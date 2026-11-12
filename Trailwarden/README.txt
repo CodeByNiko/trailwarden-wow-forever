@@ -1,4 +1,4 @@
-TRAILWARDEN 1.8.22 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.23 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -10,8 +10,10 @@ https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-
 Current 1.8 improvements include safer dynamic cave access, complete guide
 refresh after navigation errors, live objective-name and wording accuracy,
 conservative XP comparisons, and transport guidance that takes priority over
-local cave directions. Provider CI verifies the pinned QuestieDB archive by
-SHA-256 and exercises runtime modules, diagnostics, and slash commands.
+local cave directions. The guide stays above ordinary addon panels and uses
+clearer header controls with brighter button feedback. Provider CI verifies the
+pinned QuestieDB archive by SHA-256 and exercises runtime modules, diagnostics,
+and slash commands.
 See the release notes for full details:
 https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs
 

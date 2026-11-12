@@ -40,7 +40,9 @@ function methods:RegisterEvent(e) self.events=self.events or {};self.events[e]=t
 function methods:CreateFontString(name) return region("font",self,name) end
 function methods:CreateTexture(name) return region("texture",self,name) end
 function methods:SetScrollChild(v) self.scrollChild=v end
-for _,m in ipairs({"EnableMouseWheel","SetFrameStrata","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
+for _,m in ipairs({"EnableMouseWheel","SetFrameStrata","SetToplevel","SetClampedToScreen","SetMovable","EnableMouse","RegisterForDrag","SetBackdrop","SetBackdropBorderColor","SetJustifyH","SetJustifyV","SetWordWrap","SetAllPoints","StartMoving","StopMovingOrSizing","SetMultiLine","SetAutoFocus","SetFontObject","SetFocus","HighlightText"}) do methods[m]=function() end end
+function methods:SetFrameStrata(value) self.strata=value end
+function methods:SetToplevel(value) self.toplevel=value end
 function methods:SetJustifyH(value) self.justifyH=value end
 function methods:SetJustifyV(value) self.justifyV=value end
 function methods:SetWordWrap(value) self.wordWrap=value end
@@ -267,6 +269,17 @@ check("migration removes class-specific manual stage",fresh.waterTotemStage==nil
 ne();W.GetProfile().offers={};log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 1/4",numFulfilled=1,numRequired=4}}}};W.Refresh(true);W.CreateNavigator();W.UpdateNavigator();W.UpdateUI()
 check("main and navigator created",W.MainFrame and W.NavigatorFrame)
 check("main panel compact enough",W.MainFrame.w==324 and W.MainFrame.h<500)
+check("guide and navigator stay above ordinary addon panels",W.MainFrame.strata=="HIGH" and W.MainFrame.toplevel==true and W.NavigatorFrame.strata=="HIGH" and W.NavigatorFrame.toplevel==true)
+check("guide background stays nearly opaque for readability",W.MainFrame.bgColor and W.MainFrame.bgColor[4]>=.98)
+local header,headerButtons
+for _,node in ipairs(nodes) do
+ if node.parent==W.MainFrame and node.h==46 then header=node end
+end
+headerButtons={}
+for _,node in ipairs(nodes) do
+ if node.kind=="Button" and node.parent==header then headerButtons[node.label.text]=node end
+end
+check("header actions use clear supported labels and usable hit areas",headerButtons.SET and headerButtons.SET.w==32 and headerButtons["-"] and headerButtons["-"].w==24 and headerButtons.X and headerButtons.X.w==24)
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 local savedRoute,savedDecision=W.CurrentRoute,W.Decision
