@@ -1,11 +1,9 @@
 # Trailwarden 1.8.1
 
-## Fixed
-
-- Active client waypoints are now part of quest change detection. A waypoint-only change refreshes guidance on the next quest event, even when objective text and counters stay the same.
-- Route stabilization now recognizes a changed client waypoint as a new target, so the panel and navigation do not keep using the previous coordinates.
+- Polish and synchronize the CurseForge project description with the 1.8.0 feature set, including language selection, the local `/tw feedback` summary, manual travel guidance, and the addon's beta limitations.
+- Align the addon's current version and generated Forever package name with 1.8.1: `Trailwarden-1.8.1-Forever.zip`.
 
 ## Verification
 
-- Added regressions for waypoint-only changes and duplicate unchanged quest events.
-- Full Lua 5.1 and Lua 5.4 suites and reproducible package validation are required before merging this feature.
+- The full automated scenario, engine, provider/client contract, safety, travel, localization, feedback, and replay checks pass.
+- Release consistency checks pass, and the generated ZIP is valid and directly installable.

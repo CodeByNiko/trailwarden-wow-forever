@@ -1,4 +1,4 @@
-TRAILWARDEN 1.8.25 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.1 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -15,7 +15,10 @@ local cave directions. The guide stays above ordinary addon panels and uses
 clearer header controls with brighter button feedback, and a status line that
 keeps the full “Above range” label readable. Provider CI verifies the
 pinned QuestieDB archive by SHA-256 and exercises runtime modules, diagnostics,
-and slash commands.
+and slash commands. Language choices include automatic, English and Danish. The
+/tw feedback command copies a privacy-conscious summary locally; it is never
+sent automatically. The project description now explains manual travel and
+beta limitations.
 See the release notes for full details:
 https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs
 
