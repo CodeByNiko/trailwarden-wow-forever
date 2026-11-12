@@ -234,8 +234,14 @@ local function forecastCandidates(out,state)
     table.sort(keys);local stamp=table.concat(keys,"|")
     local cache=forecastCache
     if cache and cache.owner==state.key and cache.stamp==stamp and state.now-cache.at<45 and W.TravelCost(cache.player,state.player)<300 then
+        local copied,projections={},{}
         for _,c in ipairs(out) do
-            c.economyModel=W.Copy(cache.models[c.key]);c.economy=W.ProjectQuestXP(c.economyModel,state.player,state.experience)
+            c.economyModel=W.Copy(cache.models[c.key],copied)
+            local model=c.economyModel
+            if model then
+                if projections[model]==nil then projections[model]=W.ProjectQuestXP(model,state.player,state.experience) or false end
+                c.economy=projections[model] and W.Copy(projections[model]) or nil
+            end
         end
         state.experience.referenceRate=cache.referenceRate
         W.ForecastCacheHits=(W.ForecastCacheHits or 0)+1
@@ -246,11 +252,12 @@ local function forecastCandidates(out,state)
     local status,message=W.Call(W.PrepareQuestEconomies,out,state)
     W.ForecastError=status~="ok" and tostring(message) or nil
     if status~="ok" then for _,c in ipairs(out) do c.economy=nil;c.economyModel=nil end;return end
-    local models={};for _,c in ipairs(out) do models[c.key]=W.Copy(c.economyModel) end
+    local models,copied={},{};for _,c in ipairs(out) do models[c.key]=W.Copy(c.economyModel,copied) end
     forecastCache={owner=state.key,stamp=stamp,at=state.now,player=W.Copy(state.player),referenceRate=state.experience.referenceRate,models=models}
 end
 -- Candidate collection is the only routing layer that reads provider APIs.
 function W.CollectCandidates(state)
+    if W.ProviderError then return {candidates={},deferred={},gates={},ready=false,databaseStatus=W.ProviderError} end
     local out,deferred,gates={},{},{}
     local transitionStatus
     if state.questLogReady then
@@ -303,22 +310,60 @@ function W.CollectCandidates(state)
 end
 W.RouteWeights={turninFactor=.8,turninBonus=-450,turninFullRadius=250,turninFadeRadius=1000,pickupFactor=.95,pickupBase=180,nearPickupRadius=350,nearPickupBonus=-420,deliveryFactor=.9,deliveryBase=30,item=-800,objectiveBase=70,clusterRadius=300,clusterBonus=-65,clusterLimit=4,zonePenalty=800,classBonus=-60,fullLogBonus=-500,switchMargin=120,switchRatio=.18,workAreaRadius=450,leaveWorkAreaPenalty=450,leaveAreaMargin=75,xpBias=1000}
 local function planningMap(c) return c.regionMapID or c.mapID end
+-- Two spatial indexes preserve both world-yard and same-map fallback distances.
 local function clusterCounts(all,w)
-    local counts={}
-    for _,candidate in ipairs(all) do
-        local count,seen=0,{}
-        if candidate.point then
-            for _,other in ipairs(all) do
-                if other.questID~=candidate.questID and other.point and not seen[other.questID] and W.TravelCost(candidate.point,other.point)<w.clusterRadius then
-                    count=count+1;seen[other.questID]=true
-                end
+    local counts={};local world,maps={},{};local radius=w.clusterRadius
+    local function add(index,scope,x,y,c)
+        scope=tostring(scope);index[scope]=index[scope] or {}
+        local key=math.floor(x/radius)..":"..math.floor(y/radius)
+        local bucket=index[scope][key] or {};index[scope][key]=bucket;bucket[#bucket+1]=c
+    end
+    if radius>0 and radius<100000 then
+        for _,c in ipairs(all) do W.YieldPlanning();local p=c.point;if p then
+            if W.IsFinite(p.wx) and W.IsFinite(p.wy) then add(world,p.continent,p.wx,p.wy,c) end
+            if W.IsFinite(p.x) and W.IsFinite(p.y) then add(maps,p.mapID,p.x*20000,p.y*20000,c) end
+        end end
+    end
+    for _,c in ipairs(all) do
+        W.YieldPlanning()
+        local count,seen,checked=0,{},{}
+        local function consider(other)
+            W.YieldPlanning()
+            if not checked[other] then
+                checked[other]=true
+                if other.questID~=c.questID and other.point and not seen[other.questID] and W.TravelCost(c.point,other.point)<radius then count=count+1;seen[other.questID]=true end
             end
         end
-        counts[candidate.key]=count
+        local function visit(index,scope,x,y)
+            local grid=index[tostring(scope)];if not grid then return end
+            local bx,by=math.floor(x/radius),math.floor(y/radius)
+            for dx=-1,1 do for dy=-1,1 do for _,other in ipairs(grid[(bx+dx)..":"..(by+dy)] or {}) do consider(other) end end end
+        end
+        local p=c.point
+        if p and radius>0 then
+            if radius>=100000 then for _,other in ipairs(all) do consider(other) end
+            else
+                if W.IsFinite(p.wx) and W.IsFinite(p.wy) then visit(world,p.continent,p.wx,p.wy) end
+                if W.IsFinite(p.x) and W.IsFinite(p.y) then visit(maps,p.mapID,p.x*20000,p.y*20000) end
+            end
+        end
+        counts[c.key]=count
     end
     return counts
 end
-local function score(c,state,all,origin,w,releaseArea,clusters)
+local function batchDistances(all,origin,state,w)
+    local nearby={}
+    for _,other in ipairs(all) do
+        local near=other.point and W.TravelCost(origin,other.point)
+        local inArea=state.workArea and other.workAreaID==state.workArea.id
+        local caveWork=state.workArea and state.workArea.kind=="cave" and inArea
+        local localWork=near and near<=w.workAreaRadius and (not state.workArea or state.workArea.kind~="cave" or inArea)
+        local pickup=other.kind=="pickup" and (inArea or near and near<=120 and (not state.workArea or state.workArea.kind~="cave" or inArea))
+        if other.kind=="objective" and (caveWork or localWork) or pickup then nearby[#nearby+1]={other=other,near=near} end
+    end
+    return nearby
+end
+local function score(c,state,all,origin,w,releaseArea,clusters,distances,projections)
     local d=c.kind=="item" and 0 or W.TravelCost(origin,c.point)
     local cluster=clusters and clusters[c.key] or 0
     local action=0
@@ -334,8 +379,8 @@ local function score(c,state,all,origin,w,releaseArea,clusters)
     -- It applies to remote objectives too, including objectives of the same quest.
     local blocked=false
     if c.point and not releaseArea then
-        for _,other in ipairs(all) do
-            local near=other.point and W.TravelCost(origin,other.point)
+        for _,entry in ipairs(distances) do
+            local other,near=entry.other,entry.near
             if other.kind=="objective" and other.key~=c.key then
                 local caveWork=state.workArea and state.workArea.kind=="cave" and other.workAreaID==state.workArea.id
                 local nearbyWork=near and near<=w.workAreaRadius and (not state.workArea or state.workArea.kind~="cave" or other.workAreaID==state.workArea.id)
@@ -353,8 +398,9 @@ local function score(c,state,all,origin,w,releaseArea,clusters)
         end
     end
     parts.efficiency=0
-    if state.experience and state.experience.enabled and c.economyModel then
-        local projected=W.ProjectQuestXP(c.economyModel,origin,state.experience)
+    if state.experience and state.experience.enabled and c.economyModel and c.economyModel.confidence=="medium" then
+        local projected=projections[c.economyModel]
+        if projected==nil then projected=W.ProjectQuestXP(c.economyModel,origin,state.experience) or false;projections[c.economyModel]=projected end
         local baseline=parts.distance+parts.action+parts.cluster+parts.zone+parts.class+parts.capacity+parts.batching
         -- Full-cycle XP already includes travel/work. Do not charge distance
         -- a second time; the helper also fails closed for low-confidence models.
@@ -391,8 +437,10 @@ function W.SelectRoute(input)
             instruction="Avoid this enemy and move away from danger. Navigation resumes after the threat is no longer visible.",reason=danger.reason,source="Live hostile observation",ownerKey=state.key},{},{clearPin=false,candidates={},commitment=input.commitment}
     end
     local candidates,levelDeferred={},{};local previous=input.previous
+    local copied={}
     for _,raw in ipairs(input.meta.candidates) do
-        local c=W.Copy(raw)
+        W.YieldPlanning()
+        local c=W.Copy(raw,copied)
         local skipped=state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID]
         local risk=c.combatRisk
         local combatAllowed=not risk or risk.status=="allowed" and W.IsFinite(risk.maxLevel) and risk.maxLevel<=state.level+(W.CombatLevelMargin or 2) and risk.rank~=3 and (state.profile.includeGroup or risk.rank~=1 and risk.rank~=2)
@@ -418,9 +466,12 @@ function W.SelectRoute(input)
     if not input.releasePlan and not preferred and hasZone(region) then preferred=region end
     -- Score only actionable candidates: skipped quests must not hold a batch open.
     local clusters=clusterCounts(candidates,w)
+    local distances=batchDistances(candidates,state.player,state,w)
+    local projections={}
     local scoreEvaluations=0
     for _,c in ipairs(candidates) do
-        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan,clusters);scoreEvaluations=scoreEvaluations+1
+        W.YieldPlanning()
+        c.score,c.scoreParts,c.cluster,c.batchBlocked=score(c,state,candidates,state.player,w,input.releasePlan,clusters,distances,projections);scoreEvaluations=scoreEvaluations+1
         c.activityRank=c.kind=="escort" and 0 or 1
         local focus=not input.releasePlan and state.workFocus
         c.workFocusRank=c.reviewWork and 0 or focus and c.kind=="objective" and c.questID==focus.questID and c.point and (W.TravelCost(state.player,c.point)<=w.workAreaRadius or state.workArea and c.workAreaID==state.workArea.id) and 0 or 1
@@ -486,10 +537,13 @@ function W.SelectRoute(input)
     for _=1,queueDepth do
         local remaining={};for _,candidate in ipairs(candidates) do if not used[candidate.key] then remaining[#remaining+1]=candidate end end
         local remainingClusters=clusterCounts(remaining,w)
+        local remainingDistances=batchDistances(remaining,from,state,w)
+        local remainingProjections={}
         local nextStep,nextScore,nextBlocked,nextRank
         for _,c in ipairs(remaining) do
+                W.YieldPlanning()
                 -- Build the remaining list and its cluster counts once per leg.
-                local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan,remainingClusters);scoreEvaluations=scoreEvaluations+1
+                local value,_,_,blocked=score(c,state,remaining,from,w,input.releasePlan,remainingClusters,remainingDistances,remainingProjections);scoreEvaluations=scoreEvaluations+1
                 local rank=c.zoneRank
                 if not nextStep or nextBlocked and not blocked or blocked==nextBlocked and (rank<nextRank or rank==nextRank and (value<nextScore or value==nextScore and c.key<nextStep.key)) then nextStep,nextScore,nextBlocked,nextRank=c,value,blocked,rank end
         end
@@ -504,15 +558,15 @@ function W.SelectRoute(input)
     end
     return best,withDeferred(queue),detail
 end
-function W.PlanRoute(state,force,context)
+function W.PreparePlanInput(state,force,context)
     context=context or {previous=W.CurrentRoute}
     if state.profile.paused or state.dead then
         local input={state=W.Copy(state),meta={candidates={},deferred={},gates={},ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data"},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
-        local route,queue,detail=W.SelectRoute(input);detail.input=input;detail.candidateCount=0;detail.scoreEvaluations=0;return route,queue,detail
+        return input
     end
     if state.combatSafety and state.combatSafety.alert then
         local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
-        local route,queue,detail=W.SelectRoute(input);detail.input=input;return route,queue,detail
+        return input
     end
     W.BeginDataCapture()
     local ok,meta=pcall(W.CollectCandidates,state)
@@ -520,8 +574,11 @@ function W.PlanRoute(state,force,context)
     if not ok then error(meta) end
     meta.facts=facts
     local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
-    local route,queue,detail=W.SelectRoute(input)
-    detail.input=input
+    return input
+end
+function W.PlanRoute(state,force,context)
+    local input=W.PreparePlanInput(state,force,context)
+    local route,queue,detail=W.SelectRoute(input);detail.input=input
     return route,queue,detail
 end
 function W.PinStep(step) if step and not step.safetyHeld then local p=W.GetProfile();if step.levelDeferred then p.deferredLevels[step.questID]=nil end;p.pinned=step.key;W.Refresh(true) end end

@@ -1,4 +1,4 @@
-TRAILWARDEN 1.8.3 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.4 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -7,18 +7,14 @@ Renamed from Wayfinder in 1.7.2. Commands: /tw and /trailwarden.
 For existing settings, exit WoW and follow:
 https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md
 
-Current 1.8 improvements include a familiar settings gear icon, safer dynamic
-cave access, complete guide
-refresh after navigation errors, live objective-name and wording accuracy,
-conservative XP comparisons, and transport guidance that takes priority over
-local cave directions. The guide stays above ordinary addon panels and uses
-clearer header controls with brighter button feedback, and a status line that
-keeps the full “Above range” label readable. Provider CI verifies the
-pinned QuestieDB archive by SHA-256 and exercises runtime modules, diagnostics,
-and slash commands. Language choices include automatic, English and Danish. The
-/tw feedback command copies a privacy-conscious summary locally; it is never
-sent automatically. The project description now explains manual travel and
-beta limitations.
+Version 1.8.4 coalesces map toggles, hides the main guide during combat while
+keeping lightweight arrow guidance, and makes active quests clickable in the
+quest log. Shift-click planned rows to focus their route. Provider reads,
+point caches and replay capture are bounded. A verified provider zone index
+avoids global starter-spawn decoding; other/corrected data uses runtime fallback.
+Automatic route selection runs in cancellable timer slices. Use /tw perf for
+workload/provider diagnostics and /tw perfreset before reproducing a slowdown.
+Restart WoW after updating. Live performance still requires client verification.
 See the release notes for full details:
 https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.4
+- Coalesce rapid world-map toggles and defer expensive work until the map remains closed; make inactive pin cleanup idempotent.
+- Hide the main guide during combat, retain the lightweight arrow, and suspend provider queries, route planning and population scans until combat ends.
+- Click current or planned active quests to open their exact quest-log entry; shift-click planned rows to focus a route.
+- Replace global starter-spawn decoding with a verified, provider-specific compact zone index; use the bounded runtime builder on mismatches or corrections.
+- Bound point caches, diagnostic capture and replay retention; reuse immutable field reads within each planning pass without caching errors.
+- Add provider compatibility checks, cache generations and public correction/locale hooks; never clear the provider's shared caches.
+- Split automatic route selection across timer slices and discard stale work before publishing a complete decision.
+- Reduce repeated route scoring, XP projections, navigation copies and noisy event handling; add /tw perf and /tw perfreset diagnostics.
+- Test fresh-copy ownership, cold/warm real-provider workloads, index reproducibility, map storms and stale-work cancellation.
+
 ## 1.8.3
 - Reduce repeated allocations and provider API calls during navigation and combat-safety polling.
 - Reuse identical quest XP projections and precompile localized XP message patterns.

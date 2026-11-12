@@ -1,15 +1,16 @@
 local W=Trailwarden
-local owner={};local pool={};local shownSignature;local menuRegistered
+local owner={};local pool={};local shownSignature;local menuRegistered;local registered=false
 local function pins()
     -- Real LibStub is a callable table; W.Safe intentionally accepts functions only.
     if type(LibStub)=="table" then return W.Safe(LibStub.GetLibrary,LibStub,"HereBeDragons-Pins-2.0",true) end
     return W.Safe(LibStub,"HereBeDragons-Pins-2.0",true)
 end
 function W.ClearRouteOverlay()
+    if not registered then shownSignature=nil;return end
     local lib=pins()
     if lib then W.Safe(lib.RemoveAllMinimapIcons,lib,owner);W.Safe(lib.RemoveAllWorldMapIcons,lib,owner) end
     for _,pair in ipairs(pool) do pair.mini:Hide();pair.world:Hide() end
-    shownSignature=nil
+    shownSignature=nil;registered=false
 end
 local function icon(parent)
     local f=CreateFrame("Frame",nil,parent);f:SetSize(18,18)
@@ -49,6 +50,7 @@ function W.UpdateRouteOverlay()
         if not pair then pair={mini=icon(Minimap or UIParent),world=icon(UIParent)};pool[i]=pair end
         for _,f in pairs(pair) do f.pinLabel=p.label;f.pinTexture:SetVertexColor(unpack(p.color));f.pinMarker:SetText(p.marker) end
         local point=p.point
+        registered=true -- Also clean up partially registered pins after errors.
         local ms,mr=W.Call(lib.AddMinimapIconMap,lib,owner,pair.mini,point.mapID,point.x,point.y,true,true)
         local ws,wr=W.Call(lib.AddWorldMapIconMap,lib,owner,pair.world,point.mapID,point.x,point.y,nil)
         if ms~="ok" or ws~="ok" or mr==false or wr==false then

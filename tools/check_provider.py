@@ -2,17 +2,14 @@
 
 Install developer-only dependencies: python3 -m pip install lupa cbor2
 Run: python3 tools/check_provider.py /path/to/QuestieDB
-No provider data, Python dependencies or downloaded code is shipped in the addon.
+No provider source, Python dependencies or downloaded code is shipped in the addon.
+The addon includes a reproducible, version-bound factual quest/zone ID index.
 The actual provider runs under Lua 5.1; client APIs and objective counts are doubles.
 """
 import argparse
-import base64
 import os
 from pathlib import Path
-import zlib
 
-import cbor2
-from lupa.lua51 import LuaRuntime
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('provider', type=Path)
@@ -20,60 +17,9 @@ parser.add_argument('--expected-version', help='Fail if the provider TOC version
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 provider = args.provider.resolve()
-lua = LuaRuntime(encoding=None, unpack_returned_tuples=True)
-globals_ = lua.globals()
-namespace = lua.table()
-metadata, files = {}, []
-for line in (provider / 'QuestieDB_Forever.toc').read_bytes().splitlines():
-    if line.startswith(b'## '):
-        key, _, value = line[3:].partition(b':')
-        metadata[key] = value.strip()
-    elif line.strip() and not line.startswith(b'#'):
-        files.append(line.decode().replace('\\', '/'))
-version = metadata.get(b'Version', b'').decode()
-if args.expected_version and version != args.expected_version:
-    raise SystemExit(f'Expected QuestieDB {args.expected_version}, found {version or "unknown"}')
-
-
-def to_lua(value):
-    if isinstance(value, dict):
-        return lua.table_from({to_lua(k): to_lua(v) for k, v in value.items()})
-    if isinstance(value, (list, tuple)):
-        return lua.table_from([to_lua(v) for v in value])
-    return value.encode() if isinstance(value, str) else value
-
-
-def decompress(value, _kind):
-    for window in (15, -15, 31):
-        try:
-            return zlib.decompress(value, window)
-        except zlib.error:
-            pass
-    raise ValueError('Unsupported compressed QuestieDB block')
-
-
-globals_.py_metadata = lambda _addon, key: metadata.get(key)
-globals_.py_cbor = lambda value: to_lua(cbor2.loads(value))
-globals_.py_base64 = base64.b64decode
-globals_.py_decompress = decompress
-lua.execute(b'''
-GetAddOnMetadata=function(a,k) return py_metadata(a,k) end
-C_AddOns={GetAddOnMetadata=GetAddOnMetadata}
-C_EncodingUtil={DecodeBase64=function(s) return py_base64(s) end,
- DecompressString=function(s,k) return py_decompress(s,k) end,
- DeserializeCBOR=function(s) return py_cbor(s) end}
-GetLocale=function() return "enUS" end
-GetBuildInfo=function() return "1.60.1","70245","",16001 end
-UnitFactionGroup=function() return "Alliance" end
-UnitClassBase=function() return "WARRIOR",1 end
-UnitRace=function() return "Night Elf","NightElf",4 end
-''')
-for name in files:
-    path = (provider / name).resolve()
-    if not path.is_relative_to(provider):
-        raise ValueError('Provider TOC path escapes its addon directory')
-    lua.execute(path.read_bytes(), b'QuestieDB', namespace)
-assert namespace[b'RequireContract'](3) is True
+from provider_runtime import load_provider
+lua,namespace,version=load_provider(provider,args.expected_version)
+globals_=lua.globals()
 globals_.actualProvider = namespace
 os.chdir(root)
 # Exercise all existing client doubles, then start a fresh addon namespace so
@@ -83,6 +29,9 @@ lua.execute((root / 'tests/scenarios.lua').read_bytes())
 lua.execute(b'''
 LibQuestieDB=actualProvider;QuestDB=LibQuestieDB.Quest;NpcDB=LibQuestieDB.Npc
 ItemDB=LibQuestieDB.Item;ObjectDB=LibQuestieDB.Object
+hooksecurefunc=function(owner,key,callback)
+ local original=owner[key];owner[key]=function(...) local a,b,c,d=original(...);callback(...);return a,b,c,d end
+end
 QuestieLoader=nil;Trailwarden=nil;TrailwardenDB=nil;C_Timer=nil;SlashCmdList={}
 UnitGUID=function(unit) if unit=="player" then return "Player-Provider-Smoke" end end
 UnitName=function() return "Provider test" end
@@ -105,10 +54,15 @@ C_QuestLog.GetQuestObjectives=function() return objectiveRows end
 C_QuestLog.IsComplete=function() return false end
 C_QuestLog.GetAllCompletedQuestIDs=function() return {} end
 C_QuestLog.GetNextWaypoint=function() end
-for _,name in ipairs({"Common","Locale","Data","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Core","Commands"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","CatalogIndex","Provider","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Scheduler","Core","Commands"}) do dofile("Trailwarden/"..name..".lua") end
+collectgarbage("collect");local baseMemory=collectgarbage("count");local started=os.clock()
 local refresh=Trailwarden.Refresh;Trailwarden.Refresh=nil;Trailwarden.BuildQuestCatalog();Trailwarden.Refresh=refresh
+catalogColdMS=(os.clock()-started)*1000
+collectgarbage("collect");catalogRetainedKB=collectgarbage("count")-baseMemory
 assert(Trailwarden.CatalogReady,Trailwarden.CatalogError)
 assert(Trailwarden.CatalogCount==#LibQuestieDB.Quest.GetAllIds())
+assert(Trailwarden.CatalogIndexStatus=="verified offline zone index",Trailwarden.CatalogIndexStatus)
+assert(not Trailwarden.ProviderReads["Npc.spawns"] and not Trailwarden.ProviderReads["Object.spawns"],"Global spawn queries during indexed startup")
 Trailwarden.Refresh(true,"provider-smoke")
 assert(not Trailwarden.LastError,Trailwarden.LastError)
 assert(not Trailwarden.ForecastError,Trailwarden.ForecastError)
@@ -130,6 +84,29 @@ assert(Trailwarden.CurrentRoute.questID==456 and Trailwarden.CurrentRoute.kind==
 assert(not Trailwarden.LastError and not Trailwarden.ForecastError)
 assert(next(Trailwarden.OutputErrors or {})==nil,"Output errors after pinning the provider objective: "..Trailwarden.Diagnostics())
 ''')
+lua.execute(b'''
+local W=Trailwarden
+local first=LibQuestieDB.Quest.Get(456,"objectives")[1][1][1]
+local a=LibQuestieDB.Npc.Get(first,"spawns");local b=LibQuestieDB.Npc.Get(first,"spawns")
+assert(a~=b,"Real provider did not return independent tables")
+W.BeginDataCapture();local before=W.ProviderReads["Npc.spawns"] or 0
+local one=W.DBRead("Npc",first,"spawns");local two=W.DBRead("Npc",first,"spawns")
+assert(one==two and W.ProviderReads["Npc.spawns"]==before+1,"Repeated real reads not coalesced")
+W.EndDataCapture();W.BeginDataCapture();local three=W.DBRead("Npc",first,"spawns");W.EndDataCapture();assert(three~=one)
+collectgarbage("collect");local base=collectgarbage("count");collectgarbage("stop");local started=os.clock()
+for i=1,10 do W.Refresh(true,"real-provider-warm") end
+warmMS=(os.clock()-started)*1000;warmAllocatedKB=collectgarbage("count")-base
+collectgarbage("restart");collectgarbage("collect");warmRetainedKB=collectgarbage("count")-base
+assert(not W.LastError and not W.ForecastError)
+assert(W.EntityCacheEntries<=128 and W.EntityCachePoints<=4096 and (W.ReplayEntries or 0)<=24000)
+local captured=W.WorkCounters.captures;local plans=W.PlanExecutions
+WorldMapFrame={IsShown=function() return true end}
+for i=1,100 do W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnEvent(W.EventFrame,"UPDATE_MOUSEOVER_UNIT") end
+assert(W.WorkCounters.captures==captured and W.PlanExecutions==plans,"Map storm escaped gates with real provider")
+WorldMapFrame=nil
+''')
+print('Actual provider cold catalog: %.2f ms / %.1f KiB retained' % (globals_.catalogColdMS,globals_.catalogRetainedKB))
+print('Actual provider 10 warm plans: %.2f ms / %.1f KiB allocated / %.1f KiB retained' % (globals_.warmMS,globals_.warmAllocatedKB,globals_.warmRetainedKB))
 print('QuestieDB', version, '/ contract', namespace[b'contractVersion'])
 print('Complete catalog:', globals_.Trailwarden[b'CatalogCount'], 'quests; accepted objective and forecasts passed')
 print('Provider reads are real; client APIs, position and objective counts are synthetic.')

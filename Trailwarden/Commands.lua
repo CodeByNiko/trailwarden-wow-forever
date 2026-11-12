@@ -28,11 +28,13 @@ SlashCmdList.TRAILWARDEN=function(message)
     elseif cmd=="group" then p.includeGroup=not p.includeGroup;W.Refresh(true)
     elseif cmd=="auto" then p.mapSync=not p.mapSync;W.Refresh(true)
     elseif cmd=="reset" then p.panelPoint=nil;p.navigatorPoint=nil;W.ApplyPositions()
+    elseif cmd=="perf" then W.ShowDiagnostics(W.PerformanceSummary())
+    elseif cmd=="perfreset" then W.PerformanceSummary(true);print("Trailwarden performance counters reset.")
     elseif cmd=="debug" then W.ShowDiagnostics()
     elseif cmd=="feedback" then W.ShowDiagnostics(W.ExportFeedback())
     elseif cmd=="xpreset" then W.ResetExperience();W.Refresh(true)
     elseif cmd=="xp" then p.xpRouting=not p.xpRouting;W.Refresh(true)
     elseif cmd=="trace" then W.ShowDiagnostics(W.ExportReplay())
-    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, language auto|en|da, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, feedback (reviewable summary), trace (local replay), xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
+    else print("|cff5dd4d6Trailwarden|r /tw, arrow, routepins, settings, language auto|en|da, lock, refresh, rebuild, skip, later, undo, pause, resume, group, auto (map waypoint), reset (positions), debug, perf (work/provider counters), perfreset, feedback (reviewable summary), trace (local replay), xp (routing), xpreset (session), scale 60-130, arrowscale 60-150.") end
 end
 

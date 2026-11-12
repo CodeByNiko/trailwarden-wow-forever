@@ -37,7 +37,7 @@ function CreateVector2D(x,y) return {GetXY=function() return x,y end} end
 C_Map={GetBestMapForUnit=function() return 1438 end,GetPlayerMapPosition=function() return CreateVector2D(.4,.6) end,GetMapInfo=function() return {name="Teldrassil",mapType=3} end}
 C_QuestLog={GetNumQuestLogEntries=function() return 0 end,GetAllCompletedQuestIDs=function() return {} end}
 C_Timer={After=function(_,fn) timers[#timers+1]=fn end}
-for _,name in ipairs({"Common","Locale","Data","Tracking","Database"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","Provider","Tracking","Database"}) do dofile("Trailwarden/"..name..".lua") end
 local W=Trailwarden
 check("entity getter called with documented dot signature",W.DBGet("Quest",1,"name")=="Contract quest 1")
 check("numeric nil fields on known quests are zero",W.Q(1,"requiredLevel")==0)

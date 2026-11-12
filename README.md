@@ -8,6 +8,8 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 ## Recent improvements
 
+Version **1.8.4** adds map-toggle coalescing, combat guide hiding with the arrow retained, clickable active quests, bounded caches and capture, a verified provider zone index, and cancellable automatic route selection. `/tw perf` and `/tw perfreset` expose work/provider measurements for live feedback.
+
 - Waypoint-aware quest updates, verified objective matching, and synchronized fail-safe navigation.
 - Safe handling for unknown quest policy, bounded planner previews, and missing Horde start-zone coverage.
 - Same-level XP reward calibration, pinned real-provider CI, and a documented client smoke process.

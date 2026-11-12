@@ -33,5 +33,7 @@ jobs:
           echo "becb9b3cea4a99ae31f115a187179c242f5cf8ef28bf4f9579a86393f18f45c3  /tmp/trailwarden-provider/QuestieDB-1.0.14-Forever.zip" | sha256sum --check --strict
           unzip -q /tmp/trailwarden-provider/QuestieDB-1.0.14-Forever.zip -d /tmp/trailwarden-provider
           python3 tools/check_provider.py /tmp/trailwarden-provider/QuestieDB --expected-version 1.0.14
+      - name: Verify generated provider zone index
+        run: python3 tools/generate_catalog_index.py /tmp/trailwarden-provider/QuestieDB --expected-version 1.0.14 --archive-sha becb9b3cea4a99ae31f115a187179c242f5cf8ef28bf4f9579a86393f18f45c3 --check
       - name: Validate installable addon
         run: python3 tools/package.py

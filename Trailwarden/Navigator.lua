@@ -39,7 +39,7 @@ function W.ManualTransportHint(route,player)
     return "Use the in-game transport map to reach "..destination..". Trailwarden does not guess boat or flight connections; use /tw refresh after arrival."
 end
 local function readNavigation(route,previous)
-    local copy=route and W.Copy(route)
+    local copy=route and W.ShallowCopy(route)
     if copy and copy.point then
         local fresh=W.Point(copy.mapID,copy.x,copy.y)
         if fresh then fresh.entityID=copy.point.entityID end
@@ -119,8 +119,8 @@ function W.CreateNavigator()
 end
 function W.UpdateNavigator()
     if not frame then return end
-    local p=W.GetProfile();local combat=W.IsCombatActive and W.IsCombatActive();frame:SetShown(not p.navigatorHidden and not combat);frame:EnableMouse(not p.locked)
-    if p.navigatorHidden or combat then return end
+    local p=W.GetProfile();frame:SetShown(not p.navigatorHidden);frame:EnableMouse(not p.locked)
+    if p.navigatorHidden then return end
     local r=W.CurrentRoute
     W.FitCaption(title,r and (r.questName or r.title) or "Preparing your route")
     local n=W.Navigation or {label="Preparing navigation"}
@@ -140,6 +140,18 @@ function W.UpdateNavigator()
     local exceptional=not n.arrived and not direction
     title:SetShown(not exceptional);status:SetShown(exceptional)
     W.FitCaption(status,n.label or "")
+end
+function W.UpdateCombatNavigator()
+    if not frame or W.GetProfile().navigatorHidden then return end
+    -- Retain the last validated access target; only update bearing/distance.
+    -- No cave/provider queries, route planning or map-waypoint writes in combat.
+    local previous=W.Navigation
+    if previous then
+        local n=W.ComputeNavigation(previous.navRoute,W.PlayerPoint(),W.Safe(GetPlayerFacing),previous)
+        n.decisionID=previous.decisionID;n.navRoute=previous.navRoute;n.travel=previous.travel
+        W.Navigation=n
+    end
+    W.UpdateNavigator()
 end
 function W.ToggleNavigator()
     local p=W.GetProfile();p.navigatorHidden=not p.navigatorHidden;W.UpdateNavigator();if W.UpdateUI then W.UpdateUI() end
