@@ -235,7 +235,7 @@ function W.CreateUI()
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
     head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; the gear opens display settings."}) end)
     head:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
-    W.ApplyPositions();layout();if p.panelHidden then frame:Hide() end
+    W.ApplyPositions();layout();if p.panelHidden or W.IsCombatActive and W.IsCombatActive() then frame:Hide() end
 end
 function W.UpdateUI()
     if not frame then W.CreateUI() end
@@ -323,11 +323,11 @@ function W.UpdateLiveUI()
 end
 function W.ToggleSettings()
     if not frame then W.CreateUI() end
-    W.GetProfile().panelHidden=false;frame:Show();settingsOpen=not settingsOpen;W.UpdateUI()
+    W.GetProfile().panelHidden=false;frame:SetShown(not (W.IsCombatActive and W.IsCombatActive()));settingsOpen=not settingsOpen;W.UpdateUI()
 end
 function W.ToggleUI()
     if not frame then W.CreateUI() end
-    local p=W.GetProfile();p.panelHidden=not p.panelHidden;frame:SetShown(not p.panelHidden)
+    local p=W.GetProfile();p.panelHidden=not p.panelHidden;frame:SetShown(not p.panelHidden and not (W.IsCombatActive and W.IsCombatActive()))
     if not p.panelHidden then W.Refresh(false,"display") end
 end
 function W.ShowDiagnostics(content)

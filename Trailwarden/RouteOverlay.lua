@@ -24,6 +24,7 @@ local function icon(parent)
     return f
 end
 function W.UpdateRouteOverlay()
+    if W.IsCombatActive and W.IsCombatActive() then W.ClearRouteOverlay();W.OverlayStatus="Map pins hidden during combat";return end
     if not menuRegistered and OpenMapAPI and OpenMapAPI.major==1 and type(OpenMapAPI.RegisterMenuToggle)=="function" then
         local status=W.Call(OpenMapAPI.RegisterMenuToggle,"Trailwarden",{id="access",label="Trailwarden access points",get=function() return W.GetProfile().routeOverlay~=false end,set=function(on) W.GetProfile().routeOverlay=on;W.ClearRouteOverlay();W.UpdateRouteOverlay() end})
         menuRegistered=status=="ok"

@@ -355,7 +355,21 @@ for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2) end
 check("standing still avoids repeated full planning",W.PlanExecutions==executions)
 epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
 epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
-log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+3)
+W.GetProfile().panelHidden=false;W.GetProfile().navigatorHidden=false;W.UpdateNavigator()
+local combatPlans=W.PlanExecutions
+W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_DISABLED")
+check("combat hides guide and navigator",W.CombatActive and not W.MainFrame.shown and not W.NavigatorFrame.shown)
+check("combat removes Trailwarden route map pins",W.OverlayStatus=="Map pins hidden during combat")
+W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnEvent(W.EventFrame,"CHAT_MSG_COMBAT_XP_GAIN","unparsed test");drain()
+local pollCombat,navCombat=W.PollCombatSafety,W.UpdateNavigation;local polls,navigations=0,0
+W.PollCombatSafety=function(...) polls=polls+1;return pollCombat(...) end
+W.UpdateNavigation=function(...) navigations=navigations+1;return navCombat(...) end
+epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2)
+check("combat defers replanning and skips periodic navigation and nameplate scans",W.PlanExecutions==combatPlans and polls==0 and navigations==0)
+W.PollCombatSafety=pollCombat;W.UpdateNavigation=navCombat
+W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_ENABLED")
+check("combat exit restores preferred windows and refreshes once",not W.CombatActive and W.MainFrame.shown and W.NavigatorFrame.shown and W.PlanExecutions==combatPlans+1)
+log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+4)
 W.PinStep(W.ActiveSteps(W.State.activeByID[2],W.State)[1])
 local planAPI=W.PlanRoute;W.PlanRoute=function() error("synthetic planner failure") end;W.Refresh(true)
 check("planning failure retains a freshly verified unfinished step",W.CurrentRoute.questID==2 and W.CurrentRoute.kind=="objective" and W.LastError~=nil)
