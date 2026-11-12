@@ -40,8 +40,11 @@ function W.ExperienceTick()
     end
     return s
 end
+local killPatterns
 local function localizedKillXP(message)
     if type(message)~="string" then return nil end
+    if not killPatterns then
+    local compiled={}
     for name,format in pairs(_G) do
         if type(name)=="string" and name:match("^COMBATLOG_XPGAIN") and type(format)=="string" then
             local parts={"^"};local index,captures,xpIndex=1,0,nil
@@ -54,8 +57,13 @@ local function localizedKillXP(message)
                 index=finish+1
             end
             parts[#parts+1]="$"
-            if xpIndex then local values={message:match(table.concat(parts))};local value=tonumber(values[xpIndex]);if finite(value) then return value end end
+            if xpIndex then compiled[#compiled+1]={pattern=table.concat(parts),index=xpIndex} end
         end
+    end
+    if #compiled>0 then killPatterns=compiled end
+    end
+    for _,entry in ipairs(killPatterns or {}) do
+        local values={message:match(entry.pattern)};local value=tonumber(values[entry.index]);if finite(value) then return value end
     end
 end
 function W.ExperienceEvent(event,...)
@@ -374,7 +382,8 @@ function W.PrepareQuestEconomies(candidates,state)
                 else merged[#merged+1]=g;if g.sourceKey then bySource[g.sourceKey]=g end end
             end
             combined.goals=merged;table.sort(combined.questIDs)
-            for _,c in ipairs(list) do c.economyModel=combined;c.economy=W.ProjectQuestXP(combined,state.player,pace) end
+            local estimate=W.ProjectQuestXP(combined,state.player,pace)
+            for _,c in ipairs(list) do c.economyModel=combined;c.economy=W.Copy(estimate) end
             local projection=list[1].economy
             if projection and projection.xpPerHour>0 and projection.confidence=="medium" then rates[#rates+1]=projection.xpPerHour end
         end

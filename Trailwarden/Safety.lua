@@ -57,7 +57,7 @@ end
 local classifications={normal=0,elite=1,rareelite=2,worldboss=3,rare=4,minus=0,trivial=0}
 function W.PollCombatSafety()
     local before=revision;local state={level=W.Safe(UnitLevel,"player") or 1,mapID=C_Map and W.Safe(C_Map.GetBestMapForUnit,"player"),profile=W.GetProfile()}
-    local point=W.PlayerPoint();local nextAlert
+    local point=W.PlayerPoint();local nextAlert;local providerID=provider();local now=W.Now()
     local store=observations()
     for unit in pairs(units) do
         local guid=W.Safe(UnitGUID,unit)
@@ -67,22 +67,22 @@ function W.PollCombatSafety()
         if id and point and (validLevel(level) or level==-1) and attackable and W.Safe(UnitIsVisible,unit)~=false then
             local key=tostring(id)..":"..tostring(state.mapID);local old=store[key]
             local skull=level==-1
-            if type(old)~="table" or old.provider~=provider() or not W.IsFinite(old.seen) or W.Now()-old.seen>600 then old=nil end
+            if type(old)~="table" or old.provider~=providerID or not W.IsFinite(old.seen) or now-old.seen>600 then old=nil end
             local recordedLevel=old and validLevel(old.level) and validLevel(level) and math.max(old.level,level) or level
             local recordedRank=old and strongerRank(old.rank,rank) or rank
             local recordedSkull=skull or old and old.skull==true and old.playerLevel==state.level or false
             local priorPoint=old and type(old.point)=="table" and W.Point(old.point.mapID,old.point.x,old.point.y)
             if not old or old.level~=recordedLevel or old.rank~=recordedRank or old.skull~=recordedSkull or not priorPoint or (W.Distance(priorPoint,point) or 1000)>100 then revision=revision+1 end
-            store[key]={level=recordedLevel,skull=recordedSkull,rank=recordedRank,playerLevel=state.level,point=W.Copy(point),seen=W.Now(),provider=provider()}
+            store[key]={level=recordedLevel,skull=recordedSkull,rank=recordedRank,playerLevel=state.level,point=W.Copy(point),seen=now,provider=providerID}
             if not W.Safe(UnitIsDeadOrGhost,unit) and (skull or level>state.level+W.CombatLevelMargin or rank==3 or not state.profile.includeGroup and (rank==1 or rank==2)) then
                 local name=W.Safe(UnitName,unit) or "Hostile enemy"
-                local candidate={name=name,entityID=id,level=validLevel(level) and level or nil,skull=skull,seen=W.Now(),point=W.Copy(point),reason=skull and "Skull-level enemy visible" or "Hostile combat target exceeds automatic combat limits"}
+                local candidate={name=name,entityID=id,level=validLevel(level) and level or nil,skull=skull,seen=now,point=W.Copy(point),reason=skull and "Skull-level enemy visible" or "Hostile combat target exceeds automatic combat limits"}
                 if not nextAlert or (candidate.level or 999)>(nextAlert.level or 999) then nextAlert=candidate end
             end
         end
     end
     local keys={};for key,o in pairs(store) do
-        if type(o)~="table" or not W.IsFinite(o.seen) or W.Now()-o.seen>600 or o.provider~=provider() then store[key]=nil else keys[#keys+1]=key end
+        if type(o)~="table" or not W.IsFinite(o.seen) or now-o.seen>600 or o.provider~=providerID then store[key]=nil else keys[#keys+1]=key end
     end
     if #keys>200 then table.sort(keys,function(a,b) return store[a].seen<store[b].seen end);for i=1,#keys-200 do store[keys[i]]=nil end end
     local signature=nextAlert and (W.GetCharacterKey()..":"..nextAlert.entityID..":"..tostring(nextAlert.level)) or "none"
