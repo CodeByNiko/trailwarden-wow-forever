@@ -222,5 +222,21 @@ for _,record in ipairs({{event="banethil-other-objective-wins-XP",value=cave},{e
  fixtureFrames[#fixtureFrames+1]={event=record.event,input=record.value,expected={key=r.key,queue=keys,clearPin=d.clearPin==true}}
 end
 local f=io.open("tests/journey-replay.json","w");f:write(W.Json({schema=1,origin="synthetic-journey",addonVersion=W.Version,frames=fixtureFrames}));f:close()
+do
+local dispersed={}
+for i=1,500 do
+    local c=step("objective",100000+i,i/500,0);c.point.wx=i*1000;c.point.wy=0;dispersed[i]=c
+end
+local travelCost=W.TravelCost;local distanceCalls=0
+W.TravelCost=function(...) distanceCalls=distanceCalls+1;return travelCost(...) end
+local largeRoute=W.SelectRoute(input(dispersed,0,0));W.TravelCost=travelCost
+check("500 dispersed candidates stay within a 40000-distance-call budget",largeRoute.questID==100001 and distanceCalls<40000)
+local low=step("objective",200000,.5,.5);low.economyModel={confidence="low"}
+local lowInput=input({low});lowInput.state.experience={enabled=true,referenceRate=6000}
+local project=W.ProjectQuestXP;local projectionCalls=0
+W.ProjectQuestXP=function(...) projectionCalls=projectionCalls+1;return project(...) end
+W.SelectRoute(lowInput);W.ProjectQuestXP=project
+check("uncertain forecasts do not spend projection work during scoring",projectionCalls==0)
+end
 print(passed.." pure engine checks passed")
 

@@ -157,7 +157,11 @@ function W.ReadCharacter()
         if state.completed[id] or state.activeByID[id] and state.activeByID[id].isComplete or level<=state.level+p.maxLevelAbove or state.questLogReady and not state.activeByID[id] then p.deferredLevels[id]=nil end
     end
     if p.lastDeferred and not p.deferredLevels[p.lastDeferred] then p.lastDeferred=nil end
-    state.profile=W.Copy(p)
+    local planningProfile=W.ShallowCopy(p)
+    -- These mutable learning stores are read by their owning modules. They are
+    -- not planner inputs and must not be cloned into every decision/replay.
+    planningProfile.xpLearning=nil;planningProfile.combatObserved=nil
+    state.profile=W.Copy(planningProfile)
     local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
     state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)

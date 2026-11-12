@@ -1,5 +1,18 @@
 local W=Trailwarden
 local fieldCache,entityCache,mapLookup={},{},nil
+local entitySlots,entitySlot={},0
+W.EntityCacheEntries=0;W.EntityCachePoints=0
+local function cachePoints(key,points)
+    if #points>4096 then return end
+    local function evict(slot)
+        local old=entitySlots[slot]
+        if old then W.EntityCachePoints=W.EntityCachePoints-#entityCache[old];W.EntityCacheEntries=W.EntityCacheEntries-1;entityCache[old]=nil;entitySlots[slot]=nil end
+    end
+    entitySlot=entitySlot%128+1
+    evict(entitySlot)
+    while W.EntityCachePoints+#points>4096 do entitySlot=entitySlot%128+1;evict(entitySlot) end
+    entitySlots[entitySlot]=key;entityCache[key]=points;W.EntityCacheEntries=W.EntityCacheEntries+1;W.EntityCachePoints=W.EntityCachePoints+#points
+end
 local capture
 function W.BeginDataCapture() capture={} end
 function W.RecordFact(kind,id,key,value,status)
@@ -103,7 +116,7 @@ function W.EntityPoints(kind,id)
         end
     end
     table.sort(points,function(a,b) if a.mapID~=b.mapID then return a.mapID<b.mapID end if a.x~=b.x then return a.x<b.x end return a.y<b.y end)
-    if #points>0 then entityCache[key]=points end
+    if #points>0 then cachePoints(key,points) end
     W.RecordFact(kind,id,"resolvedPoints",points,#points>0 and "ok" or "empty")
     return points,#points>0 and "ok" or "empty"
 end
@@ -150,10 +163,43 @@ function W.BuildQuestCatalog(force,attempt)
     if W.CatalogReady and not force then return end
     attempt=attempt or 1
     W.CatalogGeneration=(W.CatalogGeneration or 0)+1;local generation=W.CatalogGeneration
-    fieldCache={};entityCache={};mapLookup=nil
+    fieldCache={};entityCache={};mapLookup=nil;entitySlots={};entitySlot=0;W.EntityCacheEntries=0;W.EntityCachePoints=0
     local db=entity("Quest");local status,ids=W.Call(db and db.GetAllIds)
     W.BuildingCatalog=true;W.CatalogState="loading";W.DatabaseStatus="Reading Forever quest data"
     local nextMaps,nextItems,count,index={},{},0,1
+    -- The global catalog needs zone IDs, not expanded world-coordinate points.
+    -- Keep only small per-entity zone lists for the duration of this build.
+    local starterMapCache={}
+    local function starterMaps(starters)
+        local result={}
+        for group,kind in ipairs({"Npc","Object"}) do
+            assert(starters[group]==nil or type(starters[group])=="table","Invalid starter list")
+            for _,eid in ipairs(starters[group] or {}) do
+                assert(W.IsFinite(eid) and eid>0,"Invalid starter ID")
+                local key=kind..":"..eid;local maps=starterMapCache[key]
+                if not maps then
+                    maps={};starterMapCache[key]=maps
+                    local spawns,status=W.DBRead(kind,eid,"spawns")
+                    assert(status=="ok" and (spawns==nil or type(spawns)=="table"),"Starter spawns unavailable")
+                    for area,coords in pairs(spawns or {}) do
+                        assert(type(coords)=="table","Invalid starter coordinates")
+                        local mapID=W.MapForArea(area);local info=mapID and C_Map and W.Safe(C_Map.GetMapInfo,mapID)
+                        if mapID and (not info or not info.mapType or info.mapType==3) then
+                            for i=1,#coords,math.max(1,math.ceil(#coords/40)) do
+                                local c=coords[i];assert(type(c)=="table","Invalid starter coordinate")
+                                if c[1]~=-1 or c[2]~=-1 then
+                                    assert(W.IsFinite(c[1]) and W.IsFinite(c[2]) and c[1]>=0 and c[1]<=100 and c[2]>=0 and c[2]<=100,"Invalid starter coordinate")
+                                    maps[mapID]=true
+                                end
+                            end
+                        end
+                    end
+                end
+                for mapID in pairs(maps) do result[mapID]=true end
+            end
+        end
+        return result
+    end
     local function fail(message)
         if generation~=W.CatalogGeneration then return end
         W.BuildingCatalog=false;W.CatalogError=tostring(message);W.CatalogState=W.CatalogReady and "degraded" or "waiting"
@@ -166,6 +212,7 @@ function W.BuildQuestCatalog(force,attempt)
     end
     if status~="ok" or type(ids)~="table" or #ids==0 then fail("Quest ID list unavailable");return end
     local function work()
+        local started=type(debugprofilestop)=="function" and debugprofilestop()
         local last=math.min(index+19,#ids)
         for i=index,last do
             local id=ids[i];assert(W.IsFinite(id) and id>0,"Invalid quest ID")
@@ -175,23 +222,24 @@ function W.BuildQuestCatalog(force,attempt)
             assert(ls=="ok" and ms=="ok","Invalid quest levels: "..id)
             local record={id=id,name=name,level=level or 0,minLevel=minLevel or 0}
             if name then
-                local points,ps=W.RelationPoints(id,"startedBy");assert(ps=="ok" or ps=="empty","Starter positions unavailable: "..id)
-                local seen={}
-                for _,point in ipairs(points) do
-                    if not seen[point.mapID] then nextMaps[point.mapID]=nextMaps[point.mapID] or {};nextMaps[point.mapID][#nextMaps[point.mapID]+1]=record;seen[point.mapID]=true end
+                for mapID in pairs(starterMaps(starters)) do
+                    nextMaps[mapID]=nextMaps[mapID] or {};nextMaps[mapID][#nextMaps[mapID]+1]=record
                 end
                 if starters[3]~=nil then assert(type(starters[3])=="table","Invalid item starters") end
                 if starters[3] and #starters[3]>0 then nextItems[#nextItems+1]={record=record,items=starters[3]} end
                 count=count+1
             end
+            index=i+1
+            if started and debugprofilestop()-started>=2 then break end
         end
-        index=last+1;W.CatalogProgress=math.floor(last/#ids*100)
+        W.CatalogProgress=math.floor((index-1)/#ids*100)
     end
     local slice
     slice=function()
         if generation~=W.CatalogGeneration then return end
-        local ok,message=pcall(work);if not ok then fail(message);return end
-        if index<=#ids then if C_Timer then C_Timer.After(.01,slice) else slice() end;return end
+        if C_Timer and (W.IsCombatActive and W.IsCombatActive() or W.IsWorldMapOpen and W.IsWorldMapOpen() or (W.MapQuietRemaining or 0)>0) then C_Timer.After(.25,slice);return end
+        local status,message=W.TimedCall("catalog slice",work);if status~="ok" then fail(message);return end
+        if index<=#ids then if C_Timer then C_Timer.After(.05,slice) else slice() end;return end
         if next(nextMaps)==nil and #nextItems==0 then fail("No mapped quest starters available");return end
         W.CatalogByMap,W.ItemQuests,W.CatalogCount=nextMaps,nextItems,count
         W.PublishedCatalogGeneration=generation;W.CatalogReady=true;W.BuildingCatalog=false;W.CatalogError=nil;W.CatalogState="ready";W.DatabaseStatus="Forever database ready"

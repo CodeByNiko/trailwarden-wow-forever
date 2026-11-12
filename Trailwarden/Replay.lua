@@ -29,24 +29,27 @@ local function portableInput(input)
     -- Prune saved learning/history before copying the replay graph.
     local source=W.ShallowCopy(input);local s=W.ShallowCopy(input.state);source.state=s
     s.profile={xpRouting=s.profile.xpRouting,paused=s.profile.paused,pinned=s.profile.pinned,skipped=W.Copy(s.profile.skipped),deferredLevels=W.Copy(s.profile.deferredLevels),includeGroup=s.profile.includeGroup,maxLevelAbove=s.profile.maxLevelAbove}
-    local out=W.Copy(source);s=out.state
+    local out,entries=W.CopyBudget(source,12000);s=out.state
     s.key="character";s.name=nil;s.signature=nil
     if s.player then s.player.ownerKey="character" end
     if out.previous then out.previous.ownerKey="character" end
     if out.commitment then out.commitment.ownerKey="character" end
     for _,candidate in ipairs(out.meta.candidates) do candidate.ownerKey="character" end
-    return out
+    return out,entries
 end
 function W.RecordDecision(decision)
     if not decision.detail or not decision.detail.input then return end
-    if W.ReplayOwner~=decision.state.key then W.ReplayOwner=decision.state.key;W.ReplayFrames={};W.ReplayLastSignature=nil end
+    if W.ReplayOwner~=decision.state.key then W.ReplayOwner=decision.state.key;W.ReplayFrames={};W.ReplayLastSignature=nil;W.ReplayEntries=0 end
     local frames=W.ReplayFrames or {};W.ReplayFrames=frames
     local keys={};for _,step in ipairs(decision.queue) do keys[#keys+1]=step.key end
-    local frame={event=decision.trigger or "refresh",capturedAt=decision.state.now,input=portableInput(decision.detail.input),expected={key=decision.route.key,queue=keys,clearPin=decision.detail.clearPin==true}}
+    local ok,snapshot,entries=pcall(portableInput,decision.detail.input)
+    if not ok then W.ReplayDropped=(W.ReplayDropped or 0)+1;return end
+    local frame={event=decision.trigger or "refresh",capturedAt=decision.state.now,input=snapshot,copyEntries=entries,expected={key=decision.route.key,queue=keys,clearPin=decision.detail.clearPin==true}}
     local last=frames[#frames]
-    if last and last.expected.key==frame.expected.key and W.ReplayLastSignature==decision.state.signature and (decision.trigger=="movement" or decision.trigger=="maintenance") and (last.event=="movement" or last.event=="maintenance") then frames[#frames]=frame else frames[#frames+1]=frame end
+    W.ReplayEntries=(W.ReplayEntries or 0)+entries
+    if last and last.expected.key==frame.expected.key and W.ReplayLastSignature==decision.state.signature and (decision.trigger=="movement" or decision.trigger=="maintenance") and (last.event=="movement" or last.event=="maintenance") then W.ReplayEntries=W.ReplayEntries-(last.copyEntries or 0);frames[#frames]=frame else frames[#frames+1]=frame end
     W.ReplayLastSignature=decision.state.signature
-    while #frames>20 do table.remove(frames,1) end
+    while #frames>20 or (W.ReplayEntries or 0)>24000 do local removed=table.remove(frames,1);W.ReplayEntries=W.ReplayEntries-(removed.copyEntries or 0) end
 end
 function W.ExportReplay(origin)
     return W.Json({schema=1,origin=origin or "live-export",addonVersion=W.Version,provider=W.ProviderIdentity(),frames=W.Copy(W.ReplayFrames or {})})

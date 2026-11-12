@@ -12,6 +12,18 @@ function W.Call(fn,...)
     if not ok then return "error",tostring(a) end
     return "ok",a,b,c,d
 end
+W.WorkTimings={}
+function W.TimedCall(label,fn,...)
+    local started=type(debugprofilestop)=="function" and debugprofilestop()
+    local status,a,b,c,d=W.Call(fn,...)
+    if started then
+        local ms=math.max(0,debugprofilestop()-started)
+        local row=W.WorkTimings[label] or {calls=0,total=0,peak=0};W.WorkTimings[label]=row
+        row.calls=row.calls+1;row.total=row.total+ms;row.peak=math.max(row.peak,ms)
+        if not W.SlowestWork or ms>W.SlowestWork.ms then W.SlowestWork={name=label,ms=ms,event=W.LastEvent,trigger=W.ActiveRefreshTrigger} end
+    end
+    return status,a,b,c,d
+end
 function W.Copy(value,seen)
     if type(value)~="table" then return value end
     seen=seen or {};if seen[value] then return seen[value] end
@@ -22,6 +34,18 @@ end
 function W.ShallowCopy(value)
     if type(value)~="table" then return value end
     local out={};for k,v in pairs(value) do out[k]=v end;return out
+end
+function W.CopyBudget(value,limit)
+    local seen,used={},0
+    local function copy(v)
+        if type(v)~="table" then return v end
+        if seen[v] then return seen[v] end
+        used=used+1;if used>limit then error("snapshot budget exceeded") end
+        local out={};seen[v]=out
+        for k,item in pairs(v) do used=used+1;if used>limit then error("snapshot budget exceeded") end;out[copy(k)]=copy(item) end
+        return out
+    end
+    local out=copy(value);return out,used
 end
 function W.ProviderIdentity()
     local api=C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata

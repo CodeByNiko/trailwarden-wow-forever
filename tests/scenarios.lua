@@ -441,7 +441,7 @@ W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain()
 check("between-frame map toggle catches up after settling",captures==1)
 local capturedBeforePerf=captures
 local perfSummary=W.PerformanceSummary(true)
-check("performance report identifies test build without capturing character",perfSummary:find("map-quiet-2",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
+check("performance report identifies test build without capturing character",perfSummary:find("spikes-3",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
 W.ReadCharacter=readCharacter;WorldMapFrame=mapFrame
 local questFrame,showPanel,selectQuest=QuestLogFrame,ShowUIPanel,QuestLog_SetSelection
 local selected,opened
@@ -557,6 +557,7 @@ s=W.ScanCharacter();check("unknown objective state is not treated as a delivery"
 C_QuestLog.GetQuestObjectives=oldObjectives
 s=W.ScanCharacter();local savedProfile=W.GetProfile();savedProfile.completed[777]=true;savedProfile.paused=not s.profile.paused
 check("captured state does not alias mutable saved progression",not s.completed[777] and s.profile.paused~=savedProfile.paused)
+check("planning snapshots exclude saved XP and combat caches",s.profile.xpLearning==nil and s.profile.combatObserved==nil)
 savedProfile.paused=false
 savedProfile.skipped="bad";savedProfile.offers=42;savedProfile.locations=false;savedProfile.gossip="bad";savedProfile.panelPoint={point="BAD",relativePoint="CENTER",x=0,y=0}
 savedProfile=W.GetProfile();check("nested saved containers and invalid anchors recover",type(savedProfile.skipped)=="table" and type(savedProfile.offers)=="table" and type(savedProfile.locations)=="table" and type(savedProfile.gossip)=="table" and savedProfile.panelPoint==nil)
@@ -577,6 +578,27 @@ drain();check("automatic failure retries are bounded",not W.BuildingCatalog and 
 npcs[201].spawns=originalSpawns;W.BuildQuestCatalog(true)
 check("partial new catalog is never published",W.CatalogByMap==published and W.BuildingCatalog)
 drain();check("explicit rebuild recovers and replaces catalog atomically",W.CatalogReady and not W.BuildingCatalog and W.CatalogError==nil and W.CatalogByMap~=published)
+do
+local query=W.Q;local catalogReads=0
+W.Q=function(...) catalogReads=catalogReads+1;return query(...) end
+W.SetCombatUI(true);W.BuildQuestCatalog(true)
+check("catalog timer performs no quest work in combat",W.BuildingCatalog and catalogReads==0)
+local deferredCatalog=table.remove(tasks,1);deferredCatalog()
+check("catalog retry remains paused through combat",catalogReads==0)
+W.SetCombatUI(false)
+local oldMap=WorldMapFrame;WorldMapFrame={IsShown=function() return true end}
+table.remove(tasks,1)()
+check("catalog timer also pauses while world map is open",catalogReads==0)
+WorldMapFrame=oldMap;drain();W.Q=query
+check("catalog resumes and publishes after pause ends",W.CatalogReady and not W.BuildingCatalog and catalogReads>0)
+local profileClock=debugprofilestop;local fakeMS=0
+debugprofilestop=function() fakeMS=fakeMS+2;return fakeMS end
+local timed,a,b,c,d=W.TimedCall("timing-fixture",function() return 1,2,3,4 end)
+check("section timing preserves multiple return values",timed=="ok" and a==1 and b==2 and c==3 and d==4 and W.WorkTimings["timing-fixture"].peak==2)
+local timedFailure=W.TimedCall("timing-fixture-failure",function() error("fixture") end)
+check("section timing preserves failure isolation",timedFailure=="error")
+debugprofilestop=profileClock
+end
 -- Unreadable rows stay explicitly unknown; capture failures are contained.
 local rowAPI=C_QuestLog.GetInfo;C_QuestLog.GetInfo=function() return {isHeader=false,questID=0} end
 log={{id=2,title="Warrior training"}};W.Refresh(true);check("placeholder quest IDs do not imply a complete log",not W.State.questLogReady and W.CurrentRoute.kind=="wait")

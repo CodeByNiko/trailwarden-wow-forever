@@ -58,7 +58,12 @@ end
 function W.PerformanceSummary(reset)
     local c=W.WorkCounters or {};local events={}
     for event,count in pairs(c.events or {}) do events[#events+1]=event.."="..count end;table.sort(events)
-    local summary="Trailwarden branch map-quiet-2 / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map changes="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
-    if reset then for key in pairs(c) do c[key]=key=="events" and {} or 0 end end
+    local summary="Trailwarden branch spikes-3 / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map signals="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
+    local times={};for label,row in pairs(W.WorkTimings or {}) do times[#times+1]={label=label,row=row} end
+    table.sort(times,function(a,b) return a.row.peak>b.row.peak end)
+    for _,entry in ipairs(times) do local row=entry.row;summary=summary..string.format("\n%s: calls=%d total=%.2f ms peak=%.2f ms",entry.label,row.calls,row.total,row.peak) end
+    if W.SlowestWork then local peak=W.SlowestWork;summary=summary..string.format("\nLargest: %s %.2f ms / event=%s / trigger=%s",peak.name,peak.ms,tostring(peak.event),tostring(peak.trigger)) end
+    summary=summary.."\nPoint cache: "..tostring(W.EntityCacheEntries or 0).."/128 entities / "..tostring(W.EntityCachePoints or 0).."/4096 points; replay: "..tostring(W.ReplayEntries or 0).."/24000 entries / skipped oversized="..tostring(W.ReplayDropped or 0)
+    if reset then for key in pairs(c) do c[key]=key=="events" and {} or 0 end;W.WorkTimings={};W.SlowestWork=nil end
     return summary
 end

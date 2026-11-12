@@ -26,3 +26,22 @@ The code exposes repeated work consistent with the reported symptoms, but the us
 The full suite passes, including 100 map cycles mixed with 8,000 nameplate events: zero quest captures, full navigation updates and safety scans between toggles, with one deferred quest capture after the final close. This is a deterministic workload check, not a reproduction of the reported 15% live CPU reading or an FPS measurement.
 
 Live comparison: install the new test package and restart WoW; run `/tw perfreset`, reproduce the rapid M toggles, wait two seconds after the last close and run `/tw perf`. Record the displayed counters and CPU reading together. Repeat with the reported view-distance setting. No PR or release has been made.
+
+## CPU and memory iteration: spikes-3
+
+The global catalog previously expanded and retained NPC/object coordinates worldwide merely to index quest zones. It now indexes zone IDs directly; full points are resolved on demand. Runtime point caching is limited to 128 entities and 4,096 points. Character/planner snapshots exclude the XP-learning and combat-observation stores. Replay retention is additionally limited to 24,000 copied entries in total and 12,000 per frame; oversized diagnostic snapshots are skipped without changing route decisions.
+
+Catalog timer slices now pause during combat, map display and map-settling. Each slice stops after an item when it reaches approximately 2 ms, or after 20 quests, and subsequent slices are spaced 50 ms apart. One individual provider call cannot be preempted.
+
+The route selector uses spatial indexes for cluster comparisons, computes nearby-work distances once per route leg, skips scoring projections for low-confidence models and shares immutable forecast copies/calculations within each pass. Sixty mixed-coordinate/action fixtures produced exactly the same selected route, queue and scores as commit f5650ce. Regression coverage adds a work budget for 500 dispersed candidates, bounded caches/replays, catalog pausing and timing error isolation.
+
+Synthetic measurements on the same local runtime (not live WoW):
+
+| Workload | Before | After |
+| --- | --- | --- |
+| 500-quest catalog, retained after GC | 14,678.9 KiB | 396.7 KiB |
+| 500-quest catalog, total CPU | 121.4 ms | 14.9 ms |
+| Selector, 320 candidates, median of 7 | 70.82 ms | 17.51 ms |
+| Selector, 128 candidates, median of 7 | 24.77 ms | 12.34 ms |
+
+`/tw perf` identifies `spikes-3` and includes total/peak milliseconds per work section, the largest section with its event/trigger, and retained point/replay budgets. `/tw perfreset` resets the measurement window. CPU timing depends on `debugprofilestop`; if the client does not expose it, only workload counters are available. Restart WoW after installing the updated test package so the old global point cache is released. Live memory/CPU behavior remains to be confirmed on the affected setup. No PR or merge is authorized yet.

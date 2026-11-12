@@ -35,29 +35,39 @@ function W.SetCombatUI(active)
 end
 local function render(name,fn,...)
     if name=="navigation" then counters.navigation=counters.navigation+1 end
-    local status,message=W.Call(fn,...)
+    local status,message=W.TimedCall(name,fn,...)
     W.OutputErrors=W.OutputErrors or {}
     if status~="ok" then W.OutputErrors[name]=tostring(message or status) else W.OutputErrors[name]=nil end
     return status=="ok"
+end
+local function pollSafety()
+    local status,changed=W.TimedCall("safety scan",W.PollCombatSafety)
+    return status=="ok" and changed
 end
 function W.Refresh(force,trigger)
     if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then counters.mapDeferrals=counters.mapDeferrals+1;W.MapRefreshPending=true;return end
     if W.IsCombatActive() then W.CombatRefreshPending=true;return end
     if trigger=="combat-ended" then W.CombatRefreshPending=nil end
     local started=debugprofilestop and debugprofilestop()
+    W.ActiveRefreshTrigger=trigger or (force and "manual" or "refresh")
     W.LastAttemptTime=W.Now()
     render("experience",W.SampleExperience)
     local state,route,queue,detail;local captured=false
     local ok,errorText=pcall(function()
-        counters.captures=counters.captures+1;state=W.ReadCharacter();captured=true
+        counters.captures=counters.captures+1
+        local status,result=W.TimedCall("character capture",W.ReadCharacter)
+        if status~="ok" then error(result) end
+        state=result;captured=true
         local previous=W.Decision
         local noisy=trigger=="QUEST_LOG_UPDATE" or trigger=="maintenance" or trigger=="XP_REVIEW"
         if not force and noisy and previous and previous.state.key==state.key and previous.state.signature==state.signature and W.Now()-(W.LastRefreshTime or 0)<60 and not W.LastError then return end
         W.PlanExecutions=(W.PlanExecutions or 0)+1;W.LastRefreshTime=W.Now()
-        route,queue,detail=W.PlanRoute(state,force,{previous=previous and previous.route,commitment=previous and previous.commitment,previousMapID=previous and previous.state.mapID,releasePlan=trigger=="manual-replan"})
+        local planStatus
+        planStatus,route,queue,detail=W.TimedCall("route planner",W.PlanRoute,state,force,{previous=previous and previous.route,commitment=previous and previous.commitment,previousMapID=previous and previous.state.mapID,releasePlan=trigger=="manual-replan"})
+        if planStatus~="ok" then error(route) end
         assert(type(route)=="table" and type(queue)=="table","Invalid planner result")
     end)
-    if ok and not route then return end
+    if ok and not route then W.ActiveRefreshTrigger=nil;return end
     if not ok then
         route=nil;queue=nil;detail=nil
         W.LastError=tostring(errorText)
@@ -78,7 +88,7 @@ function W.Refresh(force,trigger)
     W.Unmapped=detail and detail.input and detail.input.meta.deferred or {}
     if detail and detail.endGrind then W.EndGrindBreak() end
     if detail and detail.clearPin then W.GetProfile().pinned=nil;state.profile.pinned=nil end
-    if state.questLogReady then W.LastGoodState=W.Copy(state) end
+    -- Decision already retains the character snapshot; no duplicate graph needed.
     render("navigation",W.UpdateNavigation)
     W.NavigationPanelRefresh=nil -- The complete panel render below consumes any transition.
     render("waypoint",W.SyncWaypoint,decision.route,force)
@@ -89,6 +99,7 @@ function W.Refresh(force,trigger)
     render("route overlay",W.UpdateRouteOverlay)
     render("replay",W.RecordDecision,decision)
     if started then W.LastPlanMilliseconds=debugprofilestop()-started end
+    W.ActiveRefreshTrigger=nil
 end
 local function schedule(force,event)
     if W.IsWorldMapOpen() or W.MapQuietRemaining>0 then W.MapRefreshPending=true;return end
@@ -108,14 +119,14 @@ frame:SetScript("OnEvent",function(_,event,...)
     if event=="PLAYER_REGEN_DISABLED" then W.SetCombatUI(true);return end
     if event=="PLAYER_REGEN_ENABLED" then
         W.SetCombatUI(false)
-        if not W.IsWorldMapOpen() and W.MapQuietRemaining==0 then counters.safety=counters.safety+1;W.Safe(W.PollCombatSafety) end
+        if not W.IsWorldMapOpen() and W.MapQuietRemaining==0 then counters.safety=counters.safety+1;pollSafety() end
         W.Refresh(false,"combat-ended")
         return
     end
     if event=="PLAYER_LOGIN" then
         hookMap()
         W.SetCombatUI(liveCombat())
-        W.ResetExperience();W.Safe(W.PollCombatSafety);W.CreateUI();W.CreateNavigator();W.Refresh(true)
+        W.ResetExperience();pollSafety();W.CreateUI();W.CreateNavigator();W.Refresh(true)
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Trailwarden "..W.Version.."|r / Your character's route is ready. |cffffc366/tw|r opens the guide; |cffffc366/tw help|r lists controls.")
         return
@@ -137,7 +148,7 @@ frame:SetScript("OnEvent",function(_,event,...)
         if W.IsCombatActive() then W.CombatRefreshPending=true;return end
         if event~="PLAYER_TARGET_CHANGED" or W.IsWorldMapOpen() or W.MapQuietRemaining>0 then return end
         counters.safety=counters.safety+1
-        local changed=W.Safe(W.PollCombatSafety)
+        local changed=pollSafety()
         if changed then W.Refresh(false,"combat-safety") end
         return
     end
@@ -164,7 +175,7 @@ frame:SetScript("OnUpdate",function(_,dt)
         if active~=W.CombatActive and (type(InCombatLockdown)=="function" or type(UnitAffectingCombat)=="function") then
             W.SetCombatUI(active)
             if not active then
-                if not W.IsWorldMapOpen() and W.MapQuietRemaining==0 then counters.safety=counters.safety+1;W.Safe(W.PollCombatSafety) end
+                if not W.IsWorldMapOpen() and W.MapQuietRemaining==0 then counters.safety=counters.safety+1;pollSafety() end
                 W.Refresh(false,"combat-ended")
             end
         end
@@ -193,7 +204,7 @@ frame:SetScript("OnUpdate",function(_,dt)
         xpElapsed=0;render("experience",W.SampleExperience)
         if W.State then render("route overlay",W.UpdateRouteOverlay) end
         counters.safety=counters.safety+1
-        if W.Safe(W.PollCombatSafety) then W.Refresh(false,"combat-safety") end
+        if pollSafety() then W.Refresh(false,"combat-safety") end
     end
     if navElapsed>=.1 then
         navElapsed=0
