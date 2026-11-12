@@ -28,6 +28,7 @@ function methods:SetTextColor(...) self.textColor={...} end
 function methods:SetBackdropColor(...) self.bgColor={...} end
 function methods:SetColorTexture(...) self.bgColor={...} end
 function methods:SetTexture(t) self.texture=t end
+function methods:SetVertexColor(...) self.vertexColor={...} end
 function methods:SetRotation(a) self.rotation=a end
 function methods:SetScale(s) self.scale=s end
 function methods:SetShown(v) self.shown=v==true end
@@ -279,7 +280,10 @@ headerButtons={}
 for _,node in ipairs(nodes) do
  if node.kind=="Button" and node.parent==header then headerButtons[node.label.text]=node end
 end
-check("header actions use clear supported labels and usable hit areas",headerButtons.SET and headerButtons.SET.w==32 and headerButtons["-"] and headerButtons["-"].w==24 and headerButtons.X and headerButtons.X.w==24)
+local settingsIcon,settingsButton
+for _,node in ipairs(nodes) do if node.texture=="Interface\\Buttons\\UI-OptionsButton" then settingsIcon=node;settingsButton=node.parent end end
+check("header settings use Blizzard's options gear texture",settingsButton and settingsButton.parent==header and settingsButton.w==24 and settingsButton.label.shown==false and settingsIcon and settingsIcon.w==14 and settingsIcon.h==14 and settingsIcon.vertexColor~=nil)
+check("header collapse and close controls keep clear labels and usable hit areas",headerButtons["-"] and headerButtons["-"].w==24 and headerButtons.X and headerButtons.X.w==24)
 local oldActionRoute,oldActionState=W.CurrentRoute,W.State
 W.State=W.Copy(W.State);W.State.level=21;W.State.profile.maxLevelAbove=2
 W.CurrentRoute={key="objective:headerfit",questID=2,kind="objective",level=24,title="The Night Watch",questName="The Night Watch",instruction="Defeat the target."}

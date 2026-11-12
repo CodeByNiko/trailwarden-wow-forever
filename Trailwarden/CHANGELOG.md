@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.25
+- Replace the “SET” header label with the standard in-game options gear texture, while keeping an explanatory settings tooltip.
+- Add regression coverage for the gear texture and refresh rendered UI previews.
+
 ## 1.8.24
 - Give the objective status caption more horizontal space and reduce its font slightly so “Above range” remains visible beside progress.
 - Add a regression check for the full high-level objective status label.

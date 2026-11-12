@@ -1,4 +1,4 @@
-TRAILWARDEN 1.8.24 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.25 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -7,7 +7,8 @@ Renamed from Wayfinder in 1.7.2. Commands: /tw and /trailwarden.
 For existing settings, exit WoW and follow:
 https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md
 
-Current 1.8 improvements include safer dynamic cave access, complete guide
+Current 1.8 improvements include a familiar settings gear icon, safer dynamic
+cave access, complete guide
 refresh after navigation errors, live objective-name and wording accuracy,
 conservative XP comparisons, and transport guidance that takes priority over
 local cave directions. The guide stays above ordinary addon panels and uses
