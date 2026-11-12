@@ -125,6 +125,11 @@ state.activeByID={[90001]={objectives={{required=3,fulfilled=0}}}}
 local a=step(90001,500);local b=step(90002,100,"pickup");state.profile=W.Copy(W.GetProfile())
 W.PrepareQuestEconomies({a,b},state)
 check("both accepted and unaccepted quests receive full-cycle models",a.economy and b.economy and b.economyModel.pickup)
+local extra=step(90001,550);extra.key="objective:90001:extra"
+local project=W.ProjectQuestXP;local projections=0
+W.ProjectQuestXP=function(...) projections=projections+1;return project(...) end
+W.PrepareQuestEconomies({a,extra},state);W.ProjectQuestXP=project
+check("same-quest candidates share one calculation without sharing mutable results",projections==1 and a.economy and extra.economy and a.economy~=extra.economy and a.economy.xpPerHour==extra.economy.xpPerHour)
 check("unaccepted work remains explicitly uncertain",b.economy.confidence=="low")
 local learned=W.GetProfile().xpLearning;learned.quests[90001]={seen=now,goals={{type="monster",required=3,secondsPerUnit=20,samples=3}}}
 W.PrepareQuestEconomies({a},state);check("base reward with unknown bonuses remains uncertain",a.economy.confidence=="low")

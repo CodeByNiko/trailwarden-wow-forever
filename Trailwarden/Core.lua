@@ -102,7 +102,11 @@ frame:SetScript("OnEvent",function(_,event,...)
         if args[1]=="OpenMap" then if W.State then render("navigation",W.UpdateNavigation);render("route overlay",W.UpdateRouteOverlay) end end
         return
     end
-    render("XP event",W.ExperienceEvent,event,unpack(args))
+    -- Only these events carry XP, turn-in or AFK timing information.
+    -- Target and nameplate events can arrive in bursts and need no XP tick.
+    if event=="PLAYER_XP_UPDATE" or event=="CHAT_MSG_COMBAT_XP_GAIN" or event=="PLAYER_FLAGS_CHANGED" or event=="QUEST_TURNED_IN" then
+        render("XP event",W.ExperienceEvent,event,unpack(args))
+    end
     if event=="PLAYER_TARGET_CHANGED" or event=="UPDATE_MOUSEOVER_UNIT" or event=="NAME_PLATE_UNIT_ADDED" or event=="NAME_PLATE_UNIT_REMOVED" then
         W.TrackCombatUnit(event,args[1]);local changed=W.Safe(W.PollCombatSafety)
         if changed then W.Refresh(false,"combat-safety") end

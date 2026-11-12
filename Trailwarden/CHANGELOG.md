@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.3
+- Reduce repeated allocations and provider API calls during navigation and combat-safety polling.
+- Reuse identical quest XP projections and precompile localized XP message patterns.
+- Avoid XP-accounting work on target, mouseover and nameplate events.
+
 ## 1.8.2
 - Hide the guide, navigator, and route map pins during combat; restore the user's visibility preferences after combat.
 - Suspend frequent navigation/UI updates and periodic nameplate safety scans during combat, while keeping lightweight XP sampling and event-based safety observations.

@@ -353,6 +353,15 @@ ne();log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,t
 local executions=W.PlanExecutions
 for i=1,5 do epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2) end
 check("standing still avoids repeated full planning",W.PlanExecutions==executions)
+local experienceEvent=W.ExperienceEvent;local xpEventCalls=0
+W.ExperienceEvent=function(...) xpEventCalls=xpEventCalls+1;return experienceEvent(...) end
+W.EventFrame.scripts.OnEvent(W.EventFrame,"UPDATE_MOUSEOVER_UNIT")
+W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_ADDED","nameplate999")
+W.EventFrame.scripts.OnEvent(W.EventFrame,"NAME_PLATE_UNIT_REMOVED","nameplate999")
+check("target and nameplate events do not invoke XP accounting",xpEventCalls==0)
+W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player")
+check("XP events still invoke XP accounting",xpEventCalls==1)
+W.ExperienceEvent=experienceEvent
 epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
 epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
 W.GetProfile().panelHidden=false;W.GetProfile().navigatorHidden=false;W.UpdateNavigator()

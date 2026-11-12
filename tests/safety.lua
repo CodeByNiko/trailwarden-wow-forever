@@ -67,7 +67,12 @@ check("boss targets are never automatic combat goals",#W.CombatPoints(6,s,{})==0
 level=27;s=state();check("level-up automatically permits previously held level-29 source",W.CombatRisk(1,s).status=="allowed")
 level=22;s=state()
 -- A live correction must invalidate both navigation continuity and provider assumptions.
-targetID=2;unitLevel=29;W.PollCombatSafety();s=state();s.combatSafety=W.CombatSafetySnapshot(s)
+targetID=2;unitLevel=29
+local providerIdentity=W.ProviderIdentity;local providerCalls=0
+W.ProviderIdentity=function() providerCalls=providerCalls+1;return providerIdentity() end
+W.PollCombatSafety();W.ProviderIdentity=providerIdentity
+check("one safety scan reads provider identity once",providerCalls==1)
+s=state();s.combatSafety=W.CombatSafetySnapshot(s)
 check("live higher enemy level overrides lower provider level",W.CombatRisk(2,s).status=="blocked")
 check("visible high-level hostile creates navigation stop",s.combatSafety.alert and s.combatSafety.alert.level==29)
 local input={state=s,meta={candidates=steps,deferred={},ready=true},previous=steps[1],commitment={ownerKey=guid,mapID=1431},weights=W.Copy(W.RouteWeights)}

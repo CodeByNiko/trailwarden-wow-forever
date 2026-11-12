@@ -46,8 +46,8 @@ local function discoverCave(mapID)
     return cave
 end
 local function accessRecords(player,route)
-    local records=W.Copy(W.CaveAccess);local seen={}
-    for _,cave in ipairs(records) do for mapID in pairs(cave.interiorMaps) do seen[mapID]=true end end
+    local records={};local seen={}
+    for _,cave in ipairs(W.CaveAccess) do records[#records+1]=cave;for mapID in pairs(cave.interiorMaps) do seen[mapID]=true end end
     local playerMap=player and player.mapID;local routeMap=route and route.mapID
     if playerMap and not seen[playerMap] then local cave=discoverCave(playerMap);if cave then records[#records+1]=cave;seen[playerMap]=true end end
     if routeMap and not seen[routeMap] then local cave=discoverCave(routeMap);if cave then records[#records+1]=cave;seen[routeMap]=true end end
