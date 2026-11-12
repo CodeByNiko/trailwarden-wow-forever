@@ -280,6 +280,14 @@ for _,node in ipairs(nodes) do
  if node.kind=="Button" and node.parent==header then headerButtons[node.label.text]=node end
 end
 check("header actions use clear supported labels and usable hit areas",headerButtons.SET and headerButtons.SET.w==32 and headerButtons["-"] and headerButtons["-"].w==24 and headerButtons.X and headerButtons.X.w==24)
+local oldActionRoute,oldActionState=W.CurrentRoute,W.State
+W.State=W.Copy(W.State);W.State.level=21;W.State.profile.maxLevelAbove=2
+W.CurrentRoute={key="objective:headerfit",questID=2,kind="objective",level=24,title="The Night Watch",questName="The Night Watch",instruction="Defeat the target."}
+W.UpdateUI()
+local actionCaption
+for _,node in ipairs(nodes) do if node.kind=="font" and node.text=="OBJECTIVE · LV 24 · ABOVE RANGE" then actionCaption=node end end
+check("above-range label fits in the objective card without clipping",actionCaption and actionCaption.w>=200 and actionCaption:GetStringWidth()<=actionCaption.w)
+W.CurrentRoute,W.State=oldActionRoute,oldActionState;W.UpdateUI()
 check("diagnostics include current character",string.find(W.Diagnostics(),"Raelorn",1,true)~=nil)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_LOGIN");drain();check("login initialization has no planning errors",W.LastError==nil)
 local savedRoute,savedDecision=W.CurrentRoute,W.Decision
