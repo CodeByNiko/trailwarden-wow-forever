@@ -22,9 +22,9 @@ function W.RecordFact(kind,id,key,value,status)
     local entityKey=kind..":"..tostring(id);local factKey=entityKey..":"..key
     local previous=captureSources[factKey]
     if previous and previous.value==value and previous.status==(status or "ok") then return end
-    if captureEntries>=4000 then capture.truncated=true;return end
-    local ok,copy,used=pcall(W.CopyBudget,value,4000-captureEntries)
-    if not ok then capture.truncated=true;captureEntries=4000;return end
+    if captureEntries>=2000 then capture.truncated=true;return end
+    local ok,copy,used=pcall(W.CopyBudget,value,2000-captureEntries)
+    if not ok then capture.truncated=true;captureEntries=2000;return end
     captureEntries=captureEntries+(used or 0)+2
     capture[entityKey]=capture[entityKey] or {}
     capture[entityKey][key]={status=status or "ok",value=copy}

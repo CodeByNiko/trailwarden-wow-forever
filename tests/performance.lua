@@ -32,10 +32,10 @@ dofile('Trailwarden/Replay.lua')
 local input={state={key='fixture',profile={skipped={},deferredLevels={}}},meta={candidates={}}}
 local decision={trigger='fixture',state={key='fixture',now=1,signature='fixture'},route={key='wait'},queue={},detail={input=input}}
 for i=1,100 do W.RecordDecision(decision) end
-assert(#W.ReplayFrames==20 and W.ReplayEntries<=24000,'replay retention grew with session length')
+assert(#W.ReplayFrames==20 and W.ReplayEntries<=12000,'replay retention grew with session length')
 local beforeDropped=W.ReplayDropped or 0
 input.meta.large={};for i=1,20000 do input.meta.large[i]=i end
 W.RecordDecision(decision)
-assert((W.ReplayDropped or 0)==beforeDropped+1 and #W.ReplayFrames==20 and W.ReplayEntries<=24000,'oversized replay exceeded memory budget')
+assert((W.ReplayDropped or 0)==beforeDropped+1 and #W.ReplayFrames==20 and W.ReplayEntries<=12000,'oversized replay exceeded memory budget')
 input.meta.large=nil
 print('PASS replay remains bounded after repeated decisions and rejects oversized snapshots')

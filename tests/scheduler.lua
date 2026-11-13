@@ -32,5 +32,6 @@ W.SchedulePlan(input.state,false,{},done,fail)
 assert(W.PendingPlan and prepared==0,'candidate collection did not yield')
 while #tasks>0 do table.remove(tasks,1)() end
 assert(prepared==1 and published==2,'sliced candidate collection did not publish')
+assert(W.WorkTimings['plan stage candidates'] and W.WorkTimings['plan stage selection'],'planning phases missing from diagnostics')
 W.PreparePlanInput=originalPrepare
 print('PASS async selection yields, matches synchronous decisions and cancels stale/map/combat work')

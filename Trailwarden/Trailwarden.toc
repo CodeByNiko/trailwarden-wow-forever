@@ -11,6 +11,7 @@ Common.lua
 Locale.lua
 Data.lua
 CatalogIndex.lua
+CatalogIndex1015.lua
 Provider.lua
 Tracking.lua
 Database.lua

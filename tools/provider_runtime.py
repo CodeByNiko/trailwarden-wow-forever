@@ -5,7 +5,7 @@ import zlib
 import cbor2
 from lupa.lua51 import LuaRuntime
 
-def load_provider(provider, expected_version=None):
+def load_provider(provider, expected_version=None, build="70245"):
     provider=Path(provider).resolve()
     lua=LuaRuntime(encoding=None,unpack_returned_tuples=True)
     namespace=lua.table(); metadata={}; files=[]
@@ -27,6 +27,7 @@ def load_provider(provider, expected_version=None):
             except zlib.error: pass
         raise ValueError('Unsupported provider compression')
     g=lua.globals()
+    g.py_build=build.encode()
     g.py_metadata=lambda _addon,key: metadata.get(key)
     g.py_cbor=lambda value:to_lua(cbor2.loads(value))
     g.py_base64=base64.b64decode;g.py_decompress=decompress
@@ -34,7 +35,7 @@ def load_provider(provider, expected_version=None):
 C_AddOns={GetAddOnMetadata=GetAddOnMetadata}
 C_EncodingUtil={DecodeBase64=function(s) return py_base64(s) end,DecompressString=function(s,k) return py_decompress(s,k) end,DeserializeCBOR=function(s) return py_cbor(s) end}
 GetLocale=function() return "enUS" end
-GetBuildInfo=function() return "1.60.1","70245","",16001 end
+GetBuildInfo=function() return "1.60.1",py_build,"",16001 end
 UnitFactionGroup=function() return "Alliance" end
 UnitClassBase=function() return "WARRIOR",1 end
 UnitRace=function() return "Night Elf","NightElf",4 end''')

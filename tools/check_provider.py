@@ -14,11 +14,12 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('provider', type=Path)
 parser.add_argument('--expected-version', help='Fail if the provider TOC version differs from this pinned release.')
+parser.add_argument('--build', default='70245')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 provider = args.provider.resolve()
 from provider_runtime import load_provider
-lua,namespace,version=load_provider(provider,args.expected_version)
+lua,namespace,version=load_provider(provider,args.expected_version,args.build)
 globals_=lua.globals()
 globals_.actualProvider = namespace
 os.chdir(root)
@@ -54,13 +55,15 @@ C_QuestLog.GetQuestObjectives=function() return objectiveRows end
 C_QuestLog.IsComplete=function() return false end
 C_QuestLog.GetAllCompletedQuestIDs=function() return {} end
 C_QuestLog.GetNextWaypoint=function() end
-for _,name in ipairs({"Common","Locale","Data","CatalogIndex","Provider","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Scheduler","Core","Commands"}) do dofile("Trailwarden/"..name..".lua") end
+for _,name in ipairs({"Common","Locale","Data","CatalogIndex","CatalogIndex1015","Provider","Tracking","Database","Safety","Experience","Planner","UI","Travel","Navigator","RouteOverlay","Replay","Diagnostics","Scheduler","Core","Commands"}) do dofile("Trailwarden/"..name..".lua") end
 collectgarbage("collect");local baseMemory=collectgarbage("count");local started=os.clock()
 local refresh=Trailwarden.Refresh;Trailwarden.Refresh=nil;Trailwarden.BuildQuestCatalog();Trailwarden.Refresh=refresh
 catalogColdMS=(os.clock()-started)*1000
 collectgarbage("collect");catalogRetainedKB=collectgarbage("count")-baseMemory
 assert(Trailwarden.CatalogReady,Trailwarden.CatalogError)
-assert(Trailwarden.CatalogCount==#LibQuestieDB.Quest.GetAllIds())
+local named=0
+for _,id in ipairs(LibQuestieDB.Quest.GetAllIds()) do if type(LibQuestieDB.Quest.Get(id,"name"))=="string" then named=named+1 end end
+assert(Trailwarden.CatalogCount==named,"Catalog did not retain every named quest")
 assert(Trailwarden.CatalogIndexStatus=="verified offline zone index",Trailwarden.CatalogIndexStatus)
 assert(not Trailwarden.ProviderReads["Npc.spawns"] and not Trailwarden.ProviderReads["Object.spawns"],"Global spawn queries during indexed startup")
 Trailwarden.Refresh(true,"provider-smoke")
@@ -98,7 +101,7 @@ for i=1,10 do W.Refresh(true,"real-provider-warm") end
 warmMS=(os.clock()-started)*1000;warmAllocatedKB=collectgarbage("count")-base
 collectgarbage("restart");collectgarbage("collect");warmRetainedKB=collectgarbage("count")-base
 assert(not W.LastError and not W.ForecastError)
-assert(W.EntityCacheEntries<=128 and W.EntityCachePoints<=4096 and (W.ReplayEntries or 0)<=24000)
+assert(W.EntityCacheEntries<=128 and W.EntityCachePoints<=4096 and (W.ReplayEntries or 0)<=12000)
 local captured=W.WorkCounters.captures;local plans=W.PlanExecutions
 WorldMapFrame={IsShown=function() return true end}
 for i=1,100 do W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnEvent(W.EventFrame,"UPDATE_MOUSEOVER_UNIT") end

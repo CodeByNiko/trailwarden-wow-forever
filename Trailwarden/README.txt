@@ -13,7 +13,7 @@ automatic planning into cancellable slices.
 Version 1.8.4 coalesces map toggles, hides the main guide during combat while
 keeping lightweight arrow guidance, and makes active quests clickable in the
 quest log. Shift-click planned rows to focus their route. Provider reads,
-point caches and replay capture are bounded. A verified provider zone index
+point caches and replay capture are bounded. Verified provider/build zone indexes
 avoids global starter-spawn decoding; other/corrected data uses runtime fallback.
 Automatic route selection runs in cancellable timer slices. Use /tw perf for
 workload/provider diagnostics and /tw perfreset before reproducing a slowdown.

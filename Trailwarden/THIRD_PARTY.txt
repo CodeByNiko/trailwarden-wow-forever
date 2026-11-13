@@ -30,3 +30,8 @@ quest names, coordinates or provider source files are bundled.
 https://github.com/Questie/QuestieDB/releases/tag/v1.0.14
 Source digest and reproduction: tools/generate_catalog_index.py and
 docs/questiedb-implementation-1.8.4.md in the source repository.
+
+CatalogIndex1015.lua contains factual IDs derived through QuestieDB Forever
+1.0.15 public APIs, with no provider source or coordinates bundled.
+Source ZIP SHA-256: 462573b08fcb88dd406da98064402402891ba3368245a17bc910a0f2ea759208.
+https://github.com/Questie/QuestieDB/releases/tag/v1.0.15

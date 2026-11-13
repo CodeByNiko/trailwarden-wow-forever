@@ -43,7 +43,7 @@ W.EndDataCapture();W.BeginDataCapture();local e=W.DBRead('Npc',1,'spawns');W.End
 c[1431][1][1]=12
 check('different passes do not share mutable values',e~=c and e[1431][1][1]==50)
 W.BeginDataCapture();local large={};for i=1,10000 do large[i]=i end;W.RecordFact('Large',1,'field',large);local facts=W.EndDataCapture()
-check('diagnostic capture is bounded independently of provider output',facts.truncated==true and not facts['Large:1'])
+check('diagnostic capture is bounded independently of provider output',facts.truncated==true and not facts['Large:1'] and W.LastProviderPass.captureEntries==2000)
 local get=LibQuestieDB.Npc.Get;local fail=true
 LibQuestieDB.Npc.Get=function(...) if fail then error('transient') end;return get(...) end
 W.BeginDataCapture();local _,status=W.DBRead('Npc',2,'spawns');fail=false;local recovered=W.DBRead('Npc',2,'spawns');W.EndDataCapture();LibQuestieDB.Npc.Get=get

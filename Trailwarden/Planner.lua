@@ -231,6 +231,7 @@ local function itemPickups(out,state)
 end
 local forecastCache
 local function forecastCandidates(out,state)
+    if W.PlanningPhase then W.PlanningPhase("forecast") end
     local keys={tostring(state.workArea and state.workArea.id),tostring(state.combatSafety and state.combatSafety.revision),tostring(state.revision),tostring(W.PublishedCatalogGeneration),tostring(state.profile.maxLevelAbove)}
     for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(c.mapID)..":"..tostring(c.x)..":"..tostring(c.y)..":"..tostring(c.targetRevision)..":"..tostring(c.fingerprint)..":"..tostring(c.remaining)..":"..tostring(c.required)..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
     table.sort(keys);local stamp=table.concat(keys,"|")
@@ -308,7 +309,7 @@ function W.CollectCandidates(state)
             if state.workArea and c.mapID==state.mapID and c.regionMapID~=c.mapID then c.workAreaID=state.workArea.id end
         end
     end
-    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state) end
+    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state);if W.PlanningPhase then W.PlanningPhase("candidates") end end
     local policyUnknown=false;for _,gate in pairs(gates) do if gate.status=="unknown" and gate.source=="policy" then policyUnknown=true;break end end
     return {candidates=out,deferred=deferred,gates=gates,policyUnknown=policyUnknown,transitionStatus=transitionStatus,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
@@ -596,6 +597,7 @@ function W.PreparePlanInput(state,force,context,async)
     local facts=W.EndDataCapture()
     if not ok then error(meta) end
     meta.facts=facts
+    if W.PlanningPhase then W.PlanningPhase("snapshot") end
     local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),trip=W.Copy(context.trip),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
     return input
 end

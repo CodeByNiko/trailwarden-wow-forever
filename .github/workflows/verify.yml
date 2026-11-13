@@ -35,5 +35,13 @@ jobs:
           python3 tools/check_provider.py /tmp/trailwarden-provider/QuestieDB --expected-version 1.0.14
       - name: Verify generated provider zone index
         run: python3 tools/generate_catalog_index.py /tmp/trailwarden-provider/QuestieDB --expected-version 1.0.14 --archive-sha becb9b3cea4a99ae31f115a187179c242f5cf8ef28bf4f9579a86393f18f45c3 --check
+      - name: Test QuestieDB 1.0.15 on current Forever build
+        run: |
+          mkdir -p /tmp/trailwarden-provider-1015
+          curl --fail --location --silent --show-error https://github.com/Questie/QuestieDB/releases/download/v1.0.15/QuestieDB-1.0.15-Forever.zip --output /tmp/trailwarden-provider-1015/provider.zip
+          echo "462573b08fcb88dd406da98064402402891ba3368245a17bc910a0f2ea759208  /tmp/trailwarden-provider-1015/provider.zip" | sha256sum --check --strict
+          unzip -q /tmp/trailwarden-provider-1015/provider.zip -d /tmp/trailwarden-provider-1015
+          python3 tools/generate_catalog_index.py /tmp/trailwarden-provider-1015/QuestieDB --expected-version 1.0.15 --archive-sha 462573b08fcb88dd406da98064402402891ba3368245a17bc910a0f2ea759208 --build 70938 --symbol ProviderCatalogIndex1015 --output Trailwarden/CatalogIndex1015.lua --check
+          python3 tools/check_provider.py /tmp/trailwarden-provider-1015/QuestieDB --expected-version 1.0.15 --build 70938
       - name: Validate installable addon
         run: python3 tools/package.py

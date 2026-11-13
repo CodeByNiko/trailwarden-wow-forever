@@ -36,7 +36,7 @@ function W.EnsureProvider()
     return true
 end
 function W.GetProviderCatalog(ids)
-    local index=W.ProviderCatalogIndex;local p=LibQuestieDB;local info=W.ProviderIdentity()
+    local p=LibQuestieDB;local info=W.ProviderIdentity();local index=info.version=="1.0.15" and W.ProviderCatalogIndex1015 or W.ProviderCatalogIndex
     if not index or index.schema~=1 or W.ProviderIndexDirty or not W.ProviderHooksAvailable or type(p.GetProvenance)~='function' then W.CatalogIndexStatus='bounded runtime fallback';return end
     for _,key in ipairs({'version','contract','build','mode','flavor'}) do if index[key]~=info[key] then W.CatalogIndexStatus='provider mismatch; bounded runtime fallback';return end end
     if #ids~=#index.ids then W.CatalogIndexStatus='quest membership changed; runtime fallback';return end

@@ -2,8 +2,8 @@
 import argparse
 from pathlib import Path
 from provider_runtime import load_provider
-p=argparse.ArgumentParser();p.add_argument('provider',type=Path);p.add_argument('--expected-version',required=True);p.add_argument('--archive-sha',required=True);p.add_argument('--output',type=Path,default=Path('Trailwarden/CatalogIndex.lua'));p.add_argument('--check',action='store_true');a=p.parse_args()
-lua,provider,version=load_provider(a.provider,a.expected_version)
+p=argparse.ArgumentParser();p.add_argument('provider',type=Path);p.add_argument('--expected-version',required=True);p.add_argument('--archive-sha',required=True);p.add_argument('--output',type=Path,default=Path('Trailwarden/CatalogIndex.lua'));p.add_argument('--check',action='store_true');p.add_argument('--build',default='70245');p.add_argument('--symbol',default='ProviderCatalogIndex');a=p.parse_args()
+lua,provider,version=load_provider(a.provider,a.expected_version,a.build)
 g=lua.globals();g.LibQuestieDB=provider
 lua.execute(b'''C_Map={GetMapInfo=function() return {mapType=3} end}
 for _,name in ipairs({"Common","Data","Database"}) do dofile("Trailwarden/"..name..".lua") end
@@ -28,7 +28,7 @@ def literal(v):
     if isinstance(v,(int,float)):return str(v)
     pairs=sorted(v.items(),key=lambda x:(isinstance(x[0],bytes),x[0]))
     return '{'+','.join('['+literal(k)+']='+literal(value) for k,value in pairs)+'}'
-content='-- Generated factual IDs via tools/generate_catalog_index.py; no provider code or coordinates.\n-- QuestieDB '+version+' Forever ZIP SHA-256: '+a.archive_sha+'\nTrailwarden.ProviderCatalogIndex='+literal(g.index)+'\n'
+content='-- Generated factual IDs via tools/generate_catalog_index.py; no provider code or coordinates.\n-- QuestieDB '+version+' Forever ZIP SHA-256: '+a.archive_sha+'\nlocal identity=Trailwarden.ProviderIdentity()\nif identity.version=="'+version+'" and identity.build=="'+a.build+'" then\nTrailwarden.'+a.symbol+'='+literal(g.index)+'\nend\n'
 if a.check:
     if not a.output.exists() or a.output.read_text()!=content:raise SystemExit('Generated catalog index differs')
     print('Catalog index is reproducible and matches the actual provider')
