@@ -18,6 +18,13 @@ local function input(candidates,x,y)
  return {state={key="character",level=22,mapID=1431,zone="Duskwood",now=100,historyReady=true,questLogReady=true,freeSlots=10,player=point(x or .73,y or .46),profile={paused=false,skipped={},includeGroup=false,maxLevelAbove=2}},meta={candidates=candidates,deferred={},gates={},ready=true,databaseStatus="fixture ready"},weights=W.Copy(W.RouteWeights)}
 end
 local a=step("pickup",100,.732,.46);local b=step("pickup",101,.74,.46);local workA=step("objective",200,.65,.6);local workB=step("objective",201,.645,.61);local ready=step("turnin",300,.73,.46)
+local tripInput=input({workA,workB},.73,.46)
+tripInput.previous=step("objective",999,.73,.46);tripInput.trip={workB.key,workA.key}
+local tripRoute=W.SelectRoute(tripInput)
+check("completed step continues with next safe trip step",tripRoute.key==workB.key)
+local escort=step("escort",888,.73,.46);tripInput.meta.candidates={workA,workB,escort}
+tripRoute=W.SelectRoute(tripInput)
+check("active escort takes precedence over saved trip",tripRoute.key==escort.key)
 local previous
 local journey={
  {event="arrive_darkshire",input=input({a,b,workA,workB,ready}),expected=ready.key},

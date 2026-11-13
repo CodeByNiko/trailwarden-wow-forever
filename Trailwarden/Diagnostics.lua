@@ -58,7 +58,7 @@ end
 function W.PerformanceSummary(reset)
     local c=W.WorkCounters or {};local events={}
     for event,count in pairs(c.events or {}) do events[#events+1]=event.."="..count end;table.sort(events)
-    local summary="Trailwarden "..W.Version.." / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map signals="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
+    local summary="Trailwarden "..W.Version.." / perf-1015-5 / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map signals="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
     local provider=W.ProviderIdentity()
     summary=summary.."\nProvider: "..provider.version.." / "..provider.mode.." / "..provider.flavor.." / "..provider.locale.." / build "..provider.build.." / contract "..tostring(provider.contract).." / index: "..tostring(W.CatalogIndexStatus)
     local reads={};for field,count in pairs(W.ProviderReads or {}) do reads[#reads+1]=field.."="..count end;table.sort(reads)
@@ -70,7 +70,7 @@ function W.PerformanceSummary(reset)
     table.sort(times,function(a,b) return a.row.peak>b.row.peak end)
     for _,entry in ipairs(times) do local row=entry.row;summary=summary..string.format("\n%s: calls=%d total=%.2f ms peak=%.2f ms",entry.label,row.calls,row.total,row.peak) end
     if W.SlowestWork then local peak=W.SlowestWork;summary=summary..string.format("\nLargest: %s %.2f ms / event=%s / trigger=%s",peak.name,peak.ms,tostring(peak.event),tostring(peak.trigger)) end
-    summary=summary.."\nPoint cache: "..tostring(W.EntityCacheEntries or 0).."/128 entities / "..tostring(W.EntityCachePoints or 0).."/4096 points; replay: "..tostring(W.ReplayEntries or 0).."/24000 entries / skipped oversized="..tostring(W.ReplayDropped or 0)
-    if reset then for key in pairs(c) do c[key]=key=="events" and {} or 0 end;W.WorkTimings={};W.SlowestWork=nil;W.ProviderReads={};W.ProviderReadCacheHits=0 end
+    summary=summary.."\nPoint cache: "..tostring(W.EntityCacheEntries or 0).."/128 entities / "..tostring(W.EntityCachePoints or 0).."/4096 points; replay: "..tostring(W.ReplayEntries or 0).."/12000 entries / skipped oversized="..tostring(W.ReplayDropped or 0)
+    if reset then for key in pairs(c) do c[key]=key=="events" and {} or 0 end;W.WorkTimings={};W.SlowestWork=nil;W.ProviderReads={};W.ProviderReadCacheHits=0;W.LastProviderPass=nil end
     return summary
 end

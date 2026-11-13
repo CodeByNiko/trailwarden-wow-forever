@@ -25,4 +25,19 @@ assert(published==1 and not W.PendingPlan,'map did not cancel pending selection'
 map=false
 W.ScheduleSelection(input,done,fail);W.GetCharacterKey=function() return 'other-character' end;while #tasks>0 do table.remove(tasks,1)() end
 assert(published==1 and not W.PendingPlan,'old character work published')
+W.GetCharacterKey=function() return 'fixture' end
+local originalPrepare=W.PreparePlanInput;local prepared=0
+W.PreparePlanInput=function()
+ local status,result=W.CallPlanning(function() for i=1,160 do W.YieldPlanning() end;return input end)
+ assert(status=="ok" and result==input,"nested quest planning failed")
+ local failed,message=W.CallPlanning(function() error("fixture target failure") end)
+ assert(failed=="error" and message:find("fixture target failure",1,true),"quest failure was not isolated")
+ prepared=prepared+1;return input
+end
+W.SchedulePlan(input.state,false,{},done,fail)
+assert(W.PendingPlan and prepared==0,'candidate collection did not yield')
+while #tasks>0 do table.remove(tasks,1)() end
+assert(prepared==1 and published==2,'sliced candidate collection did not publish')
+assert(W.WorkTimings['plan stage candidates'] and W.WorkTimings['plan stage selection'],'planning phases missing from diagnostics')
+W.PreparePlanInput=originalPrepare
 print('PASS async selection yields, matches synchronous decisions and cancels stale/map/combat work')

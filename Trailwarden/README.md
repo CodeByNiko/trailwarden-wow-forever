@@ -4,11 +4,13 @@ A calm quest-routing companion that resumes from **the character you are playing
 
 **[Download the latest beta or stable version](https://github.com/CodeByNiko/trailwarden-wow-forever/releases)**
 
-## Current release: 1.8.4
+## Current release: 1.8.5
+
+Version 1.8.5 reduces idle work, coalesces unchanged events, updates partial quest progress without full replanning and reuses validated trip order. Automatic planning is split into cancellable slices.
 
 Version 1.8.4 focuses on map, combat and memory performance. The main guide hides during combat while the arrow retains lightweight guidance. Rapid map toggles coalesce into one update after the map settles. Click an active quest card or planned row to open its exact quest-log entry; shift-click a planned row to focus it.
 
-Provider reads and replay capture have explicit budgets. A verified QuestieDB Forever 1.0.14 zone index avoids decoding starter spawns worldwide during normal startup, with a runtime fallback for different or corrected data. Automatic route selection runs in cancellable timer slices. `/tw perf` displays workload/provider counters and timings; `/tw perfreset` starts a fresh measurement window. Restart WoW after updating. Live FPS and memory effects depend on the client and addon set.
+Provider reads and replay capture have explicit budgets. Verified QuestieDB Forever 1.0.14/build 70245 and 1.0.15/build 70938 zone indexes avoids decoding starter spawns worldwide during normal startup, with a runtime fallback for different or corrected data. Automatic route selection runs in cancellable timer slices. `/tw perf` displays workload/provider counters and timings; `/tw perfreset` starts a fresh measurement window. Restart WoW after updating. Live FPS and memory effects depend on the client and addon set.
 
 See the [release notes](https://github.com/CodeByNiko/trailwarden-wow-forever/tree/main/docs) for all changes.
 

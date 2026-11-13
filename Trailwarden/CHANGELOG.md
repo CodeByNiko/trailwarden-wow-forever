@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.8.5
+- Measure character capture substeps, avoid duplicating completed-quest history in snapshots, and reset last-pass metrics with /tw perfreset.
+- Schedule startup planning in cancellable slices instead of forcing synchronous full planning.
+- Revalidate corrected provider data against every indexed quest relation and starter coordinate; retain the index only when all relevant provenance still matches.
+- Split catalog-index verification and individual quest target/source collection across timed slices, retaining per-quest error isolation.
+- Check inventory before querying eligibility for item-started quests, and report why a catalog index falls back.
+- Normalize client build metadata and retain verified indexes after cache-only invalidation.
+- Add a verified QuestieDB 1.0.15 Forever build 70938 index alongside the existing 1.0.14 index; mismatches/corrections use the safe fallback.
+- Measure candidate, forecast, snapshot and selection stages individually; check slice budget more frequently.
+- Reduce diagnostic fact capture to 2,000 entries and replay budgets to 6,000 entries per frame / 12,000 total; oversized replays are skipped.
+- Reduce unchanged idle navigation, cave access and UI work, and avoid periodic full replans.
+- Reuse quest trip order and update partial progress locally while retaining safety checks.
+- Coalesce unchanged quest/reputation events and spread automatic candidate and forecast work across timer slices.
+- Reduce repeated combat safety allocations; add idle and scheduler regression coverage.
+
 ## 1.8.4
 - Coalesce rapid world-map toggles and defer expensive work until the map remains closed; make inactive pin cleanup idempotent.
 - Hide the main guide during combat, retain the lightweight arrow, and suspend provider queries, route planning and population scans until combat ends.

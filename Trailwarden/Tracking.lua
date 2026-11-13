@@ -82,6 +82,13 @@ local function updateWorkFocus(state)
     state.workFocus=W.Copy(workFocus)
 end
 function W.ReadCharacter()
+    local phaseStarted=type(debugprofilestop)=="function" and debugprofilestop()
+    local function mark(label)
+        if not phaseStarted then return end
+        local now=debugprofilestop();local elapsed=math.max(0,now-phaseStarted);phaseStarted=now
+        local key="capture "..label;local row=W.WorkTimings[key] or {calls=0,total=0,peak=0};W.WorkTimings[key]=row
+        row.calls=row.calls+1;row.total=row.total+elapsed;row.peak=math.max(row.peak,elapsed)
+    end
     if W.EnsureProvider then W.EnsureProvider() end
     local p=W.GetProfile();validateContents(p)
     local className,classToken=W.Safe(UnitClass,"player")
@@ -96,6 +103,7 @@ function W.ReadCharacter()
     if LibQuestieDB and LibQuestieDB.RequireContract and W.Safe(LibQuestieDB.RequireContract,3) then
         state.raceMask=(LibQuestieDB.Enum and LibQuestieDB.Enum.raceMaskById or {})[raceID] or state.raceMask
     end
+    mark("profile and location")
     local ql=C_QuestLog or {}
     state.capabilities={questLog=type(ql.GetInfo)=="function",objectives=type(ql.GetQuestObjectives)=="function",completedHistory=type(ql.GetAllCompletedQuestIDs)=="function",clientWaypoint=type(ql.GetNextWaypoint)=="function"}
     local historyStatus,completed=W.Call(ql.GetAllCompletedQuestIDs)
@@ -111,6 +119,7 @@ function W.ReadCharacter()
         end
     end
     if not state.historyReady then state.readIssues[#state.readIssues+1]="Completed quest history unavailable" end
+    mark("completed history")
     local logStatus,count,totalQuests=W.Call(ql.GetNumQuestLogEntries)
     state.questLogReady=logStatus=="ok" and W.IsFinite(count) and count>=0 and count%1==0
     for i=1,state.questLogReady and count or 0 do
@@ -145,6 +154,7 @@ function W.ReadCharacter()
         state.readIssues[#state.readIssues+1]="Quest log is incomplete; expand quest headers and refresh"
     end
     table.sort(state.activeQuests,function(a,b) return a.id<b.id end)
+    mark("quest log")
     state.completed=W.Copy(p.completed);state.completedCount=W.Count(state.completed)
     local progress={state.key,tostring(state.level),tostring(state.classMask),tostring(state.raceMask)}
     local signature={tostring(state.workArea and state.workArea.id),tostring(mapID),tostring(state.level),tostring(state.questLogReady),tostring(state.historyReady)}
@@ -162,7 +172,9 @@ function W.ReadCharacter()
     -- These mutable learning stores are read by their owning modules. They are
     -- not planner inputs and must not be cloned into every decision/replay.
     planningProfile.xpLearning=nil;planningProfile.combatObserved=nil
+    planningProfile.completed=nil -- state.completed already contains the isolated snapshot.
     state.profile=W.Copy(planningProfile)
+    mark("snapshot and signature")
     local limit=W.Safe(ql.GetMaxNumQuestsCanAccept)
     state.logLimit=W.IsFinite(limit) and limit>0 and limit%1==0 and limit or (W.IsFinite(MAX_QUESTLOG_QUESTS) and MAX_QUESTLOG_QUESTS>0 and MAX_QUESTLOG_QUESTS or 25)
     state.freeSlots=math.max(0,state.logLimit-#state.activeQuests)
@@ -174,6 +186,7 @@ function W.ReadCharacter()
         local xpStatus,xp=W.Call(W.ExperienceStats)
         if xpStatus=="ok" and type(xp)=="table" then state.experience=xp else W.LearningError=tostring(xp) end
     end
+    mark("safety and experience")
     return state
 end
 function W.ScanCharacter() local state=W.ReadCharacter();W.State=state;return state end

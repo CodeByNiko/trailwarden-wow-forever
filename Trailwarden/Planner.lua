@@ -52,6 +52,7 @@ local function matchObjectiveRows(q,group,entries)
     for rowIndex,row in ipairs(typed) do if not used[rowIndex] and type(row.text)=="string" then
         local winner,length,tied=nil,0,false
         for i,candidate in ipairs(entries) do
+            W.YieldPlanning()
             local name=W.DBGet(entityKind,candidate[1],"name")
             if type(name)=="string" and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
                 if #name>length then winner,length,tied=i,#name,false elseif #name==length then tied=true end
@@ -76,7 +77,7 @@ local function itemPoints(id,state,blocked)
     local out={};local hasSource=false
     for field,kind in pairs({npcDrops="Npc",objectDrops="Object",vendors="Npc"}) do
         for _,entityID in ipairs(W.DBGet("Item",id,field) or {}) do
-            hasSource=true
+            W.YieldPlanning();hasSource=true
             for _,point in ipairs(entityObjectivePoints(kind,entityID,state,blocked,field=="npcDrops")) do
                 local source=W.Copy(point);source.acquisition=field;out[#out+1]=source
             end
@@ -123,7 +124,7 @@ function W.ActiveSteps(q,state)
         local entries=objectives[group] or {}
         local liveByEntry=matchObjectiveRows(q,group,entries)
         for i,entry in ipairs(entries) do
-            local live=liveByEntry[i];local text=live and live.text
+            W.YieldPlanning();local live=liveByEntry[i];local text=live and live.text
             if not live then
                 blocked[#blocked+1]={status="unknown",reason="Live objective could not be matched safely to its provider target"}
             elseif not live.finished then
@@ -210,16 +211,18 @@ local function appendPickups(out,mapID,state,gates)
         end
     end
     for _,record in ipairs((W.CatalogByMap or {})[mapID] or {}) do
+        W.YieldPlanning()
         if record.minLevel<=state.level and (record.level==0 or record.level>=state.level-6) and record.level<=state.level+state.profile.maxLevelAbove then add(record.id,record.name) end
     end
     for id,offer in pairs(state.profile.offers) do if offer.revision==state.revision and state.now-offer.seen>=0 and state.now-offer.seen<300 then add(id,offer.title) end end
 end
 local function itemPickups(out,state)
     for _,e in ipairs(W.ItemQuests or {}) do
-        if e.record.minLevel<=state.level and W.IsQuestAvailable(e.record.id,state) then
+        W.YieldPlanning()
+        if e.record.minLevel<=state.level then
             for _,id in ipairs(e.items) do
                 local count=(C_Item and W.Safe(C_Item.GetItemCount,id)) or W.Safe(GetItemCount,id) or 0
-                if count>0 then
+                if count>0 and W.IsQuestAvailable(e.record.id,state) then
                     out[#out+1]=makeStep("item",e.record,nil,W.DBGet("Item",id,"name") or "the quest-starting item","","Inventory")
                     break
                 end
@@ -229,6 +232,7 @@ local function itemPickups(out,state)
 end
 local forecastCache
 local function forecastCandidates(out,state)
+    if W.PlanningPhase then W.PlanningPhase("forecast") end
     local keys={tostring(state.workArea and state.workArea.id),tostring(state.combatSafety and state.combatSafety.revision),tostring(state.revision),tostring(W.PublishedCatalogGeneration),tostring(state.profile.maxLevelAbove)}
     for _,c in ipairs(out) do keys[#keys+1]=c.key..":"..tostring(c.mapID)..":"..tostring(c.x)..":"..tostring(c.y)..":"..tostring(c.targetRevision)..":"..tostring(c.fingerprint)..":"..tostring(c.remaining)..":"..tostring(c.required)..":"..tostring(state.profile.skipped[c.key] or state.profile.skipped["quest:"..c.questID] or 0)..":"..tostring((state.profile.deferredLevels or {})[c.questID] or 0) end
     table.sort(keys);local stamp=table.concat(keys,"|")
@@ -249,7 +253,8 @@ local function forecastCandidates(out,state)
         return
     end
     W.ForecastBuilds=(W.ForecastBuilds or 0)+1
-    local status,message=W.Call(W.PrepareQuestEconomies,out,state)
+    local status,message
+    if W.IsPlanningSlice and W.IsPlanningSlice() then W.PrepareQuestEconomies(out,state);status="ok" else status,message=W.Call(W.PrepareQuestEconomies,out,state) end
     W.ForecastError=status~="ok" and tostring(message) or nil
     if status~="ok" then for _,c in ipairs(out) do c.economy=nil;c.economyModel=nil end;return end
     local models,copied={},{};for _,c in ipairs(out) do models[c.key]=W.Copy(c.economyModel,copied) end
@@ -262,9 +267,11 @@ function W.CollectCandidates(state)
     local transitionStatus
     if state.questLogReady then
         for _,q in ipairs(state.activeQuests) do
+            W.YieldPlanning()
             local allowed,why=W.QuestPolicy(q.id,state,true)
             if q.isComplete or (allowed and not q.failed) then
-                local status,steps=W.Call(W.ActiveSteps,q,state)
+                local status,steps
+                if W.CallPlanning then status,steps=W.CallPlanning(W.ActiveSteps,q,state) else status,steps=W.Call(W.ActiveSteps,q,state) end
                 if status~="ok" or type(steps)~="table" then
                     W.TargetErrors=W.TargetErrors or {};W.TargetErrors[q.id]=tostring(steps)
                     steps={};deferred[#deferred+1]={id=q.id,title=q.title,reason="Target data temporarily unavailable"}
@@ -304,7 +311,7 @@ function W.CollectCandidates(state)
             if state.workArea and c.mapID==state.mapID and c.regionMapID~=c.mapID then c.workAreaID=state.workArea.id end
         end
     end
-    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state) end
+    if W.PrepareQuestEconomies and state.experience and state.experience.enabled then forecastCandidates(out,state);if W.PlanningPhase then W.PlanningPhase("candidates") end end
     local policyUnknown=false;for _,gate in pairs(gates) do if gate.status=="unknown" and gate.source=="policy" then policyUnknown=true;break end end
     return {candidates=out,deferred=deferred,gates=gates,policyUnknown=policyUnknown,transitionStatus=transitionStatus,ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data",catalogState=W.CatalogState,catalogError=W.CatalogError,catalogGeneration=W.PublishedCatalogGeneration or 0}
 end
@@ -501,6 +508,21 @@ function W.SelectRoute(input)
                 if c.kind=="objective" or c.score<=best.score+math.max(w.switchMargin,math.abs(best.score)*w.switchRatio) then best=c;break end
             end end
     end
+    -- Retain the existing trip when its current step has finished, but only
+    -- among candidates that remain eligible, safe, and equally ranked.
+    if best and previous and input.trip and not foundPin and not input.force and not input.releasePlan then
+        local previousStillValid=false
+        for _,c in ipairs(candidates) do if c.key==previous.key then previousStillValid=true;break end end
+        if not previousStillValid then
+            for _,key in ipairs(input.trip) do
+                local selected
+                for _,c in ipairs(candidates) do
+                    if c.key==key and c.activityRank==best.activityRank and c.workFocusRank==best.workFocusRank and c.zoneRank==best.zoneRank and (not c.batchBlocked or best.batchBlocked) then selected=c;break end
+                end
+                if selected then best=selected;break end
+            end
+        end
+    end
     table.sort(levelDeferred,function(a,b) if a.resumeLevel~=b.resumeLevel then return a.resumeLevel<b.resumeLevel end return a.key<b.key end)
     local uniqueDeferred={};local seenDeferred={}
     for _,c in ipairs(levelDeferred) do if not seenDeferred[c.questID] then uniqueDeferred[#uniqueDeferred+1]=c;seenDeferred[c.questID]=true end end
@@ -551,6 +573,9 @@ function W.SelectRoute(input)
         queue[#queue+1]=nextStep;used[nextStep.key]=true;from=nextStep.point or from
     end
     detail.scoreEvaluations=scoreEvaluations
+    detail.trip={};local tripSeen={[best.key]=true}
+    for _,step in ipairs(queue) do if not tripSeen[step.key] then detail.trip[#detail.trip+1]=step.key;tripSeen[step.key]=true end end
+    for _,step in ipairs(candidates) do if not tripSeen[step.key] then detail.trip[#detail.trip+1]=step.key;tripSeen[step.key]=true end end
     if detail.queuePreviewShortened then best.reason=best.reason.." The next-step preview is shortened to keep planning responsive." end
     if W.ChooseGrindBreak and best.kind~="escort" and not (best.kind=="objective" and (state.workArea or state.workFocus and state.workFocus.questID==best.questID)) then
         local chosen=W.ChooseGrindBreak(best,state,previous,detail)
@@ -558,22 +583,24 @@ function W.SelectRoute(input)
     end
     return best,withDeferred(queue),detail
 end
-function W.PreparePlanInput(state,force,context)
+function W.PreparePlanInput(state,force,context,async)
     context=context or {previous=W.CurrentRoute}
     if state.profile.paused or state.dead then
-        local input={state=W.Copy(state),meta={candidates={},deferred={},gates={},ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data"},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
+        local input={state=W.Copy(state),meta={candidates={},deferred={},gates={},ready=W.CatalogReady==true,databaseStatus=W.DatabaseStatus or "Waiting for quest data"},previous=W.Copy(context.previous),trip=W.Copy(context.trip),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
         return input
     end
     if state.combatSafety and state.combatSafety.alert then
-        local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
+        local input={state=W.Copy(state),meta={candidates={},deferred={},ready=W.CatalogReady==true},previous=W.Copy(context.previous),trip=W.Copy(context.trip),commitment=W.Copy(context.commitment),force=force==true,weights=W.Copy(W.RouteWeights)}
         return input
     end
     W.BeginDataCapture()
-    local ok,meta=pcall(W.CollectCandidates,state)
+    local ok,meta
+    if async then ok=true;meta=W.CollectCandidates(state) else ok,meta=pcall(W.CollectCandidates,state) end
     local facts=W.EndDataCapture()
     if not ok then error(meta) end
     meta.facts=facts
-    local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
+    if W.PlanningPhase then W.PlanningPhase("snapshot") end
+    local input={state=W.Copy(state),meta=meta,previous=W.Copy(context.previous),trip=W.Copy(context.trip),commitment=W.Copy(context.commitment),previousMapID=context.previousMapID,releasePlan=context.releasePlan==true,force=force==true,weights=W.Copy(W.RouteWeights)}
     return input
 end
 function W.PlanRoute(state,force,context)

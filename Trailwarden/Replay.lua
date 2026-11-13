@@ -29,7 +29,7 @@ local function portableInput(input)
     -- Prune saved learning/history before copying the replay graph.
     local source=W.ShallowCopy(input);local s=W.ShallowCopy(input.state);source.state=s
     s.profile={xpRouting=s.profile.xpRouting,paused=s.profile.paused,pinned=s.profile.pinned,skipped=W.Copy(s.profile.skipped),deferredLevels=W.Copy(s.profile.deferredLevels),includeGroup=s.profile.includeGroup,maxLevelAbove=s.profile.maxLevelAbove}
-    local out,entries=W.CopyBudget(source,12000);s=out.state
+    local out,entries=W.CopyBudget(source,6000);s=out.state
     s.key="character";s.name=nil;s.signature=nil
     if s.player then s.player.ownerKey="character" end
     if out.previous then out.previous.ownerKey="character" end
@@ -49,7 +49,7 @@ function W.RecordDecision(decision)
     W.ReplayEntries=(W.ReplayEntries or 0)+entries
     if last and last.expected.key==frame.expected.key and W.ReplayLastSignature==decision.state.signature and (decision.trigger=="movement" or decision.trigger=="maintenance") and (last.event=="movement" or last.event=="maintenance") then W.ReplayEntries=W.ReplayEntries-(last.copyEntries or 0);frames[#frames]=frame else frames[#frames+1]=frame end
     W.ReplayLastSignature=decision.state.signature
-    while #frames>20 or (W.ReplayEntries or 0)>24000 do local removed=table.remove(frames,1);W.ReplayEntries=W.ReplayEntries-(removed.copyEntries or 0) end
+    while #frames>20 or (W.ReplayEntries or 0)>12000 do local removed=table.remove(frames,1);W.ReplayEntries=W.ReplayEntries-(removed.copyEntries or 0) end
 end
 function W.ExportReplay(origin)
     return W.Json({schema=1,origin=origin or "live-export",addonVersion=W.Version,provider=W.ProviderIdentity(),frames=W.Copy(W.ReplayFrames or {})})

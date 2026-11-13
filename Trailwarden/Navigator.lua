@@ -1,6 +1,8 @@
 local W=Trailwarden
 local frame,arrow,title,distance,status,here
 local ownWaypoint,lastStep
+local cachedAccess
+function W.InvalidateNavigationAccess() cachedAccess=nil;W.NavigationAccessRevision=(W.NavigationAccessRevision or 0)+1 end
 function W.PositionNavigator()
     if not frame then return end
     local p=W.GetProfile();local pos=p.navigatorPoint
@@ -48,8 +50,13 @@ local function readNavigation(route,previous)
     local player=W.PlayerPoint()
     local travel={mode="direction",navRoute=copy,goal=copy and copy.point}
     if W.ReadAccess then
-        local status,result=W.Call(W.ReadAccess,copy,player)
-        if status=="ok" then travel=result;W.AccessError=nil else travel={mode="error",navRoute={kind="wait"},label="Access data unavailable"};W.AccessError=tostring(result) end
+        local key=table.concat({tostring(route and route.key),tostring(route and route.mapID),tostring(route and route.x),tostring(route and route.y),tostring(route and route.point and route.point.entityID),tostring(player and player.mapID),tostring(W.Safe(IsIndoors)),tostring(W.Safe(GetSubZoneText)),tostring(W.ProviderGeneration),tostring(W.Decision and W.Decision.id),tostring(W.CaveAccess)},":")
+        if cachedAccess and cachedAccess.key==key and cachedAccess.reader==W.ReadAccess then travel=cachedAccess.travel
+        else
+            local status,result=W.Call(W.ReadAccess,copy,player)
+            if status=="ok" then travel=result;W.AccessError=nil;cachedAccess={key=key,reader=W.ReadAccess,travel=travel}
+            else cachedAccess=nil;travel={mode="error",navRoute={kind="wait"},label="Access data unavailable"};W.AccessError=tostring(result) end
+        end
     end
     local n=W.ComputeNavigation(travel.navRoute,player,W.Safe(GetPlayerFacing),previous)
     local transitHint=W.ManualTransportHint(copy,player)

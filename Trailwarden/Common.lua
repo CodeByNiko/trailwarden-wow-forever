@@ -1,6 +1,6 @@
 Trailwarden = Trailwarden or {}
 local W = Trailwarden
-W.Version = "1.8.4"
+W.Version = "1.8.5"
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)
@@ -50,7 +50,7 @@ end
 function W.ProviderIdentity()
     local api=C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
     local _,build=W.Safe(GetBuildInfo)
-    return {version=W.Safe(api,"QuestieDB","Version") or "unknown",contract=LibQuestieDB and LibQuestieDB.contractVersion or 0,build=build or "unknown",mode=LibQuestieDB and LibQuestieDB.mode or "unknown",flavor=LibQuestieDB and type(LibQuestieDB.flavor)=="table" and LibQuestieDB.flavor.name or "unknown",locale=W.ProviderLocale or W.Safe(GetLocale) or "enUS"}
+    return {version=W.Safe(api,"QuestieDB","Version") or "unknown",contract=LibQuestieDB and LibQuestieDB.contractVersion or 0,build=build and tostring(build) or "unknown",mode=LibQuestieDB and LibQuestieDB.mode or "unknown",flavor=LibQuestieDB and type(LibQuestieDB.flavor)=="table" and LibQuestieDB.flavor.name or "unknown",locale=W.ProviderLocale or W.Safe(GetLocale) or "enUS"}
 end
 function W.YieldPlanning() end
 function W.Now() return (GetServerTime and GetServerTime()) or (time and time()) or 0 end

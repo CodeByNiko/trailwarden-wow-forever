@@ -17,6 +17,7 @@ commands=[
  ['tools/run_lua.py','tests/localization.lua'],
  ['tools/run_lua.py','tests/feedback.lua'],
  ['tools/run_lua.py','tests/performance.lua'],
+ ['tools/run_lua.py','tests/idle.lua'],
  ['tools/replay.py','tests/journey-replay.json'],
  ['tools/replay.py','tests/replay-export.json'],
  ['tools/replay.py','tests/experience-replay.json'],
