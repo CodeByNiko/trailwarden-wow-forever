@@ -179,6 +179,7 @@ complete={24};s=scan();check("single prerequisite unlocks",W.IsQuestAvailable(23
 complete={24,26};s=scan();check("all group prerequisites unlock",W.IsQuestAvailable(25,s) and W.IsQuestAvailable(34,s))
 log={{id=2,title="Warrior training",rows={{type="monster",objectiveID=301,text="Forest creature: 0/4",numFulfilled=0,numRequired=4}}}}
 s=scan();check("active quest is not offered again",not W.IsQuestAvailable(2,s))
+check("completed history snapshot is not duplicated in profile",s.profile.completed==nil and s.completed~=W.GetProfile().completed)
 check("exclusive quests excluded",not W.IsQuestAvailable(27,s))
 local activeSteps=W.ActiveSteps(log[1].id and s.activeQuests[1],s)
 check("objective from database without client waypoint",#activeSteps==1 and activeSteps[1].target=="Forest creature")
@@ -445,7 +446,7 @@ W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain();drain()
 check("between-frame map toggle catches up after settling",captures==1)
 local capturedBeforePerf=captures
 local perfSummary=W.PerformanceSummary(true)
-check("performance report identifies test build without capturing character",perfSummary:find("1.8.5",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
+check("performance report identifies test build without capturing character",perfSummary:find("1.8.5",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0 and W.LastProviderPass==nil)
 W.ReadCharacter=readCharacter;WorldMapFrame=mapFrame
 local questFrame,showPanel,selectQuest=QuestLogFrame,ShowUIPanel,QuestLog_SetSelection
 local selected,opened

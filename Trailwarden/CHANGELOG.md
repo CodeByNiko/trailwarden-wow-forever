@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.8.5
+- Measure character capture substeps, avoid duplicating completed-quest history in snapshots, and reset last-pass metrics with /tw perfreset.
 - Schedule startup planning in cancellable slices instead of forcing synchronous full planning.
 - Revalidate corrected provider data against every indexed quest relation and starter coordinate; retain the index only when all relevant provenance still matches.
 - Split catalog-index verification and individual quest target/source collection across timed slices, retaining per-quest error isolation.
