@@ -35,20 +35,22 @@ function W.EnsureProvider()
     W.ProviderHooksAvailable=type(hooksecurefunc)=='function'
     return true
 end
-function W.GetProviderCatalog(ids)
+function W.GetProviderCatalog(ids,checkpoint)
     local p=LibQuestieDB;local info=W.ProviderIdentity();local index=info.version=="1.0.15" and W.ProviderCatalogIndex1015 or W.ProviderCatalogIndex
     if not index then W.CatalogIndexStatus='index missing at load; runtime fallback';return end
     if index.schema~=1 then W.CatalogIndexStatus='unsupported index schema; runtime fallback';return end
-    if W.ProviderIndexDirty then W.CatalogIndexStatus='index invalidated: '..tostring(W.ProviderIndexDirtyReason)..'; runtime fallback';return end
     if not W.ProviderHooksAvailable then W.CatalogIndexStatus='provider hooks unavailable; runtime fallback';return end
     if type(p.GetProvenance)~='function' then W.CatalogIndexStatus='provider provenance unavailable; runtime fallback';return end
     for _,key in ipairs({'version','contract','build','mode','flavor'}) do if index[key]~=info[key] then W.CatalogIndexStatus='provider mismatch; bounded runtime fallback';return end end
     if #ids~=#index.ids then W.CatalogIndexStatus='quest membership changed; runtime fallback';return end
     for i,id in ipairs(ids) do
-        if id~=index.ids[i] or p.GetProvenance('Quest',id,'startedBy')~='QuestieDB' then W.CatalogIndexStatus='corrected quest relations; runtime fallback';return end
+        if checkpoint then checkpoint() end
+        if id~=index.ids[i] or W.Safe(p.GetProvenance,'Quest',id,'startedBy')~='QuestieDB' then W.CatalogIndexStatus='corrected quest relations; runtime fallback';return end
     end
     for kind,list in pairs(index.entities) do for _,id in ipairs(list) do
-        if p.GetProvenance(kind,id,'spawns')~='QuestieDB' then W.CatalogIndexStatus='corrected starter coordinates; runtime fallback';return end
+        if checkpoint then checkpoint() end
+        if W.Safe(p.GetProvenance,kind,id,'spawns')~='QuestieDB' then W.CatalogIndexStatus='corrected starter coordinates; runtime fallback';return end
     end end
+    W.ProviderIndexDirty=false;W.ProviderIndexDirtyReason=nil
     W.CatalogIndexStatus='verified offline zone index';return index
 end

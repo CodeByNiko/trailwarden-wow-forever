@@ -52,6 +52,7 @@ local function matchObjectiveRows(q,group,entries)
     for rowIndex,row in ipairs(typed) do if not used[rowIndex] and type(row.text)=="string" then
         local winner,length,tied=nil,0,false
         for i,candidate in ipairs(entries) do
+            W.YieldPlanning()
             local name=W.DBGet(entityKind,candidate[1],"name")
             if type(name)=="string" and name~="" and string.find(string.lower(row.text),string.lower(name),1,true) then
                 if #name>length then winner,length,tied=i,#name,false elseif #name==length then tied=true end
@@ -76,7 +77,7 @@ local function itemPoints(id,state,blocked)
     local out={};local hasSource=false
     for field,kind in pairs({npcDrops="Npc",objectDrops="Object",vendors="Npc"}) do
         for _,entityID in ipairs(W.DBGet("Item",id,field) or {}) do
-            hasSource=true
+            W.YieldPlanning();hasSource=true
             for _,point in ipairs(entityObjectivePoints(kind,entityID,state,blocked,field=="npcDrops")) do
                 local source=W.Copy(point);source.acquisition=field;out[#out+1]=source
             end
@@ -123,7 +124,7 @@ function W.ActiveSteps(q,state)
         local entries=objectives[group] or {}
         local liveByEntry=matchObjectiveRows(q,group,entries)
         for i,entry in ipairs(entries) do
-            local live=liveByEntry[i];local text=live and live.text
+            W.YieldPlanning();local live=liveByEntry[i];local text=live and live.text
             if not live then
                 blocked[#blocked+1]={status="unknown",reason="Live objective could not be matched safely to its provider target"}
             elseif not live.finished then
@@ -269,7 +270,8 @@ function W.CollectCandidates(state)
             W.YieldPlanning()
             local allowed,why=W.QuestPolicy(q.id,state,true)
             if q.isComplete or (allowed and not q.failed) then
-                local status,steps=W.Call(W.ActiveSteps,q,state)
+                local status,steps
+                if W.CallPlanning then status,steps=W.CallPlanning(W.ActiveSteps,q,state) else status,steps=W.Call(W.ActiveSteps,q,state) end
                 if status~="ok" or type(steps)~="table" then
                     W.TargetErrors=W.TargetErrors or {};W.TargetErrors[q.id]=tostring(steps)
                     steps={};deferred[#deferred+1]={id=q.id,title=q.title,reason="Target data temporarily unavailable"}

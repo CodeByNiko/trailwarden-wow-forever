@@ -46,7 +46,7 @@ function W.CombatPoints(id,state,blocked)
     if risk.status~="allowed" then if blocked then blocked[#blocked+1]=risk end;return {} end
     local points={}
     for _,point in ipairs(W.EntityPoints("Npc",id)) do
-        local copy=W.Copy(point);copy.combatRisk=W.Copy(risk);points[#points+1]=copy
+        W.YieldPlanning();local copy=W.Copy(point);copy.combatRisk=W.Copy(risk);points[#points+1]=copy
     end
     return points
 end

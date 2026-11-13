@@ -207,7 +207,7 @@ frame:SetScript("OnEvent",function(_,event,...)
     if event=="PLAYER_LOGIN" then
         hookMap()
         W.EnsureProvider();W.SetCombatUI(liveCombat())
-        W.ResetExperience();pollSafety();W.CreateUI();W.CreateNavigator();W.Refresh(true)
+        W.ResetExperience();pollSafety();W.CreateUI();W.CreateNavigator();W.Refresh(false,"startup")
         if C_Timer then C_Timer.After(.5,function() W.BuildQuestCatalog() end) else W.BuildQuestCatalog() end
         print("|cff5dd4d6Trailwarden "..W.Version.."|r / Your character's route is ready. |cffffc366/tw|r opens the guide; |cffffc366/tw help|r lists controls.")
         return

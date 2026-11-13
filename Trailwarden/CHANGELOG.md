@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1.8.5
+- Schedule startup planning in cancellable slices instead of forcing synchronous full planning.
+- Revalidate corrected provider data against every indexed quest relation and starter coordinate; retain the index only when all relevant provenance still matches.
+- Split catalog-index verification and individual quest target/source collection across timed slices, retaining per-quest error isolation.
 - Check inventory before querying eligibility for item-started quests, and report why a catalog index falls back.
 - Normalize client build metadata and retain verified indexes after cache-only invalidation.
 - Add a verified QuestieDB 1.0.15 Forever build 70938 index alongside the existing 1.0.14 index; mismatches/corrections use the safe fallback.

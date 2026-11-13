@@ -70,6 +70,19 @@ for _,id in ipairs(LibQuestieDB.Quest.GetAllIds()) do if type(LibQuestieDB.Quest
 assert(Trailwarden.CatalogCount==named,"Catalog did not retain every named quest")
 assert(Trailwarden.CatalogIndexStatus=="verified offline zone index",Trailwarden.CatalogIndexStatus)
 assert(not Trailwarden.ProviderReads["Npc.spawns"] and not Trailwarden.ProviderReads["Object.spawns"],"Global spawn queries during indexed startup")
+local ids=LibQuestieDB.Quest.GetAllIds();local key=LibQuestieDB.Meta.Quest.keys.questLevel
+local level=LibQuestieDB.Quest.Get(456,"questLevel")
+LibQuestieDB.Corrections.Set("TrailwardenTest","Quest","unrelated",{[456]={[key]=level+1}})
+assert(Trailwarden.ProviderIndexDirty,"Correction did not invalidate consumer data")
+assert(Trailwarden.GetProviderCatalog(ids),"Unrelated real correction should retain verified index: "..tostring(Trailwarden.CatalogIndexStatus))
+local starter=LibQuestieDB.Meta.Quest.keys.startedBy
+LibQuestieDB.Corrections.Set("TrailwardenTest","Quest","starter",{[456]={[starter]={{999999}}}})
+assert(not Trailwarden.GetProviderCatalog(ids),"Changed starter relation must reject index")
+assert(Trailwarden.CatalogIndexStatus:find("corrected quest relations",1,true),Trailwarden.CatalogIndexStatus)
+LibQuestieDB.Corrections.Set("TrailwardenTest","Quest","starter",nil)
+LibQuestieDB.Corrections.Set("TrailwardenTest","Quest","unrelated",nil)
+local refreshAgain=Trailwarden.Refresh;Trailwarden.Refresh=nil;Trailwarden.BuildQuestCatalog(true);Trailwarden.Refresh=refreshAgain
+assert(Trailwarden.CatalogReady and Trailwarden.CatalogIndexStatus=="verified offline zone index",Trailwarden.CatalogError)
 Trailwarden.Refresh(true,"provider-smoke")
 assert(not Trailwarden.LastError,Trailwarden.LastError)
 assert(not Trailwarden.ForecastError,Trailwarden.ForecastError)
@@ -111,6 +124,21 @@ WorldMapFrame={IsShown=function() return true end}
 for i=1,100 do W.Refresh(false,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnEvent(W.EventFrame,"UPDATE_MOUSEOVER_UNIT") end
 assert(W.WorkCounters.captures==captured and W.PlanExecutions==plans,"Map storm escaped gates with real provider")
 WorldMapFrame=nil
+-- Exercise actual provider reads through Lua 5.1 nested yielding and catalog
+-- verification, rather than merely loading the provider into synchronous tests.
+local tasks={};C_Timer={After=function(_,fn) tasks[#tasks+1]=fn end}
+local fakeMS=0;debugprofilestop=function() fakeMS=fakeMS+1;return fakeMS end
+local refresh=W.Refresh;W.Refresh=nil;W.BuildQuestCatalog(true)
+assert(W.BuildingCatalog and #tasks>0,"Real-provider catalog verification did not yield")
+local slices=0
+while #tasks>0 do table.remove(tasks,1)();slices=slices+1;assert(slices<20000,"Catalog slices did not finish") end
+W.Refresh=refresh;assert(W.CatalogReady and W.CatalogIndexStatus=="verified offline zone index")
+W.Decision=nil;W.Refresh(false,"QUEST_LOG_UPDATE")
+assert(W.PendingPlan and #tasks>0,"Real-provider quest planning did not yield")
+slices=0
+while #tasks>0 do table.remove(tasks,1)();slices=slices+1;assert(slices<20000,"Quest slices did not finish") end
+assert(W.Decision and not W.PendingPlan and not W.LastError,"Nested quest/provider plan failed: "..tostring(W.LastError))
+C_Timer=nil;debugprofilestop=nil
 ''')
 print('Actual provider cold catalog: %.2f ms / %.1f KiB retained' % (globals_.catalogColdMS,globals_.catalogRetainedKB))
 print('Actual provider 10 warm plans: %.2f ms / %.1f KiB allocated / %.1f KiB retained' % (globals_.warmMS,globals_.warmAllocatedKB,globals_.warmRetainedKB))

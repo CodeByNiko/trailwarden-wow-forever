@@ -23,7 +23,7 @@ end
 LibQuestieDB={contractVersion=4,minSupportedContract=1,mode='baked',flavor={name='Forever'},RequireContract=function(v) return v>=1 and v<=4 end,
  Quest={GetAllIds=function() return ids end,Get=function(id,key) return getter('Quest',id,key) end},
  Npc={Get=function(id,key) return getter('Npc',id,key) end},Object={Get=function(id,key) return getter('Object',id,key) end},
- GetProvenance=function() return 'QuestieDB' end,Support={Get=function() return {private={areaIdToUiMapId={[1431]=1431,[1438]=1438}}} end},
+ GetProvenance=function(kind,id,field) if kind=='Npc' and field=='spawns' and spawnMap~=1431 then return 'FixtureCorrection' end;return 'QuestieDB' end,Support={Get=function() return {private={areaIdToUiMapId={[1431]=1431,[1438]=1438}}} end},
  InvalidateCache=function() end,ApplyRegisteredCorrections=function() level=8 end,
  Corrections={Set=function() spawnMap=1438;return true end,ApplyRegisteredCorrections=function() end,UnregisterCorrection=function() end},
  l10n={SetLocale=function(value) locale=value end,SetCorrection=function() end}}
@@ -54,6 +54,8 @@ W.BuildQuestCatalog(true)
 check('cache-only invalidation retains verified index',W.CatalogReady and W.CatalogIndexStatus=='verified offline zone index')
 local cached=W.Q(1,'questLevel');LibQuestieDB.ApplyRegisteredCorrections()
 check('public correction application invalidates local fields',cached==7 and W.Q(1,'questLevel')==8 and W.ProviderRebuildNeeded and not W.CatalogReady)
+W.BuildQuestCatalog(true)
+check('unrelated correction revalidates and preserves index',W.CatalogReady and W.CatalogIndexStatus=='verified offline zone index' and W.Q(1,'questLevel')==8)
 LibQuestieDB.Corrections.Set('fixture','Npc','relocate',{})
 W.BuildQuestCatalog(true)
 check('corrected coordinates use runtime fallback and update the zone',W.CatalogReady and W.CatalogByMap[1438] and not W.CatalogByMap[1431] and W.CatalogIndexStatus~='verified offline zone index')
@@ -71,4 +73,14 @@ while #timers>0 do table.remove(timers,1)() end
 check('invalidated async catalog cannot publish its old generation',not W.CatalogReady and W.ProviderRebuildNeeded)
 W.BuildQuestCatalog(true);while #timers>0 do table.remove(timers,1)() end
 check('new catalog generation publishes after invalidation',W.CatalogReady and W.CatalogCount==50)
+-- A full index must be verified across timer slices, and a data change must
+-- prevent the old verification from publishing a catalog.
+index.version='changed';index.ids={};for i,id in ipairs(ids) do index.ids[i]=id end
+W.ProviderCatalogIndex=index
+local clockMS=0;debugprofilestop=function() clockMS=clockMS+1;return clockMS end
+W.BuildQuestCatalog(true)
+check('index verification yields before finishing',W.BuildingCatalog and #timers>0)
+W.InvalidateProviderData('fixture changed during verification',true)
+while #timers>0 do table.remove(timers,1)() end
+check('stale index verification cannot publish',not W.CatalogReady and W.ProviderRebuildNeeded)
 print(passed..' provider lifecycle checks passed')

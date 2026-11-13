@@ -58,7 +58,7 @@ end
 function W.PerformanceSummary(reset)
     local c=W.WorkCounters or {};local events={}
     for event,count in pairs(c.events or {}) do events[#events+1]=event.."="..count end;table.sort(events)
-    local summary="Trailwarden "..W.Version.." / perf-1015-3 / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map signals="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
+    local summary="Trailwarden "..W.Version.." / perf-1015-4 / captures="..tostring(c.captures or 0).." / full navigation="..tostring(c.navigation or 0).." / safety scans="..tostring(c.safety or 0).." / map signals="..tostring(c.mapChanges or 0).." / deferred="..tostring(c.mapDeferrals or 0).."\n"..table.concat(events,", ")
     local provider=W.ProviderIdentity()
     summary=summary.."\nProvider: "..provider.version.." / "..provider.mode.." / "..provider.flavor.." / "..provider.locale.." / build "..provider.build.." / contract "..tostring(provider.contract).." / index: "..tostring(W.CatalogIndexStatus)
     local reads={};for field,count in pairs(W.ProviderReads or {}) do reads[#reads+1]=field.."="..count end;table.sort(reads)

@@ -16,6 +16,18 @@ function W.PlanningPhase(name)
     end
 end
 function W.IsPlanningSlice() return active~=nil end
+-- Lua 5.1 cannot yield across pcall; isolate a quest in a child coroutine so
+-- expensive per-quest work can yield and errors remain local to that quest.
+function W.CallPlanning(fn,...)
+    if not active then return W.Call(fn,...) end
+    local thread=coroutine.create(fn);local args={...}
+    while true do
+        local ok,a,b,c,d=coroutine.resume(thread,unpack(args));args={}
+        if not ok then return "error",tostring(a) end
+        if coroutine.status(thread)=="dead" then return "ok",a,b,c,d end
+        coroutine.yield()
+    end
+end
 function W.YieldPlanning()
     if not active then return end
     active.operations=active.operations+1

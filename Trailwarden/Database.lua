@@ -121,13 +121,14 @@ function W.EntityPoints(kind,id)
     if W.DataIssues then W.DataIssues[key]=nil end
     local points={};local name=W.DBGet(kind,id,"name") or kind
     for area,coords in pairs(spawns) do
+        W.YieldPlanning()
         if type(coords)~="table" then return {},"invalid" end
         local mapID=W.MapForArea(area)
         local info=mapID and C_Map and W.Safe(C_Map.GetMapInfo,mapID)
         if mapID and (not info or not info.mapType or info.mapType==3) then
             local stride=math.max(1,math.ceil(#coords/40))
             for i=1,#coords,stride do
-                local c=coords[i]
+                W.YieldPlanning();local c=coords[i]
                 if type(c)~="table" then return {},"invalid" end
                 -- QuestieDB uses {-1,-1} for a known entity without a mapped
                 -- position (for example an instance NPC). It is not a corrupt
@@ -195,7 +196,15 @@ function W.BuildQuestCatalog(force,attempt)
     local db=entity("Quest");local status,ids=W.Call(db and db.GetAllIds)
     W.BuildingCatalog=true;W.CatalogState="loading";W.DatabaseStatus="Reading Forever quest data"
     local nextMaps,nextItems,count,index={},{},0,1
-    local offline=W.GetProviderCatalog and W.GetProviderCatalog(ids or {})
+    local offline,verifyThread,verifyStarted,verifyCount
+    if W.GetProviderCatalog and C_Timer then
+        verifyThread=coroutine.create(function()
+            return W.GetProviderCatalog(ids or {},function()
+                verifyCount=verifyCount+1
+                if verifyCount%16==0 and (type(debugprofilestop)=="function" and debugprofilestop()-verifyStarted>=2 or type(debugprofilestop)~="function" and verifyCount>=256) then coroutine.yield() end
+            end)
+        end)
+    elseif W.GetProviderCatalog then offline=W.GetProviderCatalog(ids or {}) end
     local recordsByID={}
     -- The global catalog needs zone IDs, not expanded world-coordinate points.
     -- Keep only small per-entity zone lists for the duration of this build.
@@ -270,6 +279,13 @@ function W.BuildQuestCatalog(force,attempt)
     slice=function()
         if generation~=W.CatalogGeneration then return end
         if C_Timer and (W.IsCombatActive and W.IsCombatActive() or W.IsWorldMapOpen and W.IsWorldMapOpen() or (W.MapQuietRemaining or 0)>0) then C_Timer.After(.25,slice);return end
+        if verifyThread then
+            verifyCount=0;verifyStarted=type(debugprofilestop)=="function" and debugprofilestop() or 0
+            local status,ok,result=W.TimedCall("catalog verify slice",coroutine.resume,verifyThread)
+            if status~="ok" or not ok then fail(result or "Catalog verification failed");return end
+            if coroutine.status(verifyThread)~="dead" then C_Timer.After(.05,slice);return end
+            offline=result;verifyThread=nil
+        end
         local status,message=W.TimedCall("catalog slice",work);if status~="ok" then fail(message);return end
         if index<=#ids then if C_Timer then C_Timer.After(.05,slice) else slice() end;return end
         if offline then
