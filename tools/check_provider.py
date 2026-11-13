@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('provider', type=Path)
 parser.add_argument('--expected-version', help='Fail if the provider TOC version differs from this pinned release.')
 parser.add_argument('--build', default='70245')
+parser.add_argument('--numeric-build', action='store_true')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 provider = args.provider.resolve()
@@ -27,6 +28,9 @@ os.chdir(root)
 # fixture provider caches and character profiles cannot contaminate this check.
 lua.execute(b'print=function() end')
 lua.execute((root / 'tests/scenarios.lua').read_bytes())
+if args.numeric_build:
+    globals_.numeric_test_build=int(args.build)
+    lua.execute(b'GetBuildInfo=function() return "1.60.1",numeric_test_build end')
 lua.execute(b'''
 LibQuestieDB=actualProvider;QuestDB=LibQuestieDB.Quest;NpcDB=LibQuestieDB.Npc
 ItemDB=LibQuestieDB.Item;ObjectDB=LibQuestieDB.Object

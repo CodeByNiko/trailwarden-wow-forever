@@ -193,6 +193,10 @@ log={{id=32,title="Two creatures",rows={{type="monster",objectiveID=301,text="Fo
 s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s);check("finished kill objectives removed",#activeSteps==1 and activeSteps[1].target=="Webwood spider")
 log={{id=16,title="Delivery"}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s);check("delivery quests find receiver",activeSteps[1] and activeSteps[1].kind=="deliver")
 log={{id=33,title="Forever-only quest",wp={1438,.65,.65},rows={{type="event",text="Find the grove",finished=false}}}};s=scan();activeSteps=W.ActiveSteps(s.activeQuests[1],s);check("unknown quests use client waypoint",activeSteps[1] and activeSteps[1].source=="Client waypoint")
+log={};inventory={};s=scan();local eligibility=W.QuestEligibility;local emptyItemChecks=0
+W.QuestEligibility=function(id,...) if id==37 then emptyItemChecks=emptyItemChecks+1 end;return eligibility(id,...) end
+W.CollectCandidates(s);W.QuestEligibility=eligibility
+check("unowned quest item avoids quest eligibility queries",emptyItemChecks==0)
 log={};inventory={[900]=1};s=scan();r=plan();check("quest-starting inventory item",r.questID==37 and r.kind=="item");inventory={}
 -- Actual gossip offers resolve incomplete Forever race or chain records.
 W.ObserveQuest(21,"Observed live offer","pickup");s=scan();check("live offers override stale database restrictions",W.IsQuestAvailable(21,s))

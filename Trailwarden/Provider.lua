@@ -5,7 +5,7 @@ function W.InvalidateProviderData(reason,structural)
     W.ProviderGeneration=W.ProviderGeneration+1
     if W.CancelPlanning then W.CancelPlanning() end
     W.ProviderChangeReason=reason;W.ProviderRebuildNeeded=true
-    if structural then W.ProviderIndexDirty=true end
+    if structural then W.ProviderIndexDirty=true;W.ProviderIndexDirtyReason=reason end
     if W.InvalidateDataCaches then W.InvalidateDataCaches() end
 end
 local function hook(owner,key,callback)
@@ -25,7 +25,7 @@ function W.EnsureProvider()
     if not W.ProviderCompatible then W.ProviderError='QuestieDB with supported consumer contract 3 is required. Update QuestieDB and restart WoW.';return false end
     W.ProviderError=nil
     local function changed() W.InvalidateProviderData('provider correction/invalidation',true) end
-    hook(p,'InvalidateCache',changed);hook(p,'ApplyRegisteredCorrections',changed)
+    hook(p,'InvalidateCache',function() W.InvalidateProviderData('provider cache invalidated',false) end);hook(p,'ApplyRegisteredCorrections',changed)
     local registry=p.Corrections
     for _,key in ipairs({'Set','ApplyRegisteredCorrections','UnregisterCorrection'}) do hook(registry,key,changed) end
     if p.l10n then
@@ -37,7 +37,11 @@ function W.EnsureProvider()
 end
 function W.GetProviderCatalog(ids)
     local p=LibQuestieDB;local info=W.ProviderIdentity();local index=info.version=="1.0.15" and W.ProviderCatalogIndex1015 or W.ProviderCatalogIndex
-    if not index or index.schema~=1 or W.ProviderIndexDirty or not W.ProviderHooksAvailable or type(p.GetProvenance)~='function' then W.CatalogIndexStatus='bounded runtime fallback';return end
+    if not index then W.CatalogIndexStatus='index missing at load; runtime fallback';return end
+    if index.schema~=1 then W.CatalogIndexStatus='unsupported index schema; runtime fallback';return end
+    if W.ProviderIndexDirty then W.CatalogIndexStatus='index invalidated: '..tostring(W.ProviderIndexDirtyReason)..'; runtime fallback';return end
+    if not W.ProviderHooksAvailable then W.CatalogIndexStatus='provider hooks unavailable; runtime fallback';return end
+    if type(p.GetProvenance)~='function' then W.CatalogIndexStatus='provider provenance unavailable; runtime fallback';return end
     for _,key in ipairs({'version','contract','build','mode','flavor'}) do if index[key]~=info[key] then W.CatalogIndexStatus='provider mismatch; bounded runtime fallback';return end end
     if #ids~=#index.ids then W.CatalogIndexStatus='quest membership changed; runtime fallback';return end
     for i,id in ipairs(ids) do

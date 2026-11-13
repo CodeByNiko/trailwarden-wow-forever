@@ -1,6 +1,8 @@
 # Changelog
 
 ## 1.8.5
+- Check inventory before querying eligibility for item-started quests, and report why a catalog index falls back.
+- Normalize client build metadata and retain verified indexes after cache-only invalidation.
 - Add a verified QuestieDB 1.0.15 Forever build 70938 index alongside the existing 1.0.14 index; mismatches/corrections use the safe fallback.
 - Measure candidate, forecast, snapshot and selection stages individually; check slice budget more frequently.
 - Reduce diagnostic fact capture to 2,000 entries and replay budgets to 6,000 entries per frame / 12,000 total; oversized replays are skipped.

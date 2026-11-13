@@ -48,6 +48,10 @@ local get=LibQuestieDB.Npc.Get;local fail=true
 LibQuestieDB.Npc.Get=function(...) if fail then error('transient') end;return get(...) end
 W.BeginDataCapture();local _,status=W.DBRead('Npc',2,'spawns');fail=false;local recovered=W.DBRead('Npc',2,'spawns');W.EndDataCapture();LibQuestieDB.Npc.Get=get
 check('errors are retried within the same pass',status=='error' and recovered[1431])
+LibQuestieDB.InvalidateCache()
+check('cache-only invalidation does not mark verified index dirty',not W.ProviderIndexDirty and not W.CatalogReady)
+W.BuildQuestCatalog(true)
+check('cache-only invalidation retains verified index',W.CatalogReady and W.CatalogIndexStatus=='verified offline zone index')
 local cached=W.Q(1,'questLevel');LibQuestieDB.ApplyRegisteredCorrections()
 check('public correction application invalidates local fields',cached==7 and W.Q(1,'questLevel')==8 and W.ProviderRebuildNeeded and not W.CatalogReady)
 LibQuestieDB.Corrections.Set('fixture','Npc','relocate',{})

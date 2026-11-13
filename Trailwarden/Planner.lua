@@ -218,10 +218,10 @@ end
 local function itemPickups(out,state)
     for _,e in ipairs(W.ItemQuests or {}) do
         W.YieldPlanning()
-        if e.record.minLevel<=state.level and W.IsQuestAvailable(e.record.id,state) then
+        if e.record.minLevel<=state.level then
             for _,id in ipairs(e.items) do
                 local count=(C_Item and W.Safe(C_Item.GetItemCount,id)) or W.Safe(GetItemCount,id) or 0
-                if count>0 then
+                if count>0 and W.IsQuestAvailable(e.record.id,state) then
                     out[#out+1]=makeStep("item",e.record,nil,W.DBGet("Item",id,"name") or "the quest-starting item","","Inventory")
                     break
                 end
