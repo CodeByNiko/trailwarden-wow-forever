@@ -1,4 +1,4 @@
-TRAILWARDEN 1.8.4 — WORLD OF WARCRAFT: FOREVER
+TRAILWARDEN 1.8.5 — WORLD OF WARCRAFT: FOREVER
 
 Install the Trailwarden folder in Interface/AddOns. Keep QuestieDB (Forever)
 enabled. Questie is strongly recommended. Exit and restart WoW when updating.
@@ -6,6 +6,9 @@ enabled. Questie is strongly recommended. Exit and restart WoW when updating.
 Renamed from Wayfinder in 1.7.2. Commands: /tw and /trailwarden.
 For existing settings, exit WoW and follow:
 https://github.com/CodeByNiko/trailwarden-wow-forever/blob/main/docs/upgrade-to-trailwarden.md
+
+Version 1.8.5 reduces idle work, reuses safe quest trip order, and splits
+automatic planning into cancellable slices.
 
 Version 1.8.4 coalesces map toggles, hides the main guide during combat while
 keeping lightweight arrow guidance, and makes active quests clickable in the

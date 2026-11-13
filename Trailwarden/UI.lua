@@ -323,14 +323,15 @@ function W.UpdateUI()
     for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":");v.button.value:SetText(v.definition[2](p)) end
     layout();W.UpdateLiveUI()
 end
+local lastDistanceFont
 function W.UpdateLiveUI()
     if not fields.distance or not W.CurrentRoute then return end
     local e=W.SafeExperienceStats();local stable=e.available and not e.paused and (e.windowSeconds or 0)>=300
     local measured=e.available and (e.maximum==0 and "Level cap" or e.paused and "Paused" or stable and e.rate and W.FormatXP(e.rate) or "Learning...") or "Unavailable"
-    fields.xp:SetText(measured)
+    if fields.xp:GetText()~=measured then fields.xp:SetText(measured) end
     local etaLabel="--"
     if e.available and not e.paused and e.maximum~=0 then etaLabel=stable and e.eta and ("~"..W.FormatETA(e.eta)) or not stable and "Building sample" or "--" end
-    fields.xpETA:SetText(etaLabel)
+    if fields.xpETA:GetText()~=etaLabel then fields.xpETA:SetText(etaLabel) end
     local n=W.Navigation or {}
     if W.Decision and n.decisionID~=W.Decision.id then
         fields.distance:SetText("");fields.navStatus:SetText("Synchronizing route")
@@ -341,9 +342,11 @@ function W.UpdateLiveUI()
     local r=W.CurrentRoute
     local instruction=travel and travel.instruction or r.instruction or "Reading your quest progress..."
     if fields.instruction:GetText()~=instruction then fields.instruction:SetText(instruction);layout() end
-    fields.distance:SetText(n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="escort" and "Escort active" or W.CurrentRoute.kind=="item" and "In your bags" or ""))
-    fields.distance:SetFont("Fonts\\FRIZQT__.TTF",n.distance and 14 or 11,"")
-    fields.navStatus:SetText(n.label or "")
+    local distanceText=n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="escort" and "Escort active" or W.CurrentRoute.kind=="item" and "In your bags" or "")
+    if fields.distance:GetText()~=distanceText then fields.distance:SetText(distanceText) end
+    local distanceFont=n.distance and 14 or 11
+    if distanceFont~=lastDistanceFont then fields.distance:SetFont("Fonts\\FRIZQT__.TTF",distanceFont,"");lastDistanceFont=distanceFont end
+    if fields.navStatus:GetText()~=(n.label or "") then fields.navStatus:SetText(n.label or "") end
     if W.GetProfile().collapsed and not settingsOpen then layout() end
 end
 function W.ToggleSettings()

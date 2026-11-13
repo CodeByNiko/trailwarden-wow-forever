@@ -307,6 +307,7 @@ function W.PrepareQuestEconomies(candidates,state)
     table.sort(ids)
     local l=learning();local pace=state.experience or W.ExperienceStats()
     for _,id in ipairs(ids) do
+        W.YieldPlanning()
         local list=grouped[id]
         local reward,source=W.QuestRewardEstimate(id,state);local active=state.activeByID[id];local goals={};local pickup
         local known=true;local learned=l.quests[id];local steps=list
@@ -356,6 +357,7 @@ function W.PrepareQuestEconomies(candidates,state)
     end
     local rates={}
     for _,id in ipairs(ids) do
+        W.YieldPlanning()
         local list=grouped[id]
         local base=models[id]
         if base then
@@ -363,6 +365,7 @@ function W.PrepareQuestEconomies(candidates,state)
             -- Combine accepted work sharing the same work area and hand-in hub.
             -- Each quest reward is banked once; common mob sources share effort.
             for _,otherID in ipairs(ids) do
+                W.YieldPlanning()
                 local other=models[otherID]
                 if other and otherID~=id and other.active and W.Distance(base.receiver,other.receiver) and W.Distance(base.receiver,other.receiver)<=200 then
                     local close=#other.goals==0

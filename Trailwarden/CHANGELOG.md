@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.5
+- Reduce unchanged idle navigation, cave access and UI work, and avoid periodic full replans.
+- Reuse quest trip order and update partial progress locally while retaining safety checks.
+- Coalesce unchanged quest/reputation events and spread automatic candidate and forecast work across timer slices.
+- Reduce repeated combat safety allocations; add idle and scheduler regression coverage.
+
 ## 1.8.4
 - Coalesce rapid world-map toggles and defer expensive work until the map remains closed; make inactive pin cleanup idempotent.
 - Hide the main guide during combat, retain the lightweight arrow, and suspend provider queries, route planning and population scans until combat ends.

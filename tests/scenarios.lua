@@ -362,8 +362,8 @@ check("target and nameplate events do not invoke XP accounting",xpEventCalls==0)
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","player")
 check("XP events still invoke XP accounting",xpEventCalls==1)
 W.ExperienceEvent=experienceEvent
-epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain();check("idle maintenance still refreshes",W.PlanExecutions==executions+1)
-epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain();check("meaningful movement refreshes route",W.PlanExecutions==executions+2)
+epoch=epoch+50;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain();check("idle maintenance avoids unnecessary planning",W.PlanExecutions==executions)
+epoch=epoch+10;player.x=player.x+.03;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain();check("meaningful movement refreshes route",W.PlanExecutions==executions+1)
 W.GetProfile().panelHidden=false;W.GetProfile().navigatorHidden=false;W.UpdateNavigator()
 local combatPlans=W.PlanExecutions
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_DISABLED")
@@ -377,8 +377,8 @@ epoch=epoch+2;W.EventFrame.scripts.OnUpdate(W.EventFrame,2);drain()
 check("combat defers replanning and skips periodic navigation and nameplate scans",W.PlanExecutions==combatPlans and polls==0 and navigations==0)
 W.PollCombatSafety=pollCombat;W.UpdateNavigation=navCombat
 W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_REGEN_ENABLED")
-check("combat exit restores preferred windows and refreshes once",not W.CombatActive and W.MainFrame.shown and W.NavigatorFrame.shown and W.PlanExecutions==combatPlans+1)
-log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+4)
+check("combat exit restores preferred windows and refreshes once",not W.CombatActive and W.MainFrame.shown and W.NavigatorFrame.shown and W.PlanExecutions==combatPlans)
+log[1].rows[1].numFulfilled=1;log[1].rows[1].numRequired=4;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain();check("quest events refresh without waiting for movement",W.PlanExecutions==executions+2)
 local combatAPI=InCombatLockdown
 InCombatLockdown=function() return 1 end
 W.EventFrame.scripts.OnUpdate(W.EventFrame,.11);drain()
@@ -441,7 +441,7 @@ W.EventFrame.scripts.OnUpdate(W.EventFrame,.8);drain();drain()
 check("between-frame map toggle catches up after settling",captures==1)
 local capturedBeforePerf=captures
 local perfSummary=W.PerformanceSummary(true)
-check("performance report identifies test build without capturing character",perfSummary:find("1.8.4",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
+check("performance report identifies test build without capturing character",perfSummary:find("1.8.5",1,true) and captures==capturedBeforePerf and W.WorkCounters.captures==0)
 W.ReadCharacter=readCharacter;WorldMapFrame=mapFrame
 local questFrame,showPanel,selectQuest=QuestLogFrame,ShowUIPanel,QuestLog_SetSelection
 local selected,opened
@@ -799,8 +799,17 @@ for i=1,20 do W.EventFrame.scripts.OnEvent(W.EventFrame,"PLAYER_XP_UPDATE","play
 check("XP and kill event burst does not invoke route planning",W.PlanExecutions==initialPlans)
 for i=1,10 do W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE") end;drain()
 check("duplicate quest-log events do not rebuild an unchanged plan",W.PlanExecutions==initialPlans)
+local reputation=100
+GetNumFactions=function() return 1 end
+GetFactionInfo=function() return "Test faction",nil,4,0,3000,reputation,nil,nil,nil,nil,nil,nil,nil,47 end
+W.Refresh(true,"faction-baseline");initialPlans=W.PlanExecutions
+for i=1,10 do W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");W.EventFrame.scripts.OnEvent(W.EventFrame,"UPDATE_FACTION");drain() end
+check("mixed unchanged quest and faction events do not replan",W.PlanExecutions==initialPlans)
+reputation=101;W.EventFrame.scripts.OnEvent(W.EventFrame,"UPDATE_FACTION");drain()
+check("changed faction standing requests new planning",W.PlanExecutions==initialPlans+1)
+GetNumFactions=nil;GetFactionInfo=nil;W.PinStep(W.ActiveSteps(W.State.activeByID[2],W.State)[1]);W.GetProfile().pinned=nil;initialPlans=W.PlanExecutions
 log[1].rows[1].numFulfilled=1;W.EventFrame.scripts.OnEvent(W.EventFrame,"QUEST_LOG_UPDATE");drain()
-check("actual partial progress refreshes the instruction once",W.PlanExecutions==initialPlans+1 and W.CurrentRoute.questID==2)
+check("partial progress updates the active step without replanning",W.PlanExecutions==initialPlans and W.CurrentRoute.questID==2 and W.CurrentRoute.remaining==3)
 local sampleXP=W.SampleExperience;W.SampleExperience=function() error("synthetic combat XP failure") end
 W.Refresh(false,"fault-test");check("XP sampling failure cannot erase valid quest guidance",W.CurrentRoute.questID==2 and W.CurrentRoute.kind=="objective")
 W.SampleExperience=sampleXP
@@ -817,9 +826,9 @@ W.QuestRewardEstimate=function(id,state) if id==2 then return 500,"Questie adjus
 epoch=epoch+46;W.Refresh(false,"forecast-regression")
 local builds=W.ForecastBuilds or 0;local oldWork=W.CurrentRoute.economy.workSeconds
 for i=1,3 do log[1].rows[1].numFulfilled=i;W.Refresh(false,"QUEST_LOG_UPDATE");drain() end
-check("partial progress rebuilds stale forecast quantities immediately",(W.ForecastBuilds or 0)==builds+2 and W.CurrentRoute.questID==2 and W.CurrentRoute.economy.workSeconds<oldWork and W.CurrentRoute.remaining==1)
+check("partial progress clears stale forecasts without rebuilding",(W.ForecastBuilds or 0)==builds and W.CurrentRoute.questID==2 and W.CurrentRoute.economy==nil and W.CurrentRoute.remaining==1)
 builds=W.ForecastBuilds;local hits=W.ForecastCacheHits or 0;W.Refresh(false,"forecast-regression")
-check("unchanged progress still reuses forecast models",W.ForecastBuilds==builds and (W.ForecastCacheHits or 0)==hits+1)
+check("fresh full planning restores forecast after progress",W.ForecastBuilds==builds+1 and W.CurrentRoute.economy and W.CurrentRoute.economy.workSeconds<oldWork)
 W.QuestRewardEstimate=rewardAPI
 local routeBefore=W.CurrentRoute
 local failPlan=W.PlanRoute;W.PlanRoute=function() error("synthetic planner fault") end

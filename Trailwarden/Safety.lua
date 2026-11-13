@@ -73,7 +73,10 @@ function W.PollCombatSafety()
             local recordedSkull=skull or old and old.skull==true and old.playerLevel==state.level or false
             local priorPoint=old and type(old.point)=="table" and W.Point(old.point.mapID,old.point.x,old.point.y)
             if not old or old.level~=recordedLevel or old.rank~=recordedRank or old.skull~=recordedSkull or not priorPoint or (W.Distance(priorPoint,point) or 1000)>100 then revision=revision+1 end
-            store[key]={level=recordedLevel,skull=recordedSkull,rank=recordedRank,playerLevel=state.level,point=W.Copy(point),seen=now,provider=providerID}
+            if old then
+                old.level=recordedLevel;old.skull=recordedSkull;old.rank=recordedRank;old.playerLevel=state.level;old.seen=now;old.provider=providerID
+                if not priorPoint or (W.Distance(priorPoint,point) or 1000)>100 then old.point=W.Copy(point) end
+            else store[key]={level=recordedLevel,skull=recordedSkull,rank=recordedRank,playerLevel=state.level,point=W.Copy(point),seen=now,provider=providerID} end
             if not W.Safe(UnitIsDeadOrGhost,unit) and (skull or level>state.level+W.CombatLevelMargin or rank==3 or not state.profile.includeGroup and (rank==1 or rank==2)) then
                 local name=W.Safe(UnitName,unit) or "Hostile enemy"
                 local candidate={name=name,entityID=id,level=validLevel(level) and level or nil,skull=skull,seen=now,point=W.Copy(point),reason=skull and "Skull-level enemy visible" or "Hostile combat target exceeds automatic combat limits"}
