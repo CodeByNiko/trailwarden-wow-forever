@@ -1,9 +1,19 @@
 local W=Trailwarden
+local lastDistanceFont
 local C={bg={0.025,0.043,0.065,0.985},card={0.047,0.078,0.105,1},raised={0.065,0.105,0.135,1},hover={0.10,0.17,0.21,1},line={0.15,0.25,0.31,1},text={0.94,0.96,0.97},muted={0.70,0.77,0.81},cyan={0.39,0.86,0.85},gold={0.98,0.79,0.47},green={0.53,0.88,0.68}}
 W.Colors=C
 function W.Font(parent,size,color)
     local f=parent:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    f:SetFont("Fonts\\FRIZQT__.TTF",size,"");f:SetTextColor(unpack(color or C.text));f:SetJustifyH("LEFT");return f
+    f:SetFont(W.FontPath(),size,"");f:SetTextColor(unpack(color or C.text));f:SetJustifyH("LEFT")
+    if W.FontRegistry then W.FontRegistry[f]={size=size,flags=""} end
+    return f
+end
+function W.ApplyFont()
+    local font=W.FontPath()
+    for f,meta in pairs(W.FontRegistry or {}) do
+        if f and f.SetFont then f:SetFont(font,meta.size,meta.flags or "") end
+    end
+    lastDistanceFont=nil
 end
 function W.Backdrop(frame,color)
     frame:SetBackdrop({bgFile="Interface\\Buttons\\WHITE8X8",edgeFile="Interface\\Buttons\\WHITE8X8",edgeSize=1,insets={left=1,right=1,top=1,bottom=1}})
@@ -26,7 +36,7 @@ function W.Tooltip(owner,title,lines)
     for i=1,last do local line=lines[i];if line and line~="" then GameTooltip:AddLine(line,0.85,0.9,0.92,true) end end
     GameTooltip:Show()
 end
-local frame,body,settings,settingsOpen,rows,settingRows
+local frame,body,settings,settingsOpen,rows,settingRows,fontMenu
 local fields={}
 function W.OpenQuestLog(step)
     local id=step and step.questID
@@ -123,7 +133,7 @@ local function layout()
     local emptyH=textHeight(fields.empty,28);place(fields.empty,16,y+22,292,emptyH)
     for i,r in ipairs(rows) do r:ClearAllPoints();r:SetPoint("TOPLEFT",16,-(y+22+(i-1)*44)) end
     local xpY=y+(p.queueRows>0 and (22+(count>0 and count*44-4 or emptyH)+12) or undo and 30 or 0)
-    frame:SetHeight(settingsOpen and 626 or compact and 48 or xpY+84)
+    frame:SetHeight(settingsOpen and 655 or compact and 48 or xpY+84)
     fields.xpHover:ClearAllPoints();fields.xpHover:SetPoint("TOPLEFT",16,-xpY)
     for i,r in ipairs(rows) do r:SetShown(not compact and i<=count and r.step~=nil) end
     fields.fold.label:SetText(compact and "+" or "-")
@@ -229,7 +239,7 @@ function W.CreateUI()
         W.Tooltip(self,high and "Skip for now" or "Defer this quest",{high and ("Keep this quest for later. It returns automatically at level "..(r.level-state.profile.maxLevelAbove).." with your current level range.") or "Skip the whole current quest for 15 minutes on this character.","Use Undo skip or click a Later step to resume immediately."}) end)
     fields.refresh=W.Button(body,"Auto route",100,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.CurrentRoute=nil;W.Refresh(true,"resume-auto") end);fields.refresh:SetPoint("BOTTOMLEFT",113,11);fields.refresh:SetHeight(26)
     fields.arrow=W.Button(body,"Arrow on",90,function() W.ToggleNavigator() end);fields.arrow:SetPoint("BOTTOMRIGHT",-16,11);fields.arrow:SetHeight(26)
-    settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(292,545)
+    settings=CreateFrame("Frame",nil,frame);settings:SetPoint("TOPLEFT",16,-75);settings:SetSize(292,574)
     atText(settings,"YOUR JOURNEY",12,C.cyan,0,0,292,16)
     atText(settings,"Saved for this character. Click a row to change.",11,C.muted,0,25,292,28)
     local definitions={
@@ -251,11 +261,41 @@ function W.CreateUI()
         b.value=W.Font(b,11,C.cyan);b.value:SetPoint("RIGHT",-10,0);b.value:SetJustifyH("RIGHT");b.value:SetSize(136,16)
         b:SetPoint("TOPLEFT",0,-(58+(i-1)*29));b:SetHeight(26);settingRows[i]={button=b,definition=d}
     end
-    local undo=W.Button(settings,"Restore skipped quests",292,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.GetProfile().deferredLevels={};W.GetProfile().lastDeferred=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-362)
-    local reset=W.Button(settings,"Reset window positions",292,function() local profile=W.GetProfile();profile.panelPoint=nil;profile.navigatorPoint=nil;W.ApplyPositions() end);reset:SetPoint("TOPLEFT",0,-398)
-    local replan=W.Button(settings,"Replan region now",292,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.Refresh(true,"manual-replan") end);replan:SetPoint("TOPLEFT",0,-438)
-    local debug=W.Button(settings,"Copy diagnostics",292,function() W.ShowDiagnostics() end);debug:SetPoint("TOPLEFT",0,-474)
-    local back=W.Button(settings,"Back to your route",292,function() settingsOpen=false;layout() end);back:SetPoint("TOPLEFT",0,-510)
+    local function fontLabelFor(path)
+        for _,item in ipairs(W.FontList) do if item.path==path then return item.label end end
+        return path or W.DefaultFont
+    end
+    local fontToggle=W.Button(settings,"",292,function() fontMenu:SetShown(not fontMenu:IsShown()) end)
+    fontToggle:SetPoint("TOPLEFT",0,-348);fontToggle:SetHeight(26)
+    fontToggle.label:ClearAllPoints();fontToggle.label:SetPoint("LEFT",10,0);fontToggle.label:SetJustifyH("LEFT");fontToggle.label:SetSize(272,16)
+    fontToggle:SetScript("OnEnter",function(self) self:SetBackdropColor(unpack(C.hover));self:SetBackdropBorderColor(unpack(C.cyan));W.Tooltip(self,"UI font",{"Pick the font Trailwarden uses for its guide, navigator and map pins. The Cyrillic fonts support Russian text."}) end)
+    fontMenu=CreateFrame("Frame",nil,settings,"BackdropTemplate");fontMenu:SetPoint("TOPLEFT",fontToggle,"BOTTOMLEFT",0,0);fontMenu:SetSize(292,#W.FontList*26);fontMenu:Hide();W.Backdrop(fontMenu,C.bg);fontMenu:SetFrameStrata("DIALOG")
+    local refreshFontControls
+    fontMenu.buttons={}
+    for i,item in ipairs(W.FontList) do
+        local opt=W.Button(fontMenu,item.label,0,function()
+            W.GetProfile().font=item.path
+            W.ApplyFont()
+            fontMenu:Hide();refreshFontControls()
+        end)
+        opt:SetPoint("TOPLEFT",0,-((i-1)*26));opt:SetSize(292,26)
+        opt.label:ClearAllPoints();opt.label:SetPoint("LEFT",10,0);opt.label:SetJustifyH("LEFT");opt.label:SetSize(272,16)
+        opt.path=item.path;fontMenu.buttons[i]=opt
+    end
+    refreshFontControls=function()
+        local path=W.FontPath()
+        fontToggle.label:SetText("Font: "..fontLabelFor(path))
+        for _,item in ipairs(fontMenu.buttons) do
+            local selected=item.path==path
+            item:SetBackdropColor(unpack(selected and C.hover or C.raised));item:SetBackdropBorderColor(unpack(selected and C.cyan or C.line))
+        end
+    end
+    refreshFontControls()
+    local undo=W.Button(settings,"Restore skipped quests",292,function() W.GetProfile().skipped={};W.GetProfile().lastSkipped=nil;W.GetProfile().deferredLevels={};W.GetProfile().lastDeferred=nil;W.Refresh(true) end);undo:SetPoint("TOPLEFT",0,-391)
+    local reset=W.Button(settings,"Reset window positions",292,function() local profile=W.GetProfile();profile.panelPoint=nil;profile.navigatorPoint=nil;W.ApplyPositions() end);reset:SetPoint("TOPLEFT",0,-427)
+    local replan=W.Button(settings,"Replan region now",292,function() local profile=W.GetProfile();profile.pinned=nil;profile.paused=false;W.Refresh(true,"manual-replan") end);replan:SetPoint("TOPLEFT",0,-467)
+    local debug=W.Button(settings,"Copy diagnostics",292,function() W.ShowDiagnostics() end);debug:SetPoint("TOPLEFT",0,-503)
+    local back=W.Button(settings,"Back to your route",292,function() settingsOpen=false;fontMenu:Hide();layout() end);back:SetPoint("TOPLEFT",0,-539)
     head:EnableMouseWheel(true)
     head:SetScript("OnMouseWheel",function(_,delta) if not W.GetProfile().locked then W.SetDisplayScale("uiScale",W.GetProfile().uiScale+delta*.05) end end)
     head:SetScript("OnEnter",function(self) local s=W.State;local r=W.CurrentRoute or {};W.Tooltip(self,"Trailwarden",{s and (s.name.." · "..s.raceName.." "..s.className) or "",r.questName or r.title,r.instruction,"Drag to move. Mouse wheel adjusts panel size.","Use - to collapse the plan; the gear opens display settings."}) end)
@@ -323,7 +363,6 @@ function W.UpdateUI()
     for _,v in ipairs(settingRows) do v.button.label:SetText(v.definition[1]..":");v.button.value:SetText(v.definition[2](p)) end
     layout();W.UpdateLiveUI()
 end
-local lastDistanceFont
 function W.UpdateLiveUI()
     if not fields.distance or not W.CurrentRoute then return end
     local e=W.SafeExperienceStats();local stable=e.available and not e.paused and (e.windowSeconds or 0)>=300
@@ -345,12 +384,13 @@ function W.UpdateLiveUI()
     local distanceText=n.distance and W.FormatDistance(n.distance) or (W.CurrentRoute.kind=="escort" and "Escort active" or W.CurrentRoute.kind=="item" and "In your bags" or "")
     if fields.distance:GetText()~=distanceText then fields.distance:SetText(distanceText) end
     local distanceFont=n.distance and 14 or 11
-    if distanceFont~=lastDistanceFont then fields.distance:SetFont("Fonts\\FRIZQT__.TTF",distanceFont,"");lastDistanceFont=distanceFont end
+    if distanceFont~=lastDistanceFont then fields.distance:SetFont(W.FontPath(),distanceFont,"");lastDistanceFont=distanceFont;if W.FontRegistry then W.FontRegistry[fields.distance]={size=distanceFont,flags=""} end end
     if fields.navStatus:GetText()~=(n.label or "") then fields.navStatus:SetText(n.label or "") end
     if W.GetProfile().collapsed and not settingsOpen then layout() end
 end
 function W.ToggleSettings()
     if not frame then W.CreateUI() end
+    if fontMenu then fontMenu:Hide() end
     W.GetProfile().panelHidden=false;frame:SetShown(not (W.IsCombatActive and W.IsCombatActive()));settingsOpen=not settingsOpen;W.UpdateUI()
 end
 function W.ToggleUI()

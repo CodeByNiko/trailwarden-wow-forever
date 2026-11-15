@@ -18,7 +18,8 @@ local function icon(parent)
     local t=f:CreateTexture(nil,"ARTWORK");t:SetSize(14,14);t:SetPoint("CENTER")
     t:SetTexture("Interface\\Buttons\\WHITE8X8")
     f.pinTexture=t
-    local marker=f:CreateFontString(nil,"OVERLAY");marker:SetFont("Fonts\\FRIZQT__.TTF",10,"OUTLINE");marker:SetPoint("CENTER",f,"CENTER",0,0);marker:SetTextColor(1,1,1,1);f.pinMarker=marker
+    local marker=f:CreateFontString(nil,"OVERLAY");marker:SetFont(W.FontPath(),10,"OUTLINE");marker:SetPoint("CENTER",f,"CENTER",0,0);marker:SetTextColor(1,1,1,1);f.pinMarker=marker
+    if W.FontRegistry then W.FontRegistry[marker]={size=10,flags="OUTLINE"} end
     f:EnableMouse(true)
     f:SetScript("OnEnter",function(self) W.Tooltip(self,self.pinLabel,{W.L("marker_path_warning"),W.L("marker_help"),"Use OpenMap to inspect the terrain."}) end)
     f:SetScript("OnLeave",function() if GameTooltip then GameTooltip:Hide() end end)
