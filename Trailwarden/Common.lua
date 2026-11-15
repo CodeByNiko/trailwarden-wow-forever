@@ -1,6 +1,26 @@
 Trailwarden = Trailwarden or {}
 local W = Trailwarden
 W.Version = "1.8.5"
+W.DefaultFont="Fonts\\FRIZQT__.TTF"
+W.FontList={
+    {path="Fonts\\FRIZQT__.TTF",label="Friz Quadrata"},
+    {path="Fonts\\ARIALN.TTF",label="Arial Narrow"},
+    {path="Fonts\\MORPHEUS.TTF",label="Morpheus"},
+    {path="Fonts\\skurri.ttf",label="Skurri"},
+    {path="Fonts\\FRIENDS.TTF",label="Friends"},
+    {path="Fonts\\FRIZQT___CYR.TTF",label="Friz Quadrata (Cyrillic)"},
+    {path="Fonts\\ARIALN_CYR.TTF",label="Arial Narrow (Cyrillic)"},
+    {path="Fonts\\MORPHEUS_CYR.TTF",label="Morpheus (Cyrillic)"},
+    {path="Fonts\\SKURRI_CYR.TTF",label="Skurri (Cyrillic)"},
+}
+W.FontRegistry=setmetatable({},{__mode="k"})
+function W.FontPath()
+    if W.GetProfile then
+        local p=W.GetProfile()
+        if p and type(p.font)=="string" and p.font~="" then return p.font end
+    end
+    return W.DefaultFont
+end
 function W.Safe(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok,a,b,c,d=pcall(fn,...)
